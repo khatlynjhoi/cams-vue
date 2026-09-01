@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 import DashboardView from '@/views/DashboardView.vue'
 
 const routes = [
@@ -19,10 +19,16 @@ const routes = [
     component: () => import('@/views/TestBuilderView.vue'),
     meta: { requiresAdminOrAssessor: true },
   },
+  {
+    path: '/pilot-admin',
+    name: 'PilotAdmin',
+    component: () => import('@/views/PilotAdminView.vue'),
+    meta: { requiresAdminOrAssessor: true },
+  },
 ]
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHashHistory(),
   routes,
 })
 
