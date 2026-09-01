@@ -1,272 +1,322 @@
 <script setup>
-import { ref } from 'vue'
-import { Plus, Upload, Search, Filter, X, FileText, Download, Sparkles } from 'lucide-vue-next'
-import AiValidationModal from '@/components/questions/AiValidationModal.vue'
+import { ref, computed } from 'vue'
+import { 
+  Sparkles, 
+  Plus, 
+  Search, 
+  Filter, 
+  CheckCircle, 
+  AlertTriangle, 
+  Trash2, 
+  Wand2, 
+  BookOpen, 
+  Layers,
+  Bot
+} from 'lucide-vue-next'
 
 const searchQuery = ref('')
 const selectedCourse = ref('All')
-const isUploadModalOpen = ref(false)
-const csvFile = ref(null)
-const uploadError = ref('')
-
-const activeQuestionForAi = ref(null)
+const selectedBloom = ref('All')
 const isAiModalOpen = ref(false)
+const isGenerating = ref(false)
+
+// AI Generator Form Inputs
+const aiPrompt = ref({
+  course: 'NAV-101',
+  topic: 'COLREG Rule 15 Crossing Situations',
+  difficulty: 'Medium',
+  count: 2
+})
 
 const questions = ref([
   {
-    id: 1,
-    code: 'Q-101',
-    course: 'BSMT - Navigational Watch',
-    text: 'What is the primary objective of keeping a safe navigational watch?',
-    level: 'Remembering',
-    status: 'Approved'
+    id: 'Q-101',
+    code: 'NAV-101-01',
+    text: 'What is the primary objective of keeping a safe navigational watch under STCW?',
+    course: 'NAV-101',
+    bloomsLevel: 'Understanding',
+    options: [
+      'A. To reach destination early.',
+      'B. To avoid collision, stranding, and ensure environmental safety.',
+      'C. To log vessel speed hourly.',
+      'D. To report to shore authorities continuously.'
+    ],
+    correctAnswer: 1,
+    aiStatus: 'Validated',
+    aiScore: '98%',
+    stcwRef: 'Table A-II/1'
   },
   {
-    id: 2,
-    code: 'Q-102',
-    course: 'BSMarE - Marine Diesel Engines',
-    text: 'Explain the principle of four-stroke diesel engine operation.',
-    level: 'Understanding',
-    status: 'Validated'
+    id: 'Q-102',
+    code: 'ENG-202-04',
+    text: 'Identify the key cause of thermal stress in medium-speed marine diesel engines.',
+    course: 'ENG-202',
+    bloomsLevel: 'Analysis',
+    options: [
+      'A. Low cooling water velocity.',
+      'B. Uneven heat distribution across cylinder liner.',
+      'C. High lubricating oil pressure.',
+      'D. Excessive fuel injection viscosity.'
+    ],
+    correctAnswer: 1,
+    aiStatus: 'Flagged',
+    aiScore: '65%',
+    stcwRef: 'Table A-III/1',
+    aiIssue: 'Option C & D may cause partial overlap depending on engine load.'
   }
 ])
 
-function openAiValidation(question) {
-  activeQuestionForAi.value = question
-  isAiModalOpen.value = true
-}
+const filteredQuestions = computed(() => {
+  return questions.value.filter(q => {
+    const matchesSearch = q.text.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                          q.code.toLowerCase().includes(searchQuery.value.toLowerCase())
+    const matchesCourse = selectedCourse.value === 'All' || q.course === selectedCourse.value
+    const matchesBloom = selectedBloom.value === 'All' || q.bloomsLevel === selectedBloom.value
+    return matchesSearch && matchesCourse && matchesBloom
+  })
+})
 
-function handleAiFix(updatedData) {
-  if (activeQuestionForAi.value) {
-    activeQuestionForAi.value.text = updatedData.text
-    activeQuestionForAi.value.level = updatedData.level
-    activeQuestionForAi.value.status = updatedData.status
-  }
-}
-
-function handleFileChange(event) {
-  const file = event.target.files[0]
-  if (file && file.type === 'text/csv') {
-    csvFile.value = file
-    uploadError.value = ''
-  } else {
-    uploadError.value = 'Please select a valid .csv file.'
-    csvFile.value = null
-  }
-}
-
-function downloadSampleCSV() {
-  const headers = 'code,course,text,level,status\n'
-  const rows = 'Q-103,BSMT,What is the buoyage system for Region A?,Remembering,Pending\nQ-104,BSMarE,Define thermal efficiency in engines.,Understanding,Pending'
-  const blob = new Blob([headers + rows], { type: 'text/csv' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'sample_questions_template.csv'
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-function processCSV() {
-  if (!csvFile.value) return
-
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    const text = e.target.result
-    const lines = text.split('\n').filter(line => line.trim() !== '')
-    
-    if (lines.length < 2) {
-      uploadError.value = 'CSV file must contain a header and at least one row.'
-      return
-    }
-
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
-    const newQuestions = []
-
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim())
-      if (values.length === headers.length) {
-        newQuestions.push({
-          id: Date.now() + i,
-          code: values[0] || `Q-${Date.now()}`,
-          course: values[1] || 'General',
-          text: values[2] || '',
-          level: values[3] || 'Remembering',
-          status: values[4] || 'Pending'
-        })
+function generateAiQuestions() {
+  isGenerating.value = true
+  setTimeout(() => {
+    const newItems = [
+      {
+        id: `Q-${Date.now()}`,
+        code: `${aiPrompt.value.course}-${Math.floor(Math.random() * 90 + 10)}`,
+        text: `[AI Generated] Under ${aiPrompt.value.topic}, which action is required by the give-way vessel?`,
+        course: aiPrompt.value.course,
+        bloomsLevel: 'Application',
+        options: [
+          'A. Maintain speed and course.',
+          'B. Take early and substantial action to keep well clear.',
+          'C. Sound 5 short rapid blasts and stop engines.',
+          'D. Turn to port regardless of vessel position.'
+        ],
+        correctAnswer: 1,
+        aiStatus: 'Validated',
+        aiScore: '96%',
+        stcwRef: 'STCW A-II/1'
       }
-    }
+    ]
+    questions.value.unshift(...newItems)
+    isGenerating.value = false
+    isAiModalOpen.value = false
+  }, 1500)
+}
 
-    questions.value.push(...newQuestions)
-    isUploadModalOpen.value = false
-    csvFile.value = null
+function deleteQuestion(id) {
+  if (confirm('Delete this item from the question bank?')) {
+    questions.value = questions.value.filter(q => q.id !== id)
   }
-  
-  reader.readAsText(csvFile.value)
 }
 </script>
 
 <template>
   <div class="p-6 max-w-7xl mx-auto space-y-6">
-    <!-- Header Actions -->
+    <!-- Header -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
       <div>
         <h1 class="text-3xl font-bold text-gray-900">Question Bank</h1>
-        <p class="text-gray-500 mt-1">Manage, validate, and organize assessment items.</p>
+        <p class="text-gray-500 mt-1">Repository of maritime items with real-time AI validation.</p>
       </div>
+
       <div class="flex items-center gap-3">
         <button 
-          @click="isUploadModalOpen = true"
-          class="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+          @click="isAiModalOpen = true"
+          class="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
         >
-          <Upload :size="18" />
-          Bulk Upload
-        </button>
-        <button class="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors">
-          <Plus :size="18" />
-          Add Question
+          <Sparkles :size="16" />
+          AI Question Draft
         </button>
       </div>
     </div>
 
     <!-- Filters & Search -->
-    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 justify-between">
-      <div class="relative flex-1">
+    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 justify-between items-center">
+      <div class="relative w-full md:w-96">
         <Search :size="18" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Search questions or codes..."
-          class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        <input 
+          v-model="searchQuery" 
+          type="text" 
+          placeholder="Search question text or code..." 
+          class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
         />
       </div>
-      <div class="flex items-center gap-2">
-        <Filter :size="18" class="text-gray-500" />
-        <select
+
+      <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+        <select 
           v-model="selectedCourse"
-          class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+          class="border border-gray-300 rounded-lg text-sm px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-emerald-500"
         >
           <option value="All">All Courses</option>
-          <option value="BSMT">BSMT</option>
-          <option value="BSMarE">BSMarE</option>
+          <option value="NAV-101">NAV-101</option>
+          <option value="ENG-202">ENG-202</option>
+          <option value="SAF-301">SAF-301</option>
+        </select>
+
+        <select 
+          v-model="selectedBloom"
+          class="border border-gray-300 rounded-lg text-sm px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+        >
+          <option value="All">All Bloom's Levels</option>
+          <option value="Understanding">Understanding</option>
+          <option value="Application">Application</option>
+          <option value="Analysis">Analysis</option>
         </select>
       </div>
     </div>
 
-    <!-- Questions Table -->
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <table class="w-full text-left text-sm">
-        <thead class="bg-gray-50 text-gray-600 border-b border-gray-200">
-          <tr>
-            <th class="px-6 py-3 font-semibold">Code</th>
-            <th class="px-6 py-3 font-semibold">Course</th>
-            <th class="px-6 py-3 font-semibold">Question Text</th>
-            <th class="px-6 py-3 font-semibold">Bloom's Level</th>
-            <th class="px-6 py-3 font-semibold">Status</th>
-            <th class="px-6 py-3 font-semibold text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          <tr v-for="q in questions" :key="q.id" class="hover:bg-gray-50">
-            <td class="px-6 py-4 font-medium text-gray-900">{{ q.code }}</td>
-            <td class="px-6 py-4 text-gray-600">{{ q.course }}</td>
-            <td class="px-6 py-4 text-gray-800 font-medium max-w-md truncate">{{ q.text }}</td>
-            <td class="px-6 py-4">
-              <span class="px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                {{ q.level }}
+    <!-- Questions List -->
+    <div class="space-y-4">
+      <div 
+        v-for="q in filteredQuestions" 
+        :key="q.id"
+        class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:border-gray-300 transition-all space-y-4"
+      >
+        <div class="flex justify-between items-start gap-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-mono font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                {{ q.code }}
               </span>
-            </td>
-            <td class="px-6 py-4">
-              <span 
-                :class="[
-                  'px-2.5 py-1 rounded-full text-xs font-medium',
-                  q.status === 'Approved' || q.status === 'Validated' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                ]"
-              >
-                {{ q.status }}
+              <span class="text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                {{ q.course }}
               </span>
-            </td>
-            <td class="px-6 py-4 text-right">
-              <button 
-                @click="openAiValidation(q)" 
-                class="px-2.5 py-1 text-xs font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 flex items-center gap-1 ml-auto"
-              >
-                <Sparkles :size="14" />
-                Validate AI
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              <span class="text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-0.5 rounded-full">
+                {{ q.bloomsLevel }}
+              </span>
+            </div>
+            <h3 class="text-base font-bold text-gray-900 pt-1">{{ q.text }}</h3>
+          </div>
+
+          <!-- AI Status Tag -->
+          <div class="flex items-center gap-2 shrink-0">
+            <span 
+              v-if="q.aiStatus === 'Validated'" 
+              class="inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800"
+            >
+              <CheckCircle :size="14" /> AI Passed ({{ q.aiScore }})
+            </span>
+            <span 
+              v-else 
+              class="inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full bg-red-100 text-red-800"
+            >
+              <AlertTriangle :size="14" /> Review Flag ({{ q.aiScore }})
+            </span>
+
+            <button 
+              @click="deleteQuestion(q.id)" 
+              class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+            >
+              <Trash2 :size="16" />
+            </button>
+          </div>
+        </div>
+
+        <!-- Options Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+          <div 
+            v-for="(opt, idx) in q.options" 
+            :key="idx"
+            :class="[
+              'p-3 rounded-lg text-xs font-medium border',
+              q.correctAnswer === idx 
+                ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950 font-bold' 
+                : 'bg-gray-50/50 border-gray-200 text-gray-700'
+            ]"
+          >
+            {{ opt }}
+          </div>
+        </div>
+
+        <!-- AI Note (If Flagged) -->
+        <div v-if="q.aiIssue" class="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 flex items-start gap-2">
+          <AlertTriangle :size="16" class="shrink-0 mt-0.5" />
+          <div>
+            <span class="font-bold">AI Quality Warning:</span> {{ q.aiIssue }}
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- CSV Bulk Upload Modal -->
-    <div v-if="isUploadModalOpen" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
-        <div class="flex items-center justify-between border-b border-gray-100 pb-3">
-          <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Upload :size="20" class="text-emerald-600" />
-            Bulk Upload Questions
-          </h3>
-          <button @click="isUploadModalOpen = false" class="text-gray-400 hover:text-gray-600">
-            <X :size="20" />
-          </button>
+    <!-- AI Generator Modal -->
+    <div v-if="isAiModalOpen" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5">
+        <div class="flex items-center gap-3 text-purple-700">
+          <Bot :size="28" />
+          <div>
+            <h3 class="text-lg font-bold text-gray-900">AI Question Generator</h3>
+            <p class="text-xs text-gray-500">Draft STCW-aligned multiple choice items automatically.</p>
+          </div>
         </div>
 
-        <p class="text-sm text-gray-600">
-          Upload a standard CSV file containing questions formatted with headers: 
-          <code class="bg-gray-100 text-xs p-1 rounded">code, course, text, level, status</code>.
-        </p>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Target Course</label>
+            <select 
+              v-model="aiPrompt.course"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+            >
+              <option value="NAV-101">NAV-101 Terrestrial Navigation</option>
+              <option value="ENG-202">ENG-202 Diesel Engineering</option>
+              <option value="SAF-301">SAF-301 Maritime Safety</option>
+            </select>
+          </div>
 
-        <button 
-          @click="downloadSampleCSV"
-          class="flex items-center gap-2 text-xs font-medium text-emerald-600 hover:text-emerald-700"
-        >
-          <Download :size="14" />
-          Download Sample Template
-        </button>
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">STCW Competency / Topic</label>
+            <input 
+              v-model="aiPrompt.topic"
+              type="text"
+              placeholder="e.g. Radar Plotting and Target Tracking"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
 
-        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50 hover:bg-gray-100 transition-colors">
-          <FileText class="mx-auto text-gray-400 mb-2" :size="32" />
-          <input 
-            type="file" 
-            accept=".csv" 
-            @change="handleFileChange" 
-            class="hidden" 
-            id="csv-file-input"
-          />
-          <label for="csv-file-input" class="cursor-pointer text-sm font-medium text-emerald-600 hover:underline">
-            Choose CSV file
-          </label>
-          <p v-if="csvFile" class="text-xs text-gray-700 mt-2 font-semibold">{{ csvFile.name }}</p>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Difficulty</label>
+              <select 
+                v-model="aiPrompt.difficulty"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+              >
+                <option value="Easy">Easy</option>
+                <option value="Medium">Medium</option>
+                <option value="Hard">Hard</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Number of Items</label>
+              <select 
+                v-model="aiPrompt.count"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+              >
+                <option :value="1">1 Question</option>
+                <option :value="2">2 Questions</option>
+                <option :value="5">5 Questions</option>
+              </select>
+            </div>
+          </div>
         </div>
 
-        <p v-if="uploadError" class="text-xs text-red-600">{{ uploadError }}</p>
-
-        <div class="flex justify-end gap-3 pt-2">
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
           <button 
-            @click="isUploadModalOpen = false"
+            @click="isAiModalOpen = false" 
             class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             Cancel
           </button>
           <button 
-            @click="processCSV"
-            :disabled="!csvFile"
-            class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            @click="generateAiQuestions" 
+            :disabled="isGenerating"
+            class="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
           >
-            Import Questions
+            <Sparkles :size="16" :class="{ 'animate-spin': isGenerating }" />
+            <span>{{ isGenerating ? 'Generating...' : 'Generate Items' }}</span>
           </button>
         </div>
       </div>
     </div>
-
-    <!-- AI Validation Modal -->
-    <AiValidationModal 
-      :isOpen="isAiModalOpen" 
-      :question="activeQuestionForAi" 
-      @close="isAiModalOpen = false" 
-      @apply-fix="handleAiFix" 
-    />
   </div>
 </template>
