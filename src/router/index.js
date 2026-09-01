@@ -13,6 +13,11 @@ const routes = [
     component: () => import('@/views/QuestionBankView.vue'),
   },
   {
+    path: '/courses',
+    name: 'Courses',
+    component: () => import('@/views/CoursesView.vue'),
+  },
+  {
     path: '/test-builder',
     name: 'TestBuilder',
     component: () => import('@/views/TestBuilderView.vue'),
@@ -31,6 +36,11 @@ const routes = [
     path: '/reports',
     name: 'Reports',
     component: () => import('@/views/ReportsView.vue'),
+  },
+  {
+    path: '/users',
+    name: 'UserManagement',
+    component: () => import('@/views/UserManagementView.vue'),
   },
 ]
 
