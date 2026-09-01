@@ -1,236 +1,244 @@
 <script setup>
 import { ref } from 'vue'
-import { Plus, Upload, Search, Filter, X, FileText, Download } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { 
+  Sparkles, 
+  CheckCircle, 
+  AlertTriangle, 
+  Clock, 
+  HelpCircle, 
+  Plus, 
+  ShieldCheck, 
+  ArrowUpRight
+} from 'lucide-vue-next'
 
-const searchQuery = ref('')
-const selectedCourse = ref('All')
-const isUploadModalOpen = ref(false)
-const csvFile = ref(null)
-const uploadError = ref('')
+const router = useRouter()
 
-const questions = ref([
+// Dashboard Statistics with AI metrics
+const totalQuestions = ref(128)
+const aiValidatedCount = ref(104)
+const pendingAiCount = ref(18)
+const flaggedAiCount = ref(6)
+
+// Questions List with AI Validation Statuses
+const recentQuestions = ref([
   {
-    id: 1,
-    code: 'Q-101',
-    course: 'BSMT - Navigational Watch',
-    text: 'What is the primary objective of keeping a safe navigational watch?',
-    level: 'Remembering',
-    status: 'Approved'
+    id: 'Q-101',
+    text: 'What is the primary objective of keeping a safe navigational watch under STCW?',
+    course: 'NAV-101',
+    difficulty: 'Medium',
+    aiStatus: 'Validated',
+    aiConfidence: '98%',
+    bloomsLevel: 'Understanding'
   },
   {
-    id: 2,
-    code: 'Q-102',
-    course: 'BSMarE - Marine Diesel Engines',
-    text: 'Explain the principle of four-stroke diesel engine operation.',
-    level: 'Understanding',
-    status: 'Validated'
+    id: 'Q-102',
+    text: 'Explain the operational procedure for emergency steering changeover on a tanker.',
+    course: 'ENG-202',
+    difficulty: 'Hard',
+    aiStatus: 'Pending',
+    aiConfidence: '--',
+    bloomsLevel: 'Application'
+  },
+  {
+    id: 'Q-103',
+    text: 'According to COLREG Rule 15, which vessel is give-way in a crossing situation?',
+    course: 'COL-102',
+    difficulty: 'Easy',
+    aiStatus: 'Validated',
+    aiConfidence: '95%',
+    bloomsLevel: 'Remembering'
+  },
+  {
+    id: 'Q-104',
+    text: 'Identify the key causes of thermal stress in medium-speed marine diesel engines.',
+    course: 'ENG-202',
+    difficulty: 'Hard',
+    aiStatus: 'Flagged',
+    aiConfidence: '62%',
+    aiNote: 'Potential ambiguity in Option C',
+    bloomsLevel: 'Analysis'
+  },
+  {
+    id: 'Q-105',
+    text: 'What are the immediate actions required during a MARPOL Annex I oil spill alert?',
+    course: 'SAF-301',
+    difficulty: 'Medium',
+    aiStatus: 'Validated',
+    aiConfidence: '99%',
+    bloomsLevel: 'Application'
   }
 ])
 
-function handleFileChange(event) {
-  const file = event.target.files[0]
-  if (file && file.type === 'text/csv') {
-    csvFile.value = file
-    uploadError.value = ''
-  } else {
-    uploadError.value = 'Please select a valid .csv file.'
-    csvFile.value = null
-  }
-}
+const isBatchValidating = ref(false)
 
-function downloadSampleCSV() {
-  const headers = 'code,course,text,level,status\n'
-  const rows = 'Q-103,BSMT,What is the buoyage system for Region A?,Remembering,Pending\nQ-104,BSMarE,Define thermal efficiency in engines.,Understanding,Pending'
-  const blob = new Blob([headers + rows], { type: 'text/csv' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'sample_questions_template.csv'
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-function processCSV() {
-  if (!csvFile.value) return
-
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    const text = e.target.result
-    const lines = text.split('\n').filter(line => line.trim() !== '')
-    
-    if (lines.length < 2) {
-      uploadError.value = 'CSV file must contain a header and at least one row.'
-      return
-    }
-
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
-    const newQuestions = []
-
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim())
-      if (values.length === headers.length) {
-        newQuestions.push({
-          id: Date.now() + i,
-          code: values[0] || `Q-${Date.now()}`,
-          course: values[1] || 'General',
-          text: values[2] || '',
-          level: values[3] || 'Remembering',
-          status: values[4] || 'Pending'
-        })
+function runBatchAiValidation() {
+  isBatchValidating.value = true
+  setTimeout(() => {
+    recentQuestions.value.forEach(q => {
+      if (q.aiStatus === 'Pending') {
+        q.aiStatus = 'Validated'
+        q.aiConfidence = '96%'
       }
-    }
-
-    questions.value.push(...newQuestions)
-    isUploadModalOpen.value = false
-    csvFile.value = null
-  }
-  
-  reader.readAsText(csvFile.value)
+    })
+    aiValidatedCount.value += pendingAiCount.value
+    pendingAiCount.value = 0
+    isBatchValidating.value = false
+  }, 1200)
 }
 </script>
 
 <template>
   <div class="p-6 max-w-7xl mx-auto space-y-6">
-    <!-- Header Actions -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-      <div>
-        <h1 class="text-3xl font-bold text-gray-900">Question Bank</h1>
-        <p class="text-gray-500 mt-1">Manage, validate, and organize assessment items.</p>
+    <!-- Header Banner -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 p-6 rounded-2xl text-white shadow-lg">
+      <div class="space-y-1">
+        <div class="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-semibold rounded-full mb-1">
+          <Sparkles :size="14" /> AI-Powered Maritime Assessment System
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">System Dashboard</h1>
+        <p class="text-xs sm:text-sm text-slate-300">Overview of question bank quality, AI validation checks, and assessment metrics.</p>
       </div>
-      <div class="flex items-center gap-3">
+
+      <div class="flex flex-wrap items-center gap-3">
         <button 
-          @click="isUploadModalOpen = true"
-          class="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+          @click="runBatchAiValidation" 
+          :disabled="isBatchValidating || pendingAiCount === 0"
+          class="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs sm:text-sm rounded-xl transition-all shadow-md disabled:opacity-50"
         >
-          <Upload :size="18" />
-          Bulk Upload
+          <Sparkles :size="16" :class="{ 'animate-spin': isBatchValidating }" />
+          <span>{{ isBatchValidating ? 'Validating...' : 'Run Batch AI Validation' }}</span>
         </button>
-        <button class="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors">
-          <Plus :size="18" />
-          Add Question
+
+        <button 
+          @click="router.push('/questions')" 
+          class="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-medium text-xs sm:text-sm rounded-xl transition-all border border-slate-600"
+        >
+          <Plus :size="16" />
+          <span>Add Question</span>
         </button>
       </div>
     </div>
 
-    <!-- Filters & Search -->
-    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 justify-between">
-      <div class="relative flex-1">
-        <Search :size="18" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Search questions or codes..."
-          class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-        />
+    <!-- AI Validation Metrics Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex justify-between items-start">
+        <div>
+          <p class="text-xs font-semibold text-gray-500">Total Question Bank</p>
+          <p class="text-2xl font-bold text-gray-900 mt-1">{{ totalQuestions }}</p>
+          <p class="text-xs text-gray-400 mt-1">Across 4 maritime courses</p>
+        </div>
+        <div class="p-3 bg-gray-100 rounded-lg text-gray-700">
+          <HelpCircle :size="20" />
+        </div>
       </div>
-      <div class="flex items-center gap-2">
-        <Filter :size="18" class="text-gray-500" />
-        <select
-          v-model="selectedCourse"
-          class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-        >
-          <option value="All">All Courses</option>
-          <option value="BSMT">BSMT</option>
-          <option value="BSMarE">BSMarE</option>
-        </select>
+
+      <div class="bg-white p-5 rounded-xl border border-emerald-200 shadow-sm flex justify-between items-start">
+        <div>
+          <p class="text-xs font-semibold text-emerald-700">AI Validated Items</p>
+          <p class="text-2xl font-bold text-emerald-900 mt-1">{{ aiValidatedCount }}</p>
+          <p class="text-xs text-emerald-600 font-medium mt-1">✨ {{ Math.round((aiValidatedCount / totalQuestions) * 100) }}% Compliance Rate</p>
+        </div>
+        <div class="p-3 bg-emerald-100 rounded-lg text-emerald-700">
+          <ShieldCheck :size="20" />
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl border border-amber-200 shadow-sm flex justify-between items-start">
+        <div>
+          <p class="text-xs font-semibold text-amber-700">Pending AI Review</p>
+          <p class="text-2xl font-bold text-amber-900 mt-1">{{ pendingAiCount }}</p>
+          <p class="text-xs text-amber-600 font-medium mt-1">Requires automated check</p>
+        </div>
+        <div class="p-3 bg-amber-100 rounded-lg text-amber-700">
+          <Clock :size="20" />
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl border border-red-200 shadow-sm flex justify-between items-start">
+        <div>
+          <p class="text-xs font-semibold text-red-700">AI Flagged Items</p>
+          <p class="text-2xl font-bold text-red-900 mt-1">{{ flaggedAiCount }}</p>
+          <p class="text-xs text-red-600 font-medium mt-1">Ambiguity / STCW warning</p>
+        </div>
+        <div class="p-3 bg-red-100 rounded-lg text-red-700">
+          <AlertTriangle :size="20" />
+        </div>
       </div>
     </div>
 
-    <!-- Questions Table -->
+    <!-- Main Content: Questions with AI Validation Badges -->
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <table class="w-full text-left text-sm">
-        <thead class="bg-gray-50 text-gray-600 border-b border-gray-200">
-          <tr>
-            <th class="px-6 py-3 font-semibold">Code</th>
-            <th class="px-6 py-3 font-semibold">Course</th>
-            <th class="px-6 py-3 font-semibold">Question Text</th>
-            <th class="px-6 py-3 font-semibold">Bloom's Level</th>
-            <th class="px-6 py-3 font-semibold">Status</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          <tr v-for="q in questions" :key="q.id" class="hover:bg-gray-50">
-            <td class="px-6 py-4 font-medium text-gray-900">{{ q.code }}</td>
-            <td class="px-6 py-4 text-gray-600">{{ q.course }}</td>
-            <td class="px-6 py-4 text-gray-800 font-medium max-w-md truncate">{{ q.text }}</td>
-            <td class="px-6 py-4">
-              <span class="px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                {{ q.level }}
-              </span>
-            </td>
-            <td class="px-6 py-4">
-              <span 
-                :class="[
-                  'px-2.5 py-1 rounded-full text-xs font-medium',
-                  q.status === 'Approved' || q.status === 'Validated' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                ]"
-              >
-                {{ q.status }}
-              </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- CSV Bulk Upload Modal -->
-    <div v-if="isUploadModalOpen" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
-        <div class="flex items-center justify-between border-b border-gray-100 pb-3">
-          <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Upload :size="20" class="text-emerald-600" />
-            Bulk Upload Questions
-          </h3>
-          <button @click="isUploadModalOpen = false" class="text-gray-400 hover:text-gray-600">
-            <X :size="20" />
-          </button>
+      <div class="p-5 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <span>Recent Question Bank Items</span>
+            <span class="text-xs bg-emerald-100 text-emerald-800 font-medium px-2.5 py-0.5 rounded-full">AI Monitored</span>
+          </h2>
+          <p class="text-xs text-gray-500 mt-0.5">Real-time status of questions and AI validation confidence ratings.</p>
         </div>
-
-        <p class="text-sm text-gray-600">
-          Upload a standard CSV file containing questions formatted with headers: 
-          <code class="bg-gray-100 text-xs p-1 rounded">code, course, text, level, status</code>.
-        </p>
 
         <button 
-          @click="downloadSampleCSV"
-          class="flex items-center gap-2 text-xs font-medium text-emerald-600 hover:text-emerald-700"
+          @click="router.push('/questions')" 
+          class="flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800 transition-colors"
         >
-          <Download :size="14" />
-          Download Sample Template
+          View Full Bank <ArrowUpRight :size="14" />
         </button>
+      </div>
 
-        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50 hover:bg-gray-100 transition-colors">
-          <FileText class="mx-auto text-gray-400 mb-2" :size="32" />
-          <input 
-            type="file" 
-            accept=".csv" 
-            @change="handleFileChange" 
-            class="hidden" 
-            id="csv-file-input"
-          />
-          <label for="csv-file-input" class="cursor-pointer text-sm font-medium text-emerald-600 hover:underline">
-            Choose CSV file
-          </label>
-          <p v-if="csvFile" class="text-xs text-gray-700 mt-2 font-semibold">{{ csvFile.name }}</p>
-        </div>
-
-        <p v-if="uploadError" class="text-xs text-red-600">{{ uploadError }}</p>
-
-        <div class="flex justify-end gap-3 pt-2">
-          <button 
-            @click="isUploadModalOpen = false"
-            class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button 
-            @click="processCSV"
-            :disabled="!csvFile"
-            class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
-          >
-            Import Questions
-          </button>
-        </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-gray-50 text-gray-600 border-b border-gray-200">
+            <tr>
+              <th class="px-6 py-3 font-semibold">ID</th>
+              <th class="px-6 py-3 font-semibold">Question Stem</th>
+              <th class="px-6 py-3 font-semibold">Course</th>
+              <th class="px-6 py-3 font-semibold">Bloom's Level</th>
+              <th class="px-6 py-3 font-semibold">AI Validation Status</th>
+              <th class="px-6 py-3 font-semibold text-right">Confidence</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <tr v-for="q in recentQuestions" :key="q.id" class="hover:bg-gray-50 transition-colors">
+              <td class="px-6 py-4 font-mono font-bold text-gray-800 text-xs">{{ q.id }}</td>
+              <td class="px-6 py-4 max-w-md">
+                <p class="font-medium text-gray-900 truncate" :title="q.text">{{ q.text }}</p>
+                <p v-if="q.aiNote" class="text-xs text-red-600 flex items-center gap-1 mt-1 font-medium">
+                  <AlertTriangle :size="12" /> {{ q.aiNote }}
+                </p>
+              </td>
+              <td class="px-6 py-4">
+                <span class="text-xs font-semibold px-2.5 py-1 bg-gray-100 text-gray-700 rounded-md">
+                  {{ q.course }}
+                </span>
+              </td>
+              <td class="px-6 py-4 text-xs font-medium text-gray-600">{{ q.bloomsLevel }}</td>
+              <td class="px-6 py-4">
+                <span 
+                  v-if="q.aiStatus === 'Validated'" 
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800"
+                >
+                  <CheckCircle :size="13" /> AI Validated
+                </span>
+                <span 
+                  v-else-if="q.aiStatus === 'Pending'" 
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800"
+                >
+                  <Clock :size="13" /> Pending AI Review
+                </span>
+                <span 
+                  v-else-if="q.aiStatus === 'Flagged'" 
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800"
+                >
+                  <AlertTriangle :size="13" /> AI Flagged
+                </span>
+              </td>
+              <td class="px-6 py-4 text-right font-mono text-xs font-bold text-gray-700">
+                {{ q.aiConfidence }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
