@@ -11,19 +11,21 @@ const routes = [
     path: '/questions',
     name: 'QuestionBank',
     component: () => import('@/views/QuestionBankView.vue'),
-    meta: { requiresAdminOrAssessor: true },
   },
   {
     path: '/test-builder',
     name: 'TestBuilder',
     component: () => import('@/views/TestBuilderView.vue'),
-    meta: { requiresAdminOrAssessor: true },
   },
   {
     path: '/pilot-admin',
     name: 'PilotAdmin',
     component: () => import('@/views/PilotAdminView.vue'),
-    meta: { requiresAdminOrAssessor: true },
+  },
+  {
+    path: '/student-exam',
+    name: 'StudentExam',
+    component: () => import('@/views/StudentExamView.vue'),
   },
 ]
 
