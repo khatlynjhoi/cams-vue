@@ -13,10 +13,16 @@ const routes = [
     component: () => import('@/views/QuestionBankView.vue'),
     meta: { requiresAdminOrAssessor: true },
   },
+  {
+    path: '/test-builder',
+    name: 'TestBuilder',
+    component: () => import('@/views/TestBuilderView.vue'),
+    meta: { requiresAdminOrAssessor: true },
+  },
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes,
 })
 
