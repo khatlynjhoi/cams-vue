@@ -1,52 +1,28 @@
-import { createRouter, createWebHashHistory } from 'vue-router'
-import DashboardView from '@/views/DashboardView.vue'
+import { createRouter, createWebHistory } from 'vue-router'
+
+import DashboardView from '../views/DashboardView.vue'
+import QuestionBankView from '../views/QuestionBankView.vue'
+import CoursesView from '../views/CoursesView.vue'
+import TestBuilderView from '../views/TestBuilderView.vue'
+import PilotAdminView from '../views/PilotAdminView.vue'
+import ReportsView from '../views/ReportsView.vue'
+import UserManagementView from '../views/UserManagementView.vue'
+import StudentExamView from '../views/StudentExamView.vue'
 
 const routes = [
-  {
-    path: '/',
-    name: 'Dashboard',
-    component: DashboardView,
-  },
-  {
-    path: '/questions',
-    name: 'QuestionBank',
-    component: () => import('@/views/QuestionBankView.vue'),
-  },
-  {
-    path: '/courses',
-    name: 'Courses',
-    component: () => import('@/views/CoursesView.vue'),
-  },
-  {
-    path: '/test-builder',
-    name: 'TestBuilder',
-    component: () => import('@/views/TestBuilderView.vue'),
-  },
-  {
-    path: '/pilot-admin',
-    name: 'PilotAdmin',
-    component: () => import('@/views/PilotAdminView.vue'),
-  },
-  {
-    path: '/student-exam',
-    name: 'StudentExam',
-    component: () => import('@/views/StudentExamView.vue'),
-  },
-  {
-    path: '/reports',
-    name: 'Reports',
-    component: () => import('@/views/ReportsView.vue'),
-  },
-  {
-    path: '/users',
-    name: 'UserManagement',
-    component: () => import('@/views/UserManagementView.vue'),
-  },
+  { path: '/', name: 'Dashboard', component: DashboardView },
+  { path: '/questions', name: 'QuestionBank', component: QuestionBankView },
+  { path: '/courses', name: 'Courses', component: CoursesView },
+  { path: '/test-builder', name: 'TestBuilder', component: TestBuilderView },
+  { path: '/pilot-admin', name: 'PilotAdmin', component: PilotAdminView },
+  { path: '/reports', name: 'Reports', component: ReportsView },
+  { path: '/users', name: 'UserManagement', component: UserManagementView },
+  { path: '/student-exam', name: 'StudentExam', component: StudentExamView }
 ]
 
 const router = createRouter({
-  history: createWebHashHistory(),
-  routes,
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes
 })
 
 export default router
