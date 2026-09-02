@@ -34,21 +34,31 @@ const csvFileName = ref('')
 const csvParseError = ref('')
 const bulkPreview = ref([])
 
-async function fetchCourses() {
+// --- LOCAL STORAGE PERSISTENCE ---
+const STORAGE_KEY = 'cams_courses_data'
+
+function loadCoursesFromStorage() {
   isLoading.value = true
   try {
-    const res = await fetch('http://localhost:3001/api/courses')
-    const data = await res.json()
-    if (data.success) courses.value = data.data || []
+    const savedData = localStorage.getItem(STORAGE_KEY)
+    if (savedData) {
+      courses.value = JSON.parse(savedData)
+    } else {
+      courses.value = []
+    }
   } catch (err) {
-    console.error('Failed to load courses:', err)
+    console.error('Failed to load courses from localStorage:', err)
   } finally {
     isLoading.value = false
   }
 }
 
+function saveCoursesToStorage() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(courses.value))
+}
+
 onMounted(() => {
-  fetchCourses()
+  loadCoursesFromStorage()
 })
 
 // Accordion Toggle Functions
@@ -129,42 +139,34 @@ const totalCourseHours = computed(() => {
   return total
 })
 
-async function handleSaveCourse() {
+function handleSaveCourse() {
   if (!courseCode.value || !courseTitle.value) {
     alert('Please enter both Course Code and Course Title.')
     return
   }
 
-  const payload = {
+  const newCourse = {
+    id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
     code: courseCode.value,
     title: courseTitle.value,
     program: courseProgram.value,
-    courseOutcomes: courseOutcomes.value
+    courseOutcomes: JSON.parse(JSON.stringify(courseOutcomes.value))
   }
 
-  try {
-    const res = await fetch('http://localhost:3001/api/courses', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    const data = await res.json()
-    if (data.success) {
-      courseCode.value = ''
-      courseTitle.value = ''
-      courseProgram.value = 'BSMT'
-      courseOutcomes.value = [
-        {
-          id: 'CO1',
-          title: '',
-          learningOutcomes: [{ id: 'LO1.1', description: '', hours: 0 }]
-        }
-      ]
-      await fetchCourses()
+  courses.value.unshift(newCourse)
+  saveCoursesToStorage()
+
+  // Reset form
+  courseCode.value = ''
+  courseTitle.value = ''
+  courseProgram.value = 'BSMT'
+  courseOutcomes.value = [
+    {
+      id: 'CO1',
+      title: '',
+      learningOutcomes: [{ id: 'LO1.1', description: '', hours: 0 }]
     }
-  } catch (err) {
-    alert('Failed to create course.')
-  }
+  ]
 }
 
 // Download Sample CSV Template
@@ -219,6 +221,7 @@ function parseCourseCSVText(csvText) {
 
     if (!courseMap.has(code)) {
       courseMap.set(code, {
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
         program,
         code,
         title,
@@ -266,34 +269,21 @@ function handleCSVUpload(event) {
   reader.readAsText(file)
 }
 
-async function submitBulkCourses() {
+function submitBulkCourses() {
   if (bulkPreview.value.length === 0) return
-  try {
-    const res = await fetch('http://localhost:3001/api/courses/bulk', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ courses: bulkPreview.value })
-    })
-    const data = await res.json()
-    if (data.success) {
-      bulkPreview.value = []
-      csvFileName.value = ''
-      entryMode.value = 'manual'
-      await fetchCourses()
-    }
-  } catch (err) {
-    alert('Failed to import course CSV.')
-  }
+
+  courses.value = [...bulkPreview.value, ...courses.value]
+  saveCoursesToStorage()
+
+  bulkPreview.value = []
+  csvFileName.value = ''
+  entryMode.value = 'manual'
 }
 
-async function deleteCourse(id) {
+function deleteCourse(id) {
   if (!confirm('Are you sure you want to delete this course structure?')) return
-  try {
-    await fetch(`http://localhost:3001/api/courses/${id}`, { method: 'DELETE' })
-    await fetchCourses()
-  } catch (err) {
-    console.error(err)
-  }
+  courses.value = courses.value.filter(c => c.id !== id)
+  saveCoursesToStorage()
 }
 </script>
 

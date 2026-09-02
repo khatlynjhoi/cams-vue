@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { 
-  Plus, Trash2, Clock, BookOpen, Layers, CheckCircle2,
+  Plus, Trash2, Clock, BookOpen, Layers, 
   ChevronDown, ChevronRight, Search, Filter, ArrowUpDown 
 } from 'lucide-vue-next'
 
@@ -31,33 +31,60 @@ const sortBy = ref('code-asc')
 const expandedCourses = ref({})
 const expandedCOs = ref({})
 
-async function fetchCourses() {
+// LocalStorage Persistence Key
+const STORAGE_KEY = 'cams_courses_data'
+
+function loadCoursesFromStorage() {
   isLoading.value = true
   try {
-    const res = await fetch('http://localhost:3001/api/courses')
-    const data = await res.json()
-    if (data.success) {
-      courses.value = data.data
-
-      // Expand all top-level courses and COs by default
-      data.data.forEach(c => {
-        expandedCourses.value[c.id] = true
-        if (Array.isArray(c.courseOutcomes)) {
-          c.courseOutcomes.forEach((co, idx) => {
-            expandedCOs.value[`${c.id}-${co.id || idx}`] = true
-          })
+    const savedData = localStorage.getItem(STORAGE_KEY)
+    if (savedData) {
+      courses.value = JSON.parse(savedData)
+    } else {
+      // Default initial sample data if local storage is empty
+      courses.value = [
+        {
+          id: '1',
+          code: 'NAV-101',
+          title: 'Terrestrial and Coastal Navigation',
+          program: 'BSMT',
+          courseOutcomes: [
+            {
+              id: 'CO1',
+              title: 'Demonstrate competence in maintaining navigational watchkeeping',
+              learningOutcomes: [
+                { id: 'LO1.1', description: 'Apply COLREG Rules 1 to 19 in bridge operations', hours: 12 },
+                { id: 'LO1.2', description: 'Calculate compass variation and deviation', hours: 8 }
+              ]
+            }
+          ]
         }
-      })
+      ]
+      saveCoursesToStorage()
     }
+
+    // Expand top-level courses and COs by default
+    courses.value.forEach(c => {
+      expandedCourses.value[c.id] = true
+      if (Array.isArray(c.courseOutcomes)) {
+        c.courseOutcomes.forEach((co, idx) => {
+          expandedCOs.value[`${c.id}-${co.id || idx}`] = true
+        })
+      }
+    })
   } catch (err) {
-    console.error('Failed to load courses:', err)
+    console.error('Failed to load courses from localStorage:', err)
   } finally {
     isLoading.value = false
   }
 }
 
+function saveCoursesToStorage() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(courses.value))
+}
+
 onMounted(() => {
-  fetchCourses()
+  loadCoursesFromStorage()
 })
 
 // CO & LO Helpers
@@ -105,53 +132,46 @@ const totalCourseHours = computed(() => {
   return total
 })
 
-async function handleSaveCourse() {
+function handleSaveCourse() {
   if (!courseCode.value || !courseTitle.value) {
     alert('Please enter both Course Code and Course Title.')
     return
   }
 
-  const payload = {
+  const newCourse = {
+    id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
     code: courseCode.value,
     title: courseTitle.value,
     program: program.value,
-    courseOutcomes: courseOutcomes.value
+    courseOutcomes: JSON.parse(JSON.stringify(courseOutcomes.value))
   }
 
-  try {
-    const res = await fetch('http://localhost:3001/api/courses', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    const data = await res.json()
-    if (data.success) {
-      // Reset form
-      courseCode.value = ''
-      courseTitle.value = ''
-      program.value = 'Both'
-      courseOutcomes.value = [
-        {
-          id: 'CO1',
-          title: '',
-          learningOutcomes: [{ id: 'LO1.1', description: '', hours: 0 }]
-        }
-      ]
-      await fetchCourses()
+  courses.value.unshift(newCourse)
+  saveCoursesToStorage()
+
+  // Auto-expand newly added course
+  expandedCourses.value[newCourse.id] = true
+  newCourse.courseOutcomes.forEach((co, idx) => {
+    expandedCOs.value[`${newCourse.id}-${co.id || idx}`] = true
+  })
+
+  // Reset form
+  courseCode.value = ''
+  courseTitle.value = ''
+  program.value = 'Both'
+  courseOutcomes.value = [
+    {
+      id: 'CO1',
+      title: '',
+      learningOutcomes: [{ id: 'LO1.1', description: '', hours: 0 }]
     }
-  } catch (err) {
-    alert('Failed to create course.')
-  }
+  ]
 }
 
-async function deleteCourse(id) {
+function deleteCourse(id) {
   if (!confirm('Are you sure you want to delete this course structure?')) return
-  try {
-    await fetch(`http://localhost:3001/api/courses/${id}`, { method: 'DELETE' })
-    await fetchCourses()
-  } catch (err) {
-    console.error(err)
-  }
+  courses.value = courses.value.filter(c => c.id !== id)
+  saveCoursesToStorage()
 }
 
 // Collapsible Handlers
@@ -185,10 +205,10 @@ const filteredAndSortedCourses = computed(() => {
       return true
     })
     .sort((a, b) => {
-      if (sortBy.value === 'code-asc') return a.code.localeCompare(b.code)
-      if (sortBy.value === 'code-desc') return b.code.localeCompare(a.code)
-      if (sortBy.value === 'title-asc') return a.title.localeCompare(b.title)
-      if (sortBy.value === 'title-desc') return b.title.localeCompare(a.title)
+      if (sortBy.value === 'code-asc') return (a.code || '').localeCompare(b.code || '')
+      if (sortBy.value === 'code-desc') return (b.code || '').localeCompare(a.code || '')
+      if (sortBy.value === 'title-asc') return (a.title || '').localeCompare(b.title || '')
+      if (sortBy.value === 'title-desc') return (b.title || '').localeCompare(a.title || '')
       return 0
     })
 })
@@ -216,7 +236,7 @@ const filteredAndSortedCourses = computed(() => {
         <Plus :size="18" class="text-emerald-600" /> Create New Course Syllabus Structure
       </h2>
 
-      <!-- Basic Course Details with Program Dropdown -->
+      <!-- Basic Course Details -->
       <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
         <!-- Program -->
         <div class="md:col-span-3">
