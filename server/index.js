@@ -17,6 +17,7 @@ db.exec(`
     id TEXT PRIMARY KEY,
     code TEXT UNIQUE NOT NULL,
     title TEXT NOT NULL,
+    program TEXT DEFAULT 'Both',
     courseOutcomes TEXT NOT NULL
   );
 
@@ -69,6 +70,10 @@ db.exec(`
 `)
 
 // Schema migration safety checks for existing SQLite databases
+try {
+  db.exec("ALTER TABLE courses ADD COLUMN program TEXT DEFAULT 'Both';")
+} catch (e) {}
+
 try {
   db.exec("ALTER TABLE questions ADD COLUMN program TEXT DEFAULT 'Both';")
 } catch (e) {}
@@ -130,13 +135,13 @@ app.get('/api/courses', (req, res) => {
 })
 
 app.post('/api/courses', (req, res) => {
-  const { code, title, courseOutcomes } = req.body
+  const { code, title, program, courseOutcomes } = req.body
   const id = `CRS-${Date.now()}`
   try {
-    const stmt = db.prepare('INSERT INTO courses (id, code, title, courseOutcomes) VALUES (?, ?, ?, ?)')
-    stmt.run(id, code, title, JSON.stringify(courseOutcomes || []))
+    const stmt = db.prepare('INSERT INTO courses (id, code, title, program, courseOutcomes) VALUES (?, ?, ?, ?, ?)')
+    stmt.run(id, code, title, program || 'Both', JSON.stringify(courseOutcomes || []))
     logAuditEvent('SYSTEM', 'CREATE_COURSE', code, title)
-    res.status(201).json({ success: true, data: { id, code, title, courseOutcomes } })
+    res.status(201).json({ success: true, data: { id, code, title, program: program || 'Both', courseOutcomes } })
   } catch (err) {
     res.status(400).json({ success: false, error: err.message })
   }
@@ -146,11 +151,11 @@ app.post('/api/courses/bulk', (req, res) => {
   const { courses } = req.body
   if (!Array.isArray(courses)) return res.status(400).json({ success: false, message: 'Invalid payload' })
 
-  const insert = db.prepare('INSERT OR REPLACE INTO courses (id, code, title, courseOutcomes) VALUES (?, ?, ?, ?)')
+  const insert = db.prepare('INSERT OR REPLACE INTO courses (id, code, title, program, courseOutcomes) VALUES (?, ?, ?, ?, ?)')
   const insertMany = db.transaction((items) => {
     for (const c of items) {
       const id = c.id || `CRS-${Math.random().toString(36).substr(2, 9)}`
-      insert.run(id, c.code, c.title, JSON.stringify(c.courseOutcomes || []))
+      insert.run(id, c.code, c.title, c.program || 'Both', JSON.stringify(c.courseOutcomes || []))
     }
   })
 

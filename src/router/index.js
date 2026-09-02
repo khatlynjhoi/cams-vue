@@ -4,6 +4,7 @@ import DashboardView from '../views/DashboardView.vue'
 import QuestionBankView from '../views/QuestionBankView.vue'
 import CoursesView from '../views/CoursesView.vue'
 import TestBuilderView from '../views/TestBuilderView.vue'
+import ExamGeneratorView from '../views/ExamGeneratorView.vue'
 import PilotAdminView from '../views/PilotAdminView.vue'
 import ReportsView from '../views/ReportsView.vue'
 import UserManagementView from '../views/UserManagementView.vue'
@@ -29,6 +30,11 @@ const routes = [
     path: '/test-builder',
     name: 'TestBuilder',
     component: TestBuilderView
+  },
+  {
+    path: '/generator',
+    name: 'ExamGenerator',
+    component: ExamGeneratorView
   },
   {
     path: '/pilot-admin',
