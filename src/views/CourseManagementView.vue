@@ -1,6 +1,9 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { Plus, Trash2, Clock, BookOpen, Layers, CheckCircle2 } from 'lucide-vue-next'
+import { 
+  Plus, Trash2, Clock, BookOpen, Layers, CheckCircle2,
+  ChevronDown, ChevronRight, Search, Filter, ArrowUpDown 
+} from 'lucide-vue-next'
 
 const courses = ref([])
 const isLoading = ref(true)
@@ -8,6 +11,7 @@ const isLoading = ref(true)
 // Form State
 const courseCode = ref('')
 const courseTitle = ref('')
+const program = ref('Both')
 const courseOutcomes = ref([
   {
     id: 'CO1',
@@ -18,12 +22,33 @@ const courseOutcomes = ref([
   }
 ])
 
+// Filtering & Sorting State
+const searchQuery = ref('')
+const programFilter = ref('All')
+const sortBy = ref('code-asc')
+
+// Collapsible Toggle State
+const expandedCourses = ref({})
+const expandedCOs = ref({})
+
 async function fetchCourses() {
   isLoading.value = true
   try {
     const res = await fetch('http://localhost:3001/api/courses')
     const data = await res.json()
-    if (data.success) courses.value = data.data
+    if (data.success) {
+      courses.value = data.data
+
+      // Expand all top-level courses and COs by default
+      data.data.forEach(c => {
+        expandedCourses.value[c.id] = true
+        if (Array.isArray(c.courseOutcomes)) {
+          c.courseOutcomes.forEach((co, idx) => {
+            expandedCOs.value[`${c.id}-${co.id || idx}`] = true
+          })
+        }
+      })
+    }
   } catch (err) {
     console.error('Failed to load courses:', err)
   } finally {
@@ -89,6 +114,7 @@ async function handleSaveCourse() {
   const payload = {
     code: courseCode.value,
     title: courseTitle.value,
+    program: program.value,
     courseOutcomes: courseOutcomes.value
   }
 
@@ -103,6 +129,7 @@ async function handleSaveCourse() {
       // Reset form
       courseCode.value = ''
       courseTitle.value = ''
+      program.value = 'Both'
       courseOutcomes.value = [
         {
           id: 'CO1',
@@ -126,17 +153,56 @@ async function deleteCourse(id) {
     console.error(err)
   }
 }
+
+// Collapsible Handlers
+function toggleCourse(courseId) {
+  expandedCourses.value[courseId] = !expandedCourses.value[courseId]
+}
+
+function toggleCO(coKey) {
+  expandedCOs.value[coKey] = !expandedCOs.value[coKey]
+}
+
+// Filter and Sort Computed Logic
+const filteredAndSortedCourses = computed(() => {
+  return courses.value
+    .filter(c => {
+      // Filter by Program
+      if (programFilter.value !== 'All' && c.program !== 'Both' && c.program !== programFilter.value) {
+        return false
+      }
+      // Search Query
+      if (searchQuery.value.trim() !== '') {
+        const q = searchQuery.value.toLowerCase()
+        const matchCode = c.code?.toLowerCase().includes(q)
+        const matchTitle = c.title?.toLowerCase().includes(q)
+        const matchCO = c.courseOutcomes?.some(co => 
+          (co.title || co.text)?.toLowerCase().includes(q) ||
+          co.learningOutcomes?.some(lo => (lo.description || lo.text)?.toLowerCase().includes(q))
+        )
+        return matchCode || matchTitle || matchCO
+      }
+      return true
+    })
+    .sort((a, b) => {
+      if (sortBy.value === 'code-asc') return a.code.localeCompare(b.code)
+      if (sortBy.value === 'code-desc') return b.code.localeCompare(a.code)
+      if (sortBy.value === 'title-asc') return a.title.localeCompare(b.title)
+      if (sortBy.value === 'title-desc') return b.title.localeCompare(a.title)
+      return 0
+    })
+})
 </script>
 
 <template>
-  <div class="p-6 max-w-7xl mx-auto space-y-6">
+  <div class="p-6 max-w-7xl mx-auto space-y-6 font-sans text-slate-800">
     <!-- Header -->
     <div class="bg-slate-900 text-white p-6 rounded-2xl shadow-sm flex justify-between items-center">
       <div>
         <h1 class="text-2xl font-bold flex items-center gap-2">
           <BookOpen :size="24" class="text-emerald-400" /> Maritime Course Curriculum Builder
         </h1>
-        <p class="text-xs text-slate-300">Define Course Codes, Titles, Outcomes (COs), and Learning Objectives (LOs) with hours allocation.</p>
+        <p class="text-xs text-slate-300">Define Course Codes, Titles, Program allocations, Course Outcomes (COs), and Learning Objectives (LOs).</p>
       </div>
       <div class="bg-slate-800 border border-slate-700 px-4 py-2 rounded-xl text-right">
         <span class="text-[10px] text-slate-400 font-bold block uppercase">Active Courses</span>
@@ -145,26 +211,50 @@ async function deleteCourse(id) {
     </div>
 
     <!-- Course Creation Panel -->
-    <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-6">
-      <h2 class="text-base font-bold text-gray-900 border-b pb-3 flex items-center gap-2">
+    <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
+      <h2 class="text-base font-bold text-slate-900 border-b pb-3 flex items-center gap-2">
         <Plus :size="18" class="text-emerald-600" /> Create New Course Syllabus Structure
       </h2>
 
-      <!-- Basic Course Details -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">Course Code</label>
-          <input v-model="courseCode" placeholder="e.g. NAV-101" class="w-full text-xs p-2.5 border rounded-lg font-mono font-bold" />
+      <!-- Basic Course Details with Program Dropdown -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+        <!-- Program -->
+        <div class="md:col-span-3">
+          <label class="block text-xs font-bold text-slate-700 mb-1">Program</label>
+          <select 
+            v-model="program" 
+            class="w-full text-xs p-2.5 border rounded-lg bg-white font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+          >
+            <option value="Both">Both (BSMT & BSmarE)</option>
+            <option value="BSMT">BSMT (Marine Transportation)</option>
+            <option value="BSmarE">BSmarE (Marine Engineering)</option>
+          </select>
         </div>
-        <div class="md:col-span-2">
-          <label class="block text-xs font-bold text-gray-700 mb-1">Course Descriptive Title</label>
-          <input v-model="courseTitle" placeholder="e.g. Terrestrial and Coastal Navigation" class="w-full text-xs p-2.5 border rounded-lg" />
+
+        <!-- Course Code -->
+        <div class="md:col-span-3">
+          <label class="block text-xs font-bold text-slate-700 mb-1">Course Code</label>
+          <input 
+            v-model="courseCode" 
+            placeholder="e.g. NAV-101" 
+            class="w-full text-xs p-2.5 border rounded-lg font-mono font-bold focus:ring-2 focus:ring-emerald-500 outline-none" 
+          />
+        </div>
+
+        <!-- Course Descriptive Title -->
+        <div class="md:col-span-6">
+          <label class="block text-xs font-bold text-slate-700 mb-1">Course Descriptive Title</label>
+          <input 
+            v-model="courseTitle" 
+            placeholder="e.g. Terrestrial and Coastal Navigation" 
+            class="w-full text-xs p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" 
+          />
         </div>
       </div>
 
       <!-- Course Outcomes (COs) & Learning Outcomes (LOs) Builder -->
       <div class="space-y-6">
-        <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border">
+        <div class="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-200">
           <span class="text-xs font-bold text-slate-800">Course Outcomes (CO) & Objectives (LO) Breakdown</span>
           <span class="text-xs font-bold text-emerald-700 flex items-center gap-1">
             <Clock :size="14" /> Total Program Hours: {{ totalCourseHours }} hrs
@@ -178,7 +268,7 @@ async function deleteCourse(id) {
             <input 
               v-model="co.title" 
               :placeholder="`Enter title for Course Outcome ${coIndex + 1} (e.g. Demonstrate competence in navigational watchkeeping)`" 
-              class="w-full text-xs p-2 border rounded-lg font-semibold"
+              class="w-full text-xs p-2 border rounded-lg font-semibold bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
             />
             <button @click="removeCourseOutcome(coIndex)" class="text-red-500 hover:text-red-700 p-1">
               <Trash2 :size="16" />
@@ -197,18 +287,18 @@ async function deleteCourse(id) {
               <input 
                 v-model="lo.description" 
                 placeholder="Learning Objective Description (e.g. Calculate compass error and true bearings)" 
-                class="w-full text-xs p-2 border rounded-lg bg-white"
+                class="w-full text-xs p-2 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
               />
               <div class="flex items-center gap-1 min-w-[120px]">
                 <input 
                   type="number" 
                   v-model="lo.hours" 
                   min="0"
-                  class="w-16 text-xs p-2 border rounded-lg text-center font-bold bg-white" 
+                  class="w-16 text-xs p-2 border rounded-lg text-center font-bold bg-white focus:ring-2 focus:ring-emerald-500 outline-none" 
                 />
-                <span class="text-xs text-gray-500 font-medium">hrs</span>
+                <span class="text-xs text-slate-500 font-medium">hrs</span>
               </div>
-              <button @click="removeLearningOutcome(coIndex, loIndex)" class="text-gray-400 hover:text-red-500 p-1">
+              <button @click="removeLearningOutcome(coIndex, loIndex)" class="text-slate-400 hover:text-red-500 p-1">
                 <Trash2 :size="14" />
               </button>
             </div>
@@ -225,32 +315,140 @@ async function deleteCourse(id) {
       </button>
     </div>
 
-    <!-- Active Courses Registry -->
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-      <div class="p-4 bg-gray-50 border-b flex justify-between items-center">
-        <h3 class="text-sm font-bold text-gray-900">Registered Maritime Courses</h3>
-      </div>
+    <!-- Registered Maritime Courses Section -->
+    <div class="space-y-4">
+      
+      <!-- Toolbar: Search, Filter, and Sort Controls -->
+      <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <Layers :size="18" class="text-emerald-600" /> Registered Maritime Courses
+          <span class="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+            {{ filteredAndSortedCourses.length }} Total
+          </span>
+        </h3>
 
-      <div class="divide-y">
-        <div v-for="c in courses" :key="c.id" class="p-5 hover:bg-gray-50/50 space-y-3">
-          <div class="flex justify-between items-start">
-            <div>
-              <span class="px-2 py-0.5 bg-slate-800 text-white font-mono text-xs font-bold rounded mr-2">{{ c.code }}</span>
-              <span class="text-sm font-bold text-slate-900">{{ c.title }}</span>
-            </div>
-            <button @click="deleteCourse(c.id)" class="text-gray-400 hover:text-red-600">
-              <Trash2 :size="16" />
-            </button>
+        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <!-- Search Bar -->
+          <div class="relative flex-1 md:w-64">
+            <Search :size="14" class="text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input 
+              v-model="searchQuery" 
+              type="text" 
+              placeholder="Search code, title, or LO..." 
+              class="w-full text-xs pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+            />
           </div>
 
-          <!-- Outcomes Tree -->
-          <div class="space-y-2 pt-2">
-            <div v-for="co in c.courseOutcomes" :key="co.id" class="bg-slate-50 p-3 rounded-lg border text-xs space-y-1.5">
-              <p class="font-bold text-slate-800">{{ co.id }}: {{ co.title }}</p>
-              <div class="pl-4 space-y-1 divide-y divide-gray-100">
-                <div v-for="lo in co.learningOutcomes" :key="lo.id" class="pt-1 flex justify-between items-center text-gray-600">
-                  <span><strong class="font-mono text-emerald-800">{{ lo.id }}:</strong> {{ lo.description }}</span>
-                  <span class="font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded border border-gray-200">{{ lo.hours }} hrs</span>
+          <!-- Program Filter -->
+          <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg text-xs">
+            <Filter :size="14" class="text-slate-500" />
+            <select v-model="programFilter" class="bg-transparent font-medium text-slate-700 outline-none cursor-pointer">
+              <option value="All">All Programs</option>
+              <option value="BSMT">BSMT</option>
+              <option value="BSmarE">BSmarE</option>
+              <option value="Both">Both Only</option>
+            </select>
+          </div>
+
+          <!-- Sort Select -->
+          <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg text-xs">
+            <ArrowUpDown :size="14" class="text-slate-500" />
+            <select v-model="sortBy" class="bg-transparent font-medium text-slate-700 outline-none cursor-pointer">
+              <option value="code-asc">Code (A-Z)</option>
+              <option value="code-desc">Code (Z-A)</option>
+              <option value="title-asc">Title (A-Z)</option>
+              <option value="title-desc">Title (Z-A)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Course Cards Container -->
+      <div v-if="isLoading" class="text-center py-12 text-slate-400 text-xs">Loading course syllabus data...</div>
+      
+      <div v-else-if="filteredAndSortedCourses.length === 0" class="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300 text-slate-500 text-xs">
+        No maritime courses found matching your search or filter.
+      </div>
+
+      <div v-else class="space-y-3">
+        <div 
+          v-for="c in filteredAndSortedCourses" 
+          :key="c.id" 
+          class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden transition-all"
+        >
+          <!-- Collapsible Course Card Header -->
+          <div 
+            @click="toggleCourse(c.id)"
+            class="p-4 bg-slate-50 hover:bg-slate-100/80 cursor-pointer flex items-center justify-between border-b border-slate-100 transition-colors"
+          >
+            <div class="flex items-center gap-3">
+              <button class="text-slate-500 hover:text-slate-700">
+                <ChevronDown v-if="expandedCourses[c.id]" :size="18" />
+                <ChevronRight v-else :size="18" />
+              </button>
+              <span class="px-2 py-0.5 bg-slate-800 text-white font-mono text-xs font-bold rounded">{{ c.code }}</span>
+              <span class="text-sm font-bold text-slate-900">{{ c.title }}</span>
+
+              <!-- Program Badge -->
+              <span 
+                v-if="c.program === 'BSMT'" 
+                class="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded border border-blue-200"
+              >BSMT</span>
+              <span 
+                v-else-if="c.program === 'BSmarE'" 
+                class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-200"
+              >BSmarE</span>
+              <span 
+                v-else 
+                class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-200"
+              >Both Programs</span>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <span class="text-xs text-slate-500 font-medium">{{ c.courseOutcomes?.length || 0 }} COs</span>
+              <button @click.stop="deleteCourse(c.id)" class="text-slate-400 hover:text-red-600 p-1" title="Delete Course">
+                <Trash2 :size="16" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Course Body (Collapsible) -->
+          <div v-if="expandedCourses[c.id]" class="p-4 space-y-3 bg-white">
+            <div 
+              v-for="(co, coIdx) in c.courseOutcomes" 
+              :key="co.id || coIdx" 
+              class="border border-slate-200 rounded-lg overflow-hidden"
+            >
+              <!-- Nested Collapsible CO Header -->
+              <div 
+                @click="toggleCO(`${c.id}-${co.id || coIdx}`)"
+                class="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 cursor-pointer flex items-center justify-between text-xs font-semibold text-slate-800 border-b border-slate-100"
+              >
+                <div class="flex items-center gap-2">
+                  <button class="text-slate-400">
+                    <ChevronDown v-if="expandedCOs[`${c.id}-${co.id || coIdx}`]" :size="16" />
+                    <ChevronRight v-else :size="16" />
+                  </button>
+                  <span class="text-slate-900 font-mono font-bold">{{ co.id }}:</span>
+                  <span>{{ co.title || co.text }}</span>
+                </div>
+                <span class="text-[11px] text-slate-500 font-normal">{{ co.learningOutcomes?.length || 0 }} LOs</span>
+              </div>
+
+              <!-- Nested LO List (Collapsible) -->
+              <div v-if="expandedCOs[`${c.id}-${co.id || coIdx}`]" class="p-3 space-y-2 bg-slate-50/30">
+                <div 
+                  v-for="(lo, loIdx) in co.learningOutcomes" 
+                  :key="lo.id || loIdx" 
+                  class="flex justify-between items-center text-xs p-2 rounded border border-slate-100 bg-white"
+                >
+                  <div class="flex items-start gap-2">
+                    <strong class="font-mono text-emerald-800 min-w-[45px]">{{ lo.id }}:</strong> 
+                    <span class="text-slate-700">{{ lo.description || lo.text }}</span>
+                  </div>
+                  <span class="font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold whitespace-nowrap ml-2">
+                    {{ lo.hours }} hrs
+                  </span>
                 </div>
               </div>
             </div>

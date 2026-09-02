@@ -1,6 +1,6 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { HelpCircle, Save, Plus, Trash2, Image, X, Upload, Download, FileText } from 'lucide-vue-next'
+import { HelpCircle, Save, Plus, Trash2, Image, X, Upload, Download } from 'lucide-vue-next'
 
 const questions = ref([])
 const courses = ref([])
@@ -33,10 +33,13 @@ const form = reactive({
   ]
 })
 
-// Cascading Courses based on Program Filter
+// Cascading Courses (Subjects) strictly filtered by selected Program
 const filteredCourses = computed(() => {
-  if (form.program === 'Both') return courses.value
-  return courses.value.filter(c => !c.program || c.program === form.program || c.program === 'Both')
+  if (!courses.value || courses.value.length === 0) return []
+  if (form.program === 'Both') {
+    return courses.value
+  }
+  return courses.value.filter(c => c.program === form.program || c.program === 'Both' || !c.program)
 })
 
 // Cascading Course Outcomes (CO)
@@ -214,8 +217,6 @@ function handleBulkCSVUpload(event) {
 
       const parsedQuestions = []
       for (let i = 1; i < lines.length; i++) {
-        // Basic CSV Row Regex Parser
-        const matches = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g)
         const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').trim())
 
         if (cols.length >= 8) {
@@ -333,7 +334,7 @@ onMounted(() => {
           </select>
         </div>
 
-        <!-- Term -->
+        <!-- Academic Term -->
         <div>
           <label class="font-bold text-slate-700 block mb-1">Academic Term</label>
           <select v-model="form.term" class="w-full p-2.5 border rounded-lg bg-emerald-50 text-emerald-900 font-bold border-emerald-300">
@@ -342,11 +343,11 @@ onMounted(() => {
           </select>
         </div>
 
-        <!-- Course Code -->
+        <!-- Course Code (Filtered dynamically by Selected Program) -->
         <div>
-          <label class="font-bold text-slate-700 block mb-1">Course Code</label>
+          <label class="font-bold text-slate-700 block mb-1">Course / Subject</label>
           <select v-model="form.courseId" @change="onCourseChange" class="w-full p-2.5 border rounded-lg font-medium">
-            <option value="">Select Course Code</option>
+            <option value="">Select Subject</option>
             <option v-for="c in filteredCourses" :key="c.id" :value="c.id">
               {{ c.code }} - {{ c.title }}
             </option>
