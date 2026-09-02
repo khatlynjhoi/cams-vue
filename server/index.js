@@ -490,5 +490,5 @@ app.post('/api/questions/validate', (req, res) => {
   })
 })
 
-const PORT = 3001
+const PORT = 3002
 app.listen(PORT, () => console.log(`Maritime Server with SQLite active on http://localhost:${PORT}`))
