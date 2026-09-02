@@ -1,6 +1,10 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { Plus, Trash2, Clock, BookOpen, FileSpreadsheet, Download, Upload, ChevronDown, ChevronRight, Search, Filter, ArrowUpDown } from 'lucide-vue-next'
+import { 
+  Plus, Trash2, Clock, BookOpen, FileSpreadsheet, Download, 
+  Upload, ChevronDown, ChevronRight, Search, Filter, ArrowUpDown,
+  Pencil, RotateCcw
+} from 'lucide-vue-next'
 
 const courses = ref([])
 const isLoading = ref(true)
@@ -15,7 +19,8 @@ const searchQuery = ref('')
 const filterProgram = ref('All')
 const sortBy = ref('code')
 
-// Form State (Manual)
+// Form State (Manual / Editing)
+const editingCourseId = ref(null)
 const courseCode = ref('')
 const courseTitle = ref('')
 const courseProgram = ref('BSMT')
@@ -61,21 +66,25 @@ onMounted(() => {
   loadCoursesFromStorage()
 })
 
-// Accordion Toggle Functions
+// Accordion Toggle Functions (Reassigning Set to ensure Vue reactivity)
 function toggleCourse(courseId) {
-  if (expandedCourses.value.has(courseId)) {
-    expandedCourses.value.delete(courseId)
+  const next = new Set(expandedCourses.value)
+  if (next.has(courseId)) {
+    next.delete(courseId)
   } else {
-    expandedCourses.value.add(courseId)
+    next.add(courseId)
   }
+  expandedCourses.value = next
 }
 
 function toggleOutcome(coKey) {
-  if (expandedOutcomes.value.has(coKey)) {
-    expandedOutcomes.value.delete(coKey)
+  const next = new Set(expandedOutcomes.value)
+  if (next.has(coKey)) {
+    next.delete(coKey)
   } else {
-    expandedOutcomes.value.add(coKey)
+    next.add(coKey)
   }
+  expandedOutcomes.value = next
 }
 
 // Filter and Sort Computed Property
@@ -139,24 +148,24 @@ const totalCourseHours = computed(() => {
   return total
 })
 
-function handleSaveCourse() {
-  if (!courseCode.value || !courseTitle.value) {
-    alert('Please enter both Course Code and Course Title.')
-    return
+// Edit Course Trigger
+function startEditCourse(course) {
+  editingCourseId.value = course.id
+  courseCode.value = course.code || ''
+  courseTitle.value = course.title || ''
+  courseProgram.value = course.program || 'BSMT'
+  courseOutcomes.value = JSON.parse(JSON.stringify(course.courseOutcomes || []))
+
+  if (courseOutcomes.value.length === 0) {
+    addCourseOutcome()
   }
 
-  const newCourse = {
-    id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
-    code: courseCode.value,
-    title: courseTitle.value,
-    program: courseProgram.value,
-    courseOutcomes: JSON.parse(JSON.stringify(courseOutcomes.value))
-  }
+  entryMode.value = 'manual'
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
-  courses.value.unshift(newCourse)
-  saveCoursesToStorage()
-
-  // Reset form
+function cancelEdit() {
+  editingCourseId.value = null
   courseCode.value = ''
   courseTitle.value = ''
   courseProgram.value = 'BSMT'
@@ -167,6 +176,40 @@ function handleSaveCourse() {
       learningOutcomes: [{ id: 'LO1.1', description: '', hours: 0 }]
     }
   ]
+}
+
+function handleSaveCourse() {
+  if (!courseCode.value || !courseTitle.value) {
+    alert('Please enter both Course Code and Course Title.')
+    return
+  }
+
+  if (editingCourseId.value) {
+    // Update existing course
+    const index = courses.value.findIndex(c => c.id === editingCourseId.value)
+    if (index !== -1) {
+      courses.value[index] = {
+        ...courses.value[index],
+        code: courseCode.value,
+        title: courseTitle.value,
+        program: courseProgram.value,
+        courseOutcomes: JSON.parse(JSON.stringify(courseOutcomes.value))
+      }
+    }
+  } else {
+    // Create new course
+    const newCourse = {
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
+      code: courseCode.value,
+      title: courseTitle.value,
+      program: courseProgram.value,
+      courseOutcomes: JSON.parse(JSON.stringify(courseOutcomes.value))
+    }
+    courses.value.unshift(newCourse)
+  }
+
+  saveCoursesToStorage()
+  cancelEdit()
 }
 
 // Download Sample CSV Template
@@ -283,12 +326,15 @@ function submitBulkCourses() {
 function deleteCourse(id) {
   if (!confirm('Are you sure you want to delete this course structure?')) return
   courses.value = courses.value.filter(c => c.id !== id)
+  if (editingCourseId.value === id) {
+    cancelEdit()
+  }
   saveCoursesToStorage()
 }
 </script>
 
 <template>
-  <div class="p-6 max-w-7xl mx-auto space-y-6">
+  <div class="p-6 max-w-7xl mx-auto space-y-6 font-sans text-slate-800">
     <!-- Header -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900 text-white p-6 rounded-2xl shadow-sm">
       <div>
@@ -314,16 +360,27 @@ function deleteCourse(id) {
       </div>
     </div>
 
-    <!-- Manual Entry View -->
+    <!-- Manual Entry / Edit View -->
     <div v-if="entryMode === 'manual'" class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-6">
-      <h2 class="text-base font-bold text-gray-900 border-b pb-3 flex items-center gap-2">
-        <Plus :size="18" class="text-emerald-600" /> Create New Course Syllabus
-      </h2>
+      <div class="flex justify-between items-center border-b pb-3">
+        <h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
+          <Pencil v-if="editingCourseId" :size="18" class="text-amber-600" />
+          <Plus v-else :size="18" class="text-emerald-600" /> 
+          {{ editingCourseId ? 'Edit Course Syllabus' : 'Create New Course Syllabus' }}
+        </h2>
+        <button 
+          v-if="editingCourseId" 
+          @click="cancelEdit" 
+          class="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 font-semibold bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200"
+        >
+          <RotateCcw :size="14" /> Cancel Edit
+        </button>
+      </div>
 
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Target Program</label>
-          <select v-model="courseProgram" class="w-full text-xs p-2.5 border rounded-lg font-bold bg-slate-50">
+          <select v-model="courseProgram" class="w-full text-xs p-2.5 border rounded-lg font-bold bg-slate-50 focus:ring-2 focus:ring-emerald-500 outline-none">
             <option value="BSMT">BSMT</option>
             <option value="BSMarE">BSMarE</option>
             <option value="Both">Both (BSMT & BSMarE)</option>
@@ -331,11 +388,11 @@ function deleteCourse(id) {
         </div>
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Course Code</label>
-          <input v-model="courseCode" placeholder="e.g. NAV-101" class="w-full text-xs p-2.5 border rounded-lg font-mono font-bold" />
+          <input v-model="courseCode" placeholder="e.g. NAV-101" class="w-full text-xs p-2.5 border rounded-lg font-mono font-bold focus:ring-2 focus:ring-emerald-500 outline-none" />
         </div>
         <div class="md:col-span-2">
           <label class="block text-xs font-bold text-gray-700 mb-1">Course Descriptive Title</label>
-          <input v-model="courseTitle" placeholder="e.g. Terrestrial and Coastal Navigation" class="w-full text-xs p-2.5 border rounded-lg" />
+          <input v-model="courseTitle" placeholder="e.g. Terrestrial and Coastal Navigation" class="w-full text-xs p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
         </div>
       </div>
 
@@ -353,7 +410,7 @@ function deleteCourse(id) {
             <input 
               v-model="co.title" 
               :placeholder="`Course Outcome ${coIndex + 1} Description`" 
-              class="w-full text-xs p-2 border rounded-lg font-semibold"
+              class="w-full text-xs p-2 border rounded-lg font-semibold bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
             />
             <button @click="removeCourseOutcome(coIndex)" class="text-red-500 hover:text-red-700 p-1">
               <Trash2 :size="16" />
@@ -371,14 +428,14 @@ function deleteCourse(id) {
               <input 
                 v-model="lo.description" 
                 placeholder="Learning Objective Description" 
-                class="w-full text-xs p-2 border rounded-lg bg-white"
+                class="w-full text-xs p-2 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
               />
               <div class="flex items-center gap-1 min-w-[120px]">
                 <input 
                   type="number" 
                   v-model="lo.hours" 
                   min="0"
-                  class="w-16 text-xs p-2 border rounded-lg text-center font-bold bg-white" 
+                  class="w-16 text-xs p-2 border rounded-lg text-center font-bold bg-white focus:ring-2 focus:ring-emerald-500 outline-none" 
                 />
                 <span class="text-xs text-gray-500 font-medium">hrs</span>
               </div>
@@ -394,9 +451,22 @@ function deleteCourse(id) {
         </button>
       </div>
 
-      <button @click="handleSaveCourse" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm">
-        Save Syllabus & Structure
-      </button>
+      <div class="flex items-center gap-3">
+        <button 
+          @click="handleSaveCourse" 
+          class="px-6 py-2.5 text-xs font-bold text-white rounded-xl shadow-sm transition-colors"
+          :class="editingCourseId ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+        >
+          {{ editingCourseId ? 'Update Syllabus & Structure' : 'Save Syllabus & Structure' }}
+        </button>
+        <button 
+          v-if="editingCourseId" 
+          @click="cancelEdit" 
+          class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-300"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
 
     <!-- Bulk CSV View -->
@@ -453,16 +523,16 @@ function deleteCourse(id) {
     </div>
 
     <!-- Search, Filter & Sort Toolbar -->
-    <div class="bg-slate-100 p-4 rounded-xl flex flex-wrap gap-4 items-center justify-between border">
+    <div class="bg-slate-100 p-4 rounded-xl flex flex-wrap gap-4 items-center justify-between border border-slate-200">
       <div class="flex items-center gap-3 flex-1 min-w-[280px]">
         <div class="relative w-full max-w-xs">
           <Search class="absolute left-3 top-2.5 text-slate-400" :size="14" />
-          <input v-model="searchQuery" placeholder="Search course code or title..." class="w-full pl-8 pr-3 py-2 border rounded-lg text-xs bg-white" />
+          <input v-model="searchQuery" placeholder="Search course code or title..." class="w-full pl-8 pr-3 py-2 border rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500" />
         </div>
 
         <div class="flex items-center gap-1.5 text-slate-700 font-bold text-xs">
           <Filter :size="14" />
-          <select v-model="filterProgram" class="p-2 border rounded-lg text-xs bg-white">
+          <select v-model="filterProgram" class="p-2 border rounded-lg text-xs bg-white outline-none cursor-pointer">
             <option value="All">All Programs</option>
             <option value="BSMT">BSMT Only</option>
             <option value="BSMarE">BSMarE Only</option>
@@ -474,7 +544,7 @@ function deleteCourse(id) {
       <div class="flex items-center gap-2 font-bold text-slate-700 text-xs">
         <ArrowUpDown :size="14" />
         <span>Sort By:</span>
-        <select v-model="sortBy" class="p-2 border rounded-lg text-xs bg-white">
+        <select v-model="sortBy" class="p-2 border rounded-lg text-xs bg-white outline-none cursor-pointer">
           <option value="code">Course Code</option>
           <option value="title">Course Title</option>
         </select>
@@ -492,7 +562,12 @@ function deleteCourse(id) {
       </div>
 
       <div class="divide-y">
-        <div v-for="c in filteredAndSortedCourses" :key="c.id" class="bg-white">
+        <div 
+          v-for="c in filteredAndSortedCourses" 
+          :key="c.id" 
+          class="bg-white transition-colors"
+          :class="{ 'bg-amber-50/40': editingCourseId === c.id }"
+        >
           <!-- Course Level Accordion Header -->
           <div class="p-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors">
             <button @click="toggleCourse(c.id)" class="flex items-center gap-3 text-left flex-1">
@@ -509,11 +584,22 @@ function deleteCourse(id) {
               <span class="text-xs font-bold text-slate-900">{{ c.title }}</span>
             </button>
 
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-3">
               <span class="text-[11px] font-semibold text-slate-400">
                 {{ c.courseOutcomes?.length || 0 }} Outcomes
               </span>
-              <button @click="deleteCourse(c.id)" class="text-gray-400 hover:text-red-600 p-1">
+              <button 
+                @click="startEditCourse(c)" 
+                class="text-gray-400 hover:text-amber-600 p-1 hover:bg-amber-50 rounded transition-colors"
+                title="Edit Course"
+              >
+                <Pencil :size="16" />
+              </button>
+              <button 
+                @click="deleteCourse(c.id)" 
+                class="text-gray-400 hover:text-red-600 p-1 hover:bg-red-50 rounded transition-colors"
+                title="Delete Course"
+              >
                 <Trash2 :size="16" />
               </button>
             </div>
@@ -526,7 +612,7 @@ function deleteCourse(id) {
             </div>
 
             <!-- Course Outcome Level Accordion -->
-            <div v-for="co in c.courseOutcomes" :key="co.id" class="border rounded-xl bg-white overflow-hidden shadow-xs">
+            <div v-for="co in c.courseOutcomes" :key="co.id" class="border border-slate-200 rounded-xl bg-white overflow-hidden shadow-xs">
               <button @click="toggleOutcome(`${c.id}-${co.id}`)" class="w-full p-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors">
                 <div class="flex items-center gap-2 text-xs">
                   <component :is="expandedOutcomes.has(`${c.id}-${co.id}`) ? ChevronDown : ChevronRight" :size="16" class="text-slate-400" />
