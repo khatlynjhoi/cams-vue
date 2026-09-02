@@ -8,6 +8,9 @@ const isSubmitting = ref(false)
 const isUploadingBulk = ref(false)
 const bulkFileInput = ref(null)
 
+const STORAGE_COURSES_KEY = 'cams_courses_data'
+const STORAGE_QUESTIONS_KEY = 'cams_questions_data'
+
 const form = reactive({
   program: 'Both', // BSMarE | BSMT | Both
   term: 'Midterm', // Midterm | Final
@@ -105,27 +108,45 @@ function removeImage(targetObj, propertyName) {
 
 async function fetchQuestions() {
   try {
+    const saved = localStorage.getItem(STORAGE_QUESTIONS_KEY)
+    if (saved) {
+      questions.value = JSON.parse(saved)
+      return
+    }
     const res = await fetch('http://localhost:3001/api/questions')
     const data = await res.json()
-    if (data.success) questions.value = data.data
+    if (data.success) {
+      questions.value = data.data
+      localStorage.setItem(STORAGE_QUESTIONS_KEY, JSON.stringify(data.data))
+    }
   } catch (err) {
-    console.error('Failed to load questions:', err)
+    console.warn('Backend unavailable, reading questions from localStorage:', err)
   }
 }
 
 async function fetchCourses() {
   try {
+    // Priority: Read courses saved locally from CourseManagementView
+    const savedCourses = localStorage.getItem(STORAGE_COURSES_KEY)
+    if (savedCourses) {
+      courses.value = JSON.parse(savedCourses)
+      return
+    }
+
+    // Fallback: Fetch from backend API
     const res = await fetch('http://localhost:3001/api/courses')
     const data = await res.json()
-    if (data.success) courses.value = data.data
+    if (data.success) {
+      courses.value = data.data
+    }
   } catch (err) {
-    console.error('Failed to load courses:', err)
+    console.warn('Backend unavailable, using local courses storage:', err)
   }
 }
 
 async function saveQuestion() {
   if (!form.courseId || !form.text) {
-    alert('Please select a Course Code and enter Question Stem.')
+    alert('Please select a Course / Subject and enter Question Stem.')
     return
   }
 
@@ -153,6 +174,7 @@ async function saveQuestion() {
   }
 
   const payload = {
+    id: Date.now().toString(),
     ...form,
     options: formattedOptions,
     correctAnswer: formattedCorrectAnswer,
@@ -161,6 +183,7 @@ async function saveQuestion() {
 
   isSubmitting.value = true
   try {
+    // Try API endpoint first
     const res = await fetch('http://localhost:3001/api/questions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -171,10 +194,13 @@ async function saveQuestion() {
       alert('Question saved successfully!')
       fetchQuestions()
     } else {
-      alert(`Error: ${data.error}`)
+      throw new Error(data.error)
     }
   } catch (err) {
-    alert('Failed to save question item.')
+    // LocalStorage fallback for standalone / static environments
+    questions.value.unshift(payload)
+    localStorage.setItem(STORAGE_QUESTIONS_KEY, JSON.stringify(questions.value))
+    alert('Question item saved locally!')
   } finally {
     isSubmitting.value = false
   }
@@ -245,6 +271,7 @@ function handleBulkCSVUpload(event) {
           }
 
           parsedQuestions.push({
+            id: Date.now().toString() + i,
             program,
             term,
             courseId,
@@ -265,17 +292,23 @@ function handleBulkCSVUpload(event) {
         return
       }
 
-      const res = await fetch('http://localhost:3001/api/questions/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questions: parsedQuestions })
-      })
-      const data = await res.json()
-      if (data.success) {
-        alert(`Successfully imported ${data.count} questions!`)
-        fetchQuestions()
-      } else {
-        alert(`Upload failed: ${data.error}`)
+      try {
+        const res = await fetch('http://localhost:3001/api/questions/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ questions: parsedQuestions })
+        })
+        const data = await res.json()
+        if (data.success) {
+          alert(`Successfully imported ${data.count} questions!`)
+          fetchQuestions()
+        } else {
+          throw new Error(data.error)
+        }
+      } catch {
+        questions.value.unshift(...parsedQuestions)
+        localStorage.setItem(STORAGE_QUESTIONS_KEY, JSON.stringify(questions.value))
+        alert(`Successfully imported ${parsedQuestions.length} questions locally!`)
       }
     } catch (err) {
       alert('Error parsing CSV file.')
@@ -327,26 +360,26 @@ onMounted(() => {
         <!-- Program -->
         <div>
           <label class="font-bold text-slate-700 block mb-1">Program</label>
-          <select v-model="form.program" @change="onProgramChange" class="w-full p-2.5 border rounded-lg bg-slate-50 font-bold text-slate-900">
+          <select v-model="form.program" @change="onProgramChange" class="w-full p-2.5 border rounded-lg bg-slate-50 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
             <option value="Both">Both (BSMT & BSMarE)</option>
             <option value="BSMT">BSMT (Marine Transportation)</option>
             <option value="BSMarE">BSMarE (Marine Engineering)</option>
           </select>
         </div>
 
-        <!-- Academic Term -->
+        <!-- Academic Term (Styling matched to other standard text dropdowns) -->
         <div>
           <label class="font-bold text-slate-700 block mb-1">Academic Term</label>
-          <select v-model="form.term" class="w-full p-2.5 border rounded-lg bg-emerald-50 text-emerald-900 font-bold border-emerald-300">
+          <select v-model="form.term" class="w-full p-2.5 border rounded-lg bg-slate-50 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
             <option value="Midterm">Midterm</option>
             <option value="Final">Finals</option>
           </select>
         </div>
 
-        <!-- Course Code (Filtered dynamically by Selected Program) -->
+        <!-- Course Code (Reflects created courses dynamically) -->
         <div>
           <label class="font-bold text-slate-700 block mb-1">Course / Subject</label>
-          <select v-model="form.courseId" @change="onCourseChange" class="w-full p-2.5 border rounded-lg font-medium">
+          <select v-model="form.courseId" @change="onCourseChange" class="w-full p-2.5 border rounded-lg bg-slate-50 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
             <option value="">Select Subject</option>
             <option v-for="c in filteredCourses" :key="c.id" :value="c.id">
               {{ c.code }} - {{ c.title }}
@@ -357,7 +390,7 @@ onMounted(() => {
         <!-- Course Outcome (CO) -->
         <div>
           <label class="font-bold text-slate-700 block mb-1">Course Outcome (CO)</label>
-          <select v-model="form.courseOutcomeId" @change="onCOChange" :disabled="!form.courseId" class="w-full p-2.5 border rounded-lg disabled:bg-slate-100">
+          <select v-model="form.courseOutcomeId" @change="onCOChange" :disabled="!form.courseId" class="w-full p-2.5 border rounded-lg disabled:bg-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none">
             <option value="">Select Course Outcome</option>
             <option v-for="co in availableCourseOutcomes" :key="co.id || co.code" :value="co.id || co.code">
               {{ co.code || co.id }}: {{ co.description || co.title }}
@@ -368,7 +401,7 @@ onMounted(() => {
         <!-- Learning Outcome (LO) -->
         <div>
           <label class="font-bold text-slate-700 block mb-1">Learning Outcome (LO)</label>
-          <select v-model="form.learningOutcomeId" :disabled="!form.courseOutcomeId" class="w-full p-2.5 border rounded-lg disabled:bg-slate-100">
+          <select v-model="form.learningOutcomeId" :disabled="!form.courseOutcomeId" class="w-full p-2.5 border rounded-lg disabled:bg-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none">
             <option value="">Select Learning Outcome</option>
             <option v-for="lo in availableLearningOutcomes" :key="lo.id || lo.code" :value="lo.id || lo.code">
               {{ lo.code || lo.id }}: {{ lo.description || lo.title }}
@@ -383,7 +416,7 @@ onMounted(() => {
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
         <div>
           <label class="font-bold text-slate-700 block mb-1">Bloom's Taxonomy</label>
-          <select v-model="form.bloomLevel" class="w-full p-2.5 border rounded-lg">
+          <select v-model="form.bloomLevel" class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
             <option value="Remembering">Remembering</option>
             <option value="Understanding">Understanding</option>
             <option value="Application">Application</option>
@@ -394,7 +427,7 @@ onMounted(() => {
 
         <div>
           <label class="font-bold text-slate-700 block mb-1">Question Type</label>
-          <select v-model="form.type" class="w-full p-2.5 border rounded-lg font-bold bg-slate-50 text-slate-900">
+          <select v-model="form.type" class="w-full p-2.5 border rounded-lg font-bold bg-slate-50 text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
             <option value="multiple_choice">Multiple Choice</option>
             <option value="true_false">True / False</option>
             <option value="short_answer">Short Answer</option>
@@ -406,7 +439,7 @@ onMounted(() => {
       <!-- Question Stem & Image Upload -->
       <div class="space-y-3">
         <label class="font-bold text-xs text-slate-700 block">Question Stem</label>
-        <textarea v-model="form.text" rows="3" placeholder="Enter question statement..." class="w-full p-3 border rounded-xl text-xs"></textarea>
+        <textarea v-model="form.text" rows="3" placeholder="Enter question statement..." class="w-full p-3 border rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none"></textarea>
 
         <div class="bg-slate-50 p-3 rounded-xl border border-dashed flex items-center justify-between">
           <div>
@@ -436,7 +469,7 @@ onMounted(() => {
 
         <div v-for="(opt, idx) in form.options" :key="idx" class="flex items-center gap-3 bg-white p-3 rounded-xl border shadow-sm">
           <input type="checkbox" v-model="opt.isCorrect" title="Mark as correct answer" class="h-4 w-4 text-emerald-600 rounded border-slate-300" />
-          <input v-model="opt.text" :placeholder="`Option ${idx + 1} text...`" class="flex-1 p-2 border rounded-lg text-xs" />
+          <input v-model="opt.text" :placeholder="`Option ${idx + 1} text...`" class="flex-1 p-2 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500" />
 
           <div class="flex items-center gap-2">
             <label class="cursor-pointer p-2 border rounded-lg hover:bg-slate-50 text-slate-600 flex items-center gap-1 text-[11px] font-semibold">
@@ -473,7 +506,7 @@ onMounted(() => {
       <!-- SHORT ANSWER -->
       <div v-if="form.type === 'short_answer'" class="space-y-3 bg-slate-50 p-4 rounded-xl border">
         <label class="font-bold text-xs text-slate-700 block">Accepted Keywords / Answer Phrases (Comma-Separated)</label>
-        <input v-model="form.shortAnswerKeywords" placeholder="e.g. Navigation, GPS, ECDIS" class="w-full p-2.5 border rounded-lg text-xs bg-white" />
+        <input v-model="form.shortAnswerKeywords" placeholder="e.g. Navigation, GPS, ECDIS" class="w-full p-2.5 border rounded-lg text-xs bg-white focus:ring-2 focus:ring-emerald-500 outline-none" />
         <p class="text-[11px] text-slate-500">Cadet responses matching any of these keywords will be marked as correct.</p>
       </div>
 
@@ -489,7 +522,7 @@ onMounted(() => {
         <div v-for="(pair, idx) in form.matchingPairs" :key="idx" class="grid grid-cols-1 md:grid-cols-2 gap-3 bg-white p-3 rounded-xl border relative">
           <div class="space-y-2">
             <span class="text-[11px] font-bold text-slate-500">Item {{ idx + 1 }} (Prompt)</span>
-            <input v-model="pair.prompt" placeholder="Prompt text..." class="w-full p-2 border rounded-lg text-xs" />
+            <input v-model="pair.prompt" placeholder="Prompt text..." class="w-full p-2 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500" />
             <div class="flex items-center gap-2">
               <label class="cursor-pointer text-[11px] font-bold text-slate-600 flex items-center gap-1 border px-2 py-1 rounded bg-slate-50">
                 <Image :size="12" /> {{ pair.promptImage ? 'Change Image' : 'Add Image' }}
@@ -506,7 +539,7 @@ onMounted(() => {
 
           <div class="space-y-2 pr-6">
             <span class="text-[11px] font-bold text-slate-500">Matching Answer</span>
-            <input v-model="pair.match" placeholder="Matching answer text..." class="w-full p-2 border rounded-lg text-xs" />
+            <input v-model="pair.match" placeholder="Matching answer text..." class="w-full p-2 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500" />
             <div class="flex items-center gap-2">
               <label class="cursor-pointer text-[11px] font-bold text-slate-600 flex items-center gap-1 border px-2 py-1 rounded bg-slate-50">
                 <Image :size="12" /> {{ pair.matchImage ? 'Change Image' : 'Add Image' }}
