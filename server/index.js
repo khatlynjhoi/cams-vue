@@ -127,7 +127,7 @@ app.post('/api/auth/login', (req, res) => {
 app.get('/api/courses', (req, res) => {
   try {
     const rows = db.prepare('SELECT * FROM courses').all()
-    const courses = rows.map(r => ({ ...r, courseOutcomes: JSON.parse(r.courseOutcomes) }))
+    const courses = rows.map(r => ({ ...r, courseOutcomes: JSON.parse(r.courseOutcomes || '[]') }))
     res.json({ success: true, data: courses })
   } catch (err) {
     res.status(500).json({ success: false, error: err.message })
@@ -153,8 +153,9 @@ app.post('/api/courses/bulk', (req, res) => {
 
   const insert = db.prepare('INSERT OR REPLACE INTO courses (id, code, title, program, courseOutcomes) VALUES (?, ?, ?, ?, ?)')
   const insertMany = db.transaction((items) => {
-    for (const c of items) {
-      const id = c.id || `CRS-${Math.random().toString(36).substr(2, 9)}`
+    for (let i = 0; i < items.length; i++) {
+      const c = items[i]
+      const id = c.id || `CRS-${Date.now()}-${i}`
       insert.run(id, c.code, c.title, c.program || 'Both', JSON.stringify(c.courseOutcomes || []))
     }
   })
@@ -234,7 +235,7 @@ app.get('/api/questions', (req, res) => {
 
 app.post('/api/questions', (req, res) => {
   const q = req.body
-  const generatedCode = q.code || `Q-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+  const generatedCode = q.code || `Q-${Date.now()}-${Math.floor(Math.random() * 10000)}`
 
   try {
     const stmt = db.prepare(`
@@ -267,7 +268,7 @@ app.post('/api/questions', (req, res) => {
 
 app.put('/api/questions/:id', (req, res) => {
   const q = req.body
-  const itemCode = q.code || `Q-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+  const itemCode = q.code || `Q-${Date.now()}-${Math.floor(Math.random() * 10000)}`
 
   try {
     const stmt = db.prepare(`
@@ -278,9 +279,9 @@ app.put('/api/questions/:id', (req, res) => {
     stmt.run(
       q.program || 'Both',
       q.term || 'Midterm',
-      q.courseId,
-      q.courseOutcomeId,
-      q.learningOutcomeId,
+      q.courseId || '',
+      q.courseOutcomeId || '',
+      q.learningOutcomeId || '',
       itemCode,
       q.type,
       q.text,
@@ -289,7 +290,7 @@ app.put('/api/questions/:id', (req, res) => {
       JSON.stringify(q.correctAnswer ?? null),
       JSON.stringify(q.matchingPairs || []),
       q.stcwStandard || 'Table A-II/1',
-      q.bloomLevel,
+      q.bloomLevel || 'Understanding',
       req.params.id
     )
     logAuditEvent('SYSTEM', 'UPDATE_QUESTION', itemCode)
@@ -320,8 +321,9 @@ app.post('/api/questions/bulk', (req, res) => {
   `)
 
   const insertMany = db.transaction((items) => {
-    for (const q of items) {
-      const generatedCode = q.code || `Q-${Date.now()}-${Math.floor(Math.random() * 10000)}`
+    for (let i = 0; i < items.length; i++) {
+      const q = items[i]
+      const generatedCode = q.code || `Q-${Date.now()}-${i}-${Math.floor(Math.random() * 10000)}`
       stmt.run(
         q.program || 'Both',
         q.term || 'Midterm',
