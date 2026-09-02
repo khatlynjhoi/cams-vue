@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { submitExam as submitExamApi } from '../services/api'
 import { 
   Timer, 
   ChevronLeft, 
@@ -117,8 +118,16 @@ function toggleFlag(questionIdx) {
   flaggedQuestions.value[questionIdx] = !flaggedQuestions.value[questionIdx]
 }
 
-function submitExam() {
+async function submitExam() {
   if (timerInterval) clearInterval(timerInterval)
+
+  try {
+    const apiResult = await submitExamApi('CADET-2026-001', selectedAnswers.value)
+    console.log('Exam evaluated on server:', apiResult)
+  } catch (err) {
+    console.error('Failed to process exam payload with server:', err)
+  }
+
   examSubmitted.value = true
 }
 

@@ -1,320 +1,386 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { 
-  Sparkles, 
-  Plus, 
-  Search, 
-  Filter, 
-  CheckCircle, 
-  AlertTriangle, 
-  Trash2, 
-  Wand2, 
-  BookOpen, 
-  Layers,
-  Bot
-} from 'lucide-vue-next'
+import { ref, reactive, onMounted } from 'vue'
+import { Plus, Trash2, Image, Save, HelpCircle, Check, X, Eye } from 'lucide-vue-next'
 
-const searchQuery = ref('')
-const selectedCourse = ref('All')
-const selectedBloom = ref('All')
-const isAiModalOpen = ref(false)
-const isGenerating = ref(false)
+const questions = ref([])
+const courses = ref([])
+const isSubmitting = ref(false)
 
-// AI Generator Form Inputs
-const aiPrompt = ref({
-  course: 'NAV-101',
-  topic: 'COLREG Rule 15 Crossing Situations',
-  difficulty: 'Medium',
-  count: 2
+const form = reactive({
+  code: '',
+  courseId: '',
+  courseOutcomeId: 'CO1',
+  learningOutcomeId: 'LO1.1',
+  stcwStandard: 'Table A-II/1',
+  bloomLevel: 'Understanding',
+  type: 'multiple_choice', // multiple_choice | true_false | short_answer | matching
+  text: '',
+  imageUrl: '',
+  
+  // Type: Multiple Choice Options
+  options: [
+    { text: '', imageUrl: '', isCorrect: false },
+    { text: '', imageUrl: '', isCorrect: false }
+  ],
+  
+  // Type: True/False
+  tfCorrect: 'true',
+  
+  // Type: Short Answer
+  shortAnswerKeywords: '',
+  
+  // Type: Matching
+  matchingPairs: [
+    { prompt: '', promptImage: '', match: '', matchImage: '' },
+    { prompt: '', promptImage: '', match: '', matchImage: '' }
+  ]
 })
 
-const questions = ref([
-  {
-    id: 'Q-101',
-    code: 'NAV-101-01',
-    text: 'What is the primary objective of keeping a safe navigational watch under STCW?',
-    course: 'NAV-101',
-    bloomsLevel: 'Understanding',
-    options: [
-      'A. To reach destination early.',
-      'B. To avoid collision, stranding, and ensure environmental safety.',
-      'C. To log vessel speed hourly.',
-      'D. To report to shore authorities continuously.'
-    ],
-    correctAnswer: 1,
-    aiStatus: 'Validated',
-    aiScore: '98%',
-    stcwRef: 'Table A-II/1'
-  },
-  {
-    id: 'Q-102',
-    code: 'ENG-202-04',
-    text: 'Identify the key cause of thermal stress in medium-speed marine diesel engines.',
-    course: 'ENG-202',
-    bloomsLevel: 'Analysis',
-    options: [
-      'A. Low cooling water velocity.',
-      'B. Uneven heat distribution across cylinder liner.',
-      'C. High lubricating oil pressure.',
-      'D. Excessive fuel injection viscosity.'
-    ],
-    correctAnswer: 1,
-    aiStatus: 'Flagged',
-    aiScore: '65%',
-    stcwRef: 'Table A-III/1',
-    aiIssue: 'Option C & D may cause partial overlap depending on engine load.'
+// Image Upload Handler (Converts File to Base64 String)
+function handleFileUpload(event, targetObj, propertyName) {
+  const file = event.target.files[0]
+  if (!file) return
+  
+  if (file.size > 2 * 1024 * 1024) {
+    alert('File size exceeds 2MB limit.')
+    return
   }
-])
 
-const filteredQuestions = computed(() => {
-  return questions.value.filter(q => {
-    const matchesSearch = q.text.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                          q.code.toLowerCase().includes(searchQuery.value.toLowerCase())
-    const matchesCourse = selectedCourse.value === 'All' || q.course === selectedCourse.value
-    const matchesBloom = selectedBloom.value === 'All' || q.bloomsLevel === selectedBloom.value
-    return matchesSearch && matchesCourse && matchesBloom
-  })
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    targetObj[propertyName] = e.target.result
+  }
+  reader.readAsDataURL(file)
+}
+
+function removeImage(targetObj, propertyName) {
+  targetObj[propertyName] = ''
+}
+
+// Option Management for Multiple Choice
+function addOption() {
+  form.options.push({ text: '', imageUrl: '', isCorrect: false })
+}
+
+function removeOption(index) {
+  if (form.options.length > 2) {
+    form.options.splice(index, 1)
+  }
+}
+
+// Pair Management for Matching
+function addPair() {
+  form.matchingPairs.push({ prompt: '', promptImage: '', match: '', matchImage: '' })
+}
+
+function removePair(index) {
+  if (form.matchingPairs.length > 2) {
+    form.matchingPairs.splice(index, 1)
+  }
+}
+
+async function fetchQuestions() {
+  try {
+    const res = await fetch('http://localhost:3001/api/questions')
+    const data = await res.json()
+    if (data.success) questions.value = data.data
+  } catch (err) {
+    console.error('Failed to load question bank:', err)
+  }
+}
+
+async function fetchCourses() {
+  try {
+    const res = await fetch('http://localhost:3001/api/courses')
+    const data = await res.json()
+    if (data.success) courses.value = data.data
+  } catch (err) {
+    console.error('Failed to load courses:', err)
+  }
+}
+
+async function saveQuestion() {
+  if (!form.code || !form.text) {
+    alert('Please complete the question code and stem text.')
+    return
+  }
+
+  // Format payload based on question type
+  let formattedOptions = []
+  let formattedCorrectAnswer = null
+  let formattedMatchingPairs = []
+
+  if (form.type === 'multiple_choice') {
+    formattedOptions = form.options.map(opt => ({ text: opt.text, imageUrl: opt.imageUrl }))
+    // Array of indices marked as correct (supports single or multiple)
+    formattedCorrectAnswer = form.options
+      .map((opt, idx) => opt.isCorrect ? idx : null)
+      .filter(val => val !== null)
+    
+    if (formattedCorrectAnswer.length === 0) {
+      alert('Please mark at least one option as the correct answer.')
+      return
+    }
+  } else if (form.type === 'true_false') {
+    formattedOptions = ['True', 'False']
+    formattedCorrectAnswer = form.tfCorrect === 'true' ? 0 : 1
+  } else if (form.type === 'short_answer') {
+    formattedCorrectAnswer = form.shortAnswerKeywords.split(',').map(s => s.trim())
+  } else if (form.type === 'matching') {
+    formattedMatchingPairs = form.matchingPairs
+  }
+
+  const payload = {
+    code: form.code,
+    courseId: form.courseId || (courses.value[0]?.id || 'CRS-NAV101'),
+    courseOutcomeId: form.courseOutcomeId,
+    learningOutcomeId: form.learningOutcomeId,
+    stcwStandard: form.stcwStandard,
+    bloomLevel: form.bloomLevel,
+    type: form.type,
+    text: form.text,
+    imageUrl: form.imageUrl,
+    options: formattedOptions,
+    correctAnswer: formattedCorrectAnswer,
+    matchingPairs: formattedMatchingPairs
+  }
+
+  isSubmitting.value = true
+  try {
+    const res = await fetch('http://localhost:3001/api/questions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    const data = await res.json()
+
+    if (data.success) {
+      alert('Question saved to database.')
+      resetForm()
+      fetchQuestions()
+    } else {
+      alert(`Save error: ${data.error}`)
+    }
+  } catch (err) {
+    alert('Failed to connect to backend server on port 3001.')
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+function resetForm() {
+  form.code = ''
+  form.text = ''
+  form.imageUrl = ''
+  form.shortAnswerKeywords = ''
+  form.options = [
+    { text: '', imageUrl: '', isCorrect: false },
+    { text: '', imageUrl: '', isCorrect: false }
+  ]
+  form.matchingPairs = [
+    { prompt: '', promptImage: '', match: '', matchImage: '' },
+    { prompt: '', promptImage: '', match: '', matchImage: '' }
+  ]
+}
+
+onMounted(() => {
+  fetchQuestions()
+  fetchCourses()
 })
-
-function generateAiQuestions() {
-  isGenerating.value = true
-  setTimeout(() => {
-    const newItems = [
-      {
-        id: `Q-${Date.now()}`,
-        code: `${aiPrompt.value.course}-${Math.floor(Math.random() * 90 + 10)}`,
-        text: `[AI Generated] Under ${aiPrompt.value.topic}, which action is required by the give-way vessel?`,
-        course: aiPrompt.value.course,
-        bloomsLevel: 'Application',
-        options: [
-          'A. Maintain speed and course.',
-          'B. Take early and substantial action to keep well clear.',
-          'C. Sound 5 short rapid blasts and stop engines.',
-          'D. Turn to port regardless of vessel position.'
-        ],
-        correctAnswer: 1,
-        aiStatus: 'Validated',
-        aiScore: '96%',
-        stcwRef: 'STCW A-II/1'
-      }
-    ]
-    questions.value.unshift(...newItems)
-    isGenerating.value = false
-    isAiModalOpen.value = false
-  }, 1500)
-}
-
-function deleteQuestion(id) {
-  if (confirm('Delete this item from the question bank?')) {
-    questions.value = questions.value.filter(q => q.id !== id)
-  }
-}
 </script>
 
 <template>
-  <div class="p-6 max-w-7xl mx-auto space-y-6">
+  <div class="p-6 max-w-7xl mx-auto space-y-8">
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div class="bg-slate-900 text-white p-6 rounded-2xl flex justify-between items-center shadow-md">
       <div>
-        <h1 class="text-3xl font-bold text-gray-900">Question Bank</h1>
-        <p class="text-gray-500 mt-1">Repository of maritime items with real-time AI validation.</p>
+        <h1 class="text-xl font-bold flex items-center gap-2">
+          <HelpCircle class="text-emerald-400" :size="22" /> STCW Question Authoring Suite
+        </h1>
+        <p class="text-xs text-slate-300">Create and manage multi-type assessment items with image media support.</p>
       </div>
-
-      <div class="flex items-center gap-3">
-        <button 
-          @click="isAiModalOpen = true"
-          class="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
-        >
-          <Sparkles :size="16" />
-          AI Question Draft
-        </button>
-      </div>
+      <span class="px-3 py-1 bg-slate-800 border border-slate-700 text-emerald-400 text-xs font-mono font-bold rounded-lg">
+        Bank Size: {{ questions.length }} Items
+      </span>
     </div>
 
-    <!-- Filters & Search -->
-    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 justify-between items-center">
-      <div class="relative w-full md:w-96">
-        <Search :size="18" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input 
-          v-model="searchQuery" 
-          type="text" 
-          placeholder="Search question text or code..." 
-          class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-        />
+    <!-- Question Authoring Form -->
+    <div class="bg-white border rounded-2xl p-6 shadow-sm space-y-6">
+      <h2 class="text-sm font-bold text-slate-900 border-b pb-3 uppercase tracking-wide">Question Metadata & Type Selection</h2>
+      
+      <!-- Metadata Row -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Item Code / Reference</label>
+          <input v-model="form.code" placeholder="e.g. NAV-Q104" class="w-full p-2.5 border rounded-lg font-mono" />
+        </div>
+
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">STCW Standard</label>
+          <select v-model="form.stcwStandard" class="w-full p-2.5 border rounded-lg">
+            <option value="Table A-II/1">Table A-II/1 (Deck Officers)</option>
+            <option value="Table A-III/1">Table A-III/1 (Engine Officers)</option>
+            <option value="Table A-VI/1">Table A-VI/1 (Safety Training)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Bloom's Taxonomy Level</label>
+          <select v-model="form.bloomLevel" class="w-full p-2.5 border rounded-lg">
+            <option value="Remembering">Remembering</option>
+            <option value="Understanding">Understanding</option>
+            <option value="Application">Application</option>
+            <option value="Analysis">Analysis</option>
+            <option value="Evaluation">Evaluation</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Question Type</label>
+          <select v-model="form.type" class="w-full p-2.5 border rounded-lg bg-emerald-50 text-emerald-900 font-bold">
+            <option value="multiple_choice">Multiple Choice (Single/Multi Answer)</option>
+            <option value="true_false">True / False</option>
+            <option value="short_answer">Short Answer / Keywords</option>
+            <option value="matching">Matching Pairs</option>
+          </select>
+        </div>
       </div>
 
-      <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
-        <select 
-          v-model="selectedCourse"
-          class="border border-gray-300 rounded-lg text-sm px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-emerald-500"
-        >
-          <option value="All">All Courses</option>
-          <option value="NAV-101">NAV-101</option>
-          <option value="ENG-202">ENG-202</option>
-          <option value="SAF-301">SAF-301</option>
-        </select>
+      <!-- Question Stem Section -->
+      <div class="space-y-3">
+        <label class="font-bold text-xs text-slate-700 block">Question Stem / Scenario Text</label>
+        <textarea v-model="form.text" rows="3" placeholder="Enter full question statement..." class="w-full p-3 border rounded-xl text-xs font-medium"></textarea>
 
-        <select 
-          v-model="selectedBloom"
-          class="border border-gray-300 rounded-lg text-sm px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-emerald-500"
-        >
-          <option value="All">All Bloom's Levels</option>
-          <option value="Understanding">Understanding</option>
-          <option value="Application">Application</option>
-          <option value="Analysis">Analysis</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Questions List -->
-    <div class="space-y-4">
-      <div 
-        v-for="q in filteredQuestions" 
-        :key="q.id"
-        class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:border-gray-300 transition-all space-y-4"
-      >
-        <div class="flex justify-between items-start gap-4">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-mono font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                {{ q.code }}
-              </span>
-              <span class="text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                {{ q.course }}
-              </span>
-              <span class="text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-0.5 rounded-full">
-                {{ q.bloomsLevel }}
-              </span>
-            </div>
-            <h3 class="text-base font-bold text-gray-900 pt-1">{{ q.text }}</h3>
+        <!-- Question Stem Image Attachment -->
+        <div class="flex items-center gap-4 bg-slate-50 p-3 rounded-xl border border-dashed">
+          <div class="flex-1">
+            <span class="text-[11px] font-bold text-slate-700 block mb-1">Question Stem Diagram / Image (Optional)</span>
+            <input type="file" accept="image/*" @change="e => handleFileUpload(e, form, 'imageUrl')" class="text-xs text-slate-500" />
           </div>
-
-          <!-- AI Status Tag -->
-          <div class="flex items-center gap-2 shrink-0">
-            <span 
-              v-if="q.aiStatus === 'Validated'" 
-              class="inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800"
-            >
-              <CheckCircle :size="14" /> AI Passed ({{ q.aiScore }})
-            </span>
-            <span 
-              v-else 
-              class="inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full bg-red-100 text-red-800"
-            >
-              <AlertTriangle :size="14" /> Review Flag ({{ q.aiScore }})
-            </span>
-
-            <button 
-              @click="deleteQuestion(q.id)" 
-              class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-            >
-              <Trash2 :size="16" />
+          <div v-if="form.imageUrl" class="relative group">
+            <img :src="form.imageUrl" class="h-16 w-16 object-cover rounded-lg border" />
+            <button @click="removeImage(form, 'imageUrl')" class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 shadow">
+              <X :size="12" />
             </button>
           </div>
         </div>
+      </div>
 
-        <!-- Options Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-          <div 
-            v-for="(opt, idx) in q.options" 
-            :key="idx"
-            :class="[
-              'p-3 rounded-lg text-xs font-medium border',
-              q.correctAnswer === idx 
-                ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950 font-bold' 
-                : 'bg-gray-50/50 border-gray-200 text-gray-700'
-            ]"
-          >
-            {{ opt }}
-          </div>
+      <hr class="border-slate-200" />
+
+      <!-- TYPE 1: Multiple Choice Config -->
+      <div v-if="form.type === 'multiple_choice'" class="space-y-4">
+        <div class="flex justify-between items-center">
+          <span class="text-xs font-bold text-slate-800">Multiple Choice Items (Check all correct answers)</span>
+          <button @click="addOption" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1">
+            <Plus :size="14" /> Add Option
+          </button>
         </div>
 
-        <!-- AI Note (If Flagged) -->
-        <div v-if="q.aiIssue" class="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 flex items-start gap-2">
-          <AlertTriangle :size="16" class="shrink-0 mt-0.5" />
-          <div>
-            <span class="font-bold">AI Quality Warning:</span> {{ q.aiIssue }}
+        <div v-for="(opt, idx) in form.options" :key="idx" class="p-3 border rounded-xl space-y-2 bg-slate-50/50">
+          <div class="flex items-center gap-3">
+            <input type="checkbox" v-model="opt.isCorrect" title="Mark as correct answer" class="w-4 h-4 text-emerald-600 rounded" />
+            <span class="font-mono text-xs font-bold">{{ String.fromCharCode(65 + idx) }}.</span>
+            <input v-model="opt.text" :placeholder="'Option ' + String.fromCharCode(65 + idx) + ' text...'" class="flex-1 p-2 border rounded-lg text-xs bg-white" />
+            
+            <label class="cursor-pointer text-slate-500 hover:text-slate-800 p-2">
+              <Image :size="16" />
+              <input type="file" accept="image/*" @change="e => handleFileUpload(e, opt, 'imageUrl')" class="hidden" />
+            </label>
+
+            <button v-if="form.options.length > 2" @click="removeOption(idx)" class="text-red-500 hover:text-red-700 p-2">
+              <Trash2 :size="16" />
+            </button>
+          </div>
+
+          <!-- Option Image Preview -->
+          <div v-if="opt.imageUrl" class="flex items-center gap-2 pl-10">
+            <img :src="opt.imageUrl" class="h-12 w-12 object-cover rounded border" />
+            <button @click="removeImage(opt, 'imageUrl')" class="text-xs text-red-600 font-bold">Remove Image</button>
           </div>
         </div>
       </div>
+
+      <!-- TYPE 2: True / False Config -->
+      <div v-else-if="form.type === 'true_false'" class="space-y-3">
+        <span class="text-xs font-bold text-slate-800 block">Correct Statement Answer</span>
+        <div class="flex gap-4">
+          <label class="flex-1 p-4 border rounded-xl flex items-center gap-3 cursor-pointer hover:bg-slate-50">
+            <input type="radio" value="true" v-model="form.tfCorrect" class="text-emerald-600" />
+            <span class="text-xs font-bold">True</span>
+          </label>
+          <label class="flex-1 p-4 border rounded-xl flex items-center gap-3 cursor-pointer hover:bg-slate-50">
+            <input type="radio" value="false" v-model="form.tfCorrect" class="text-emerald-600" />
+            <span class="text-xs font-bold">False</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- TYPE 3: Short Answer Config -->
+      <div v-else-if="form.type === 'short_answer'" class="space-y-2">
+        <span class="text-xs font-bold text-slate-800 block">Accepted Keywords / Exact Phrases (Comma Separated)</span>
+        <input v-model="form.shortAnswerKeywords" placeholder="e.g. Deviation, Magnetic Error, Compass Deviation" class="w-full p-3 border rounded-xl text-xs font-mono" />
+      </div>
+
+      <!-- TYPE 4: Matching Pairs Config -->
+      <div v-else-if="form.type === 'matching'" class="space-y-4">
+        <div class="flex justify-between items-center">
+          <span class="text-xs font-bold text-slate-800">Matching Pairs Configurator</span>
+          <button @click="addPair" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1">
+            <Plus :size="14" /> Add Matching Pair
+          </button>
+        </div>
+
+        <div v-for="(pair, idx) in form.matchingPairs" :key="idx" class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-xl bg-slate-50 relative">
+          <!-- Left Item -->
+          <div class="space-y-2">
+            <span class="text-[11px] font-bold text-slate-700 block">Premise Item {{ idx + 1 }}</span>
+            <input v-model="pair.prompt" placeholder="Premise text..." class="w-full p-2 border rounded-lg text-xs bg-white" />
+            <div class="flex items-center gap-2">
+              <input type="file" accept="image/*" @change="e => handleFileUpload(e, pair, 'promptImage')" class="text-[10px]" />
+              <img v-if="pair.promptImage" :src="pair.promptImage" class="h-8 w-8 object-cover rounded border" />
+            </div>
+          </div>
+
+          <!-- Right Item -->
+          <div class="space-y-2">
+            <span class="text-[11px] font-bold text-slate-700 block">Target Match {{ idx + 1 }}</span>
+            <input v-model="pair.match" placeholder="Matching target text..." class="w-full p-2 border rounded-lg text-xs bg-white" />
+            <div class="flex items-center gap-2">
+              <input type="file" accept="image/*" @change="e => handleFileUpload(e, pair, 'matchImage')" class="text-[10px]" />
+              <img v-if="pair.matchImage" :src="pair.matchImage" class="h-8 w-8 object-cover rounded border" />
+            </div>
+          </div>
+
+          <button v-if="form.matchingPairs.length > 2" @click="removePair(idx)" class="absolute top-2 right-2 text-red-500 hover:text-red-700">
+            <X :size="14" />
+          </button>
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <button @click="saveQuestion" :disabled="isSubmitting" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2">
+        <Save :size="16" /> {{ isSubmitting ? 'Saving to Database...' : 'Save Assessment Item' }}
+      </button>
     </div>
 
-    <!-- AI Generator Modal -->
-    <div v-if="isAiModalOpen" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5">
-        <div class="flex items-center gap-3 text-purple-700">
-          <Bot :size="28" />
-          <div>
-            <h3 class="text-lg font-bold text-gray-900">AI Question Generator</h3>
-            <p class="text-xs text-gray-500">Draft STCW-aligned multiple choice items automatically.</p>
-          </div>
-        </div>
+    <!-- Questions Bank List View -->
+    <div class="bg-white border rounded-2xl p-6 shadow-sm space-y-4">
+      <h2 class="text-sm font-bold text-slate-900 border-b pb-3 uppercase tracking-wide">Existing STCW Item Repository</h2>
 
-        <div class="space-y-4">
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1">Target Course</label>
-            <select 
-              v-model="aiPrompt.course"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-            >
-              <option value="NAV-101">NAV-101 Terrestrial Navigation</option>
-              <option value="ENG-202">ENG-202 Diesel Engineering</option>
-              <option value="SAF-301">SAF-301 Maritime Safety</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1">STCW Competency / Topic</label>
-            <input 
-              v-model="aiPrompt.topic"
-              type="text"
-              placeholder="e.g. Radar Plotting and Target Tracking"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500"
-            />
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-semibold text-gray-700 mb-1">Difficulty</label>
-              <select 
-                v-model="aiPrompt.difficulty"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-              >
-                <option value="Easy">Easy</option>
-                <option value="Medium">Medium</option>
-                <option value="Hard">Hard</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-gray-700 mb-1">Number of Items</label>
-              <select 
-                v-model="aiPrompt.count"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-              >
-                <option :value="1">1 Question</option>
-                <option :value="2">2 Questions</option>
-                <option :value="5">5 Questions</option>
-              </select>
+      <div class="divide-y">
+        <div v-for="q in questions" :key="q.id" class="py-4 space-y-2">
+          <div class="flex justify-between items-start">
+            <div class="space-x-2">
+              <span class="font-mono text-xs font-bold text-slate-900 px-2 py-0.5 bg-slate-100 rounded">{{ q.code }}</span>
+              <span class="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold uppercase">{{ q.type }}</span>
+              <span class="text-xs text-slate-500 font-medium">{{ q.stcwStandard }} | {{ q.bloomLevel }}</span>
             </div>
           </div>
-        </div>
 
-        <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
-          <button 
-            @click="isAiModalOpen = false" 
-            class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button 
-            @click="generateAiQuestions" 
-            :disabled="isGenerating"
-            class="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
-          >
-            <Sparkles :size="16" :class="{ 'animate-spin': isGenerating }" />
-            <span>{{ isGenerating ? 'Generating...' : 'Generate Items' }}</span>
-          </button>
+          <p class="text-xs font-semibold text-slate-800">{{ q.text }}</p>
+
+          <img v-if="q.imageUrl" :src="q.imageUrl" class="h-20 w-auto object-cover rounded-lg border" />
         </div>
       </div>
     </div>
