@@ -23,6 +23,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS questions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     program TEXT DEFAULT 'Both',
+    term TEXT DEFAULT 'Midterm',
     courseId TEXT NOT NULL,
     courseOutcomeId TEXT NOT NULL,
     learningOutcomeId TEXT NOT NULL,
@@ -67,12 +68,14 @@ db.exec(`
   );
 `)
 
-// Schema migration safety check for existing SQLite databases
+// Schema migration safety checks for existing SQLite databases
 try {
   db.exec("ALTER TABLE questions ADD COLUMN program TEXT DEFAULT 'Both';")
-} catch (e) {
-  // Column already exists
-}
+} catch (e) {}
+
+try {
+  db.exec("ALTER TABLE questions ADD COLUMN term TEXT DEFAULT 'Midterm';")
+} catch (e) {}
 
 // Audit Helper Function
 function logAuditEvent(userId, action, target, details = '') {
@@ -171,13 +174,17 @@ app.delete('/api/courses/:id', (req, res) => {
 
 // --- QUESTION BANK ENDPOINTS WITH FILTERING & CRUD ---
 app.get('/api/questions', (req, res) => {
-  const { program, courseId, courseOutcomeId, learningOutcomeId, bloomLevel, type, search } = req.query
+  const { program, term, courseId, courseOutcomeId, learningOutcomeId, bloomLevel, type, search } = req.query
   let query = 'SELECT * FROM questions WHERE 1=1'
   const params = []
 
   if (program && program !== 'Both') {
     query += ' AND (program = ? OR program = "Both")'
     params.push(program)
+  }
+  if (term) {
+    query += ' AND term = ?'
+    params.push(term)
   }
   if (courseId) {
     query += ' AND courseId = ?'
@@ -222,18 +229,21 @@ app.get('/api/questions', (req, res) => {
 
 app.post('/api/questions', (req, res) => {
   const q = req.body
+  const generatedCode = q.code || `Q-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+
   try {
     const stmt = db.prepare(`
       INSERT INTO questions 
-      (program, courseId, courseOutcomeId, learningOutcomeId, code, type, text, imageUrl, options, correctAnswer, matchingPairs, stcwStandard, bloomLevel)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (program, term, courseId, courseOutcomeId, learningOutcomeId, code, type, text, imageUrl, options, correctAnswer, matchingPairs, stcwStandard, bloomLevel)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     const info = stmt.run(
       q.program || 'Both',
+      q.term || 'Midterm',
       q.courseId || '',
       q.courseOutcomeId || '',
       q.learningOutcomeId || '',
-      q.code,
+      generatedCode,
       q.type,
       q.text,
       q.imageUrl || '',
@@ -243,7 +253,7 @@ app.post('/api/questions', (req, res) => {
       q.stcwStandard || 'Table A-II/1',
       q.bloomLevel || 'Understanding'
     )
-    logAuditEvent('SYSTEM', 'CREATE_QUESTION', q.code, q.type)
+    logAuditEvent('SYSTEM', 'CREATE_QUESTION', generatedCode, q.type)
     res.status(201).json({ success: true, id: info.lastInsertRowid })
   } catch (err) {
     res.status(400).json({ success: false, error: err.message })
@@ -252,29 +262,32 @@ app.post('/api/questions', (req, res) => {
 
 app.put('/api/questions/:id', (req, res) => {
   const q = req.body
+  const itemCode = q.code || `Q-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+
   try {
     const stmt = db.prepare(`
       UPDATE questions 
-      SET program = ?, courseId = ?, courseOutcomeId = ?, learningOutcomeId = ?, code = ?, type = ?, text = ?, imageUrl = ?, options = ?, correctAnswer = ?, matchingPairs = ?, stcwStandard = ?, bloomLevel = ?
+      SET program = ?, term = ?, courseId = ?, courseOutcomeId = ?, learningOutcomeId = ?, code = ?, type = ?, text = ?, imageUrl = ?, options = ?, correctAnswer = ?, matchingPairs = ?, stcwStandard = ?, bloomLevel = ?
       WHERE id = ?
     `)
     stmt.run(
       q.program || 'Both',
+      q.term || 'Midterm',
       q.courseId,
       q.courseOutcomeId,
       q.learningOutcomeId,
-      q.code,
+      itemCode,
       q.type,
       q.text,
       q.imageUrl || '',
       JSON.stringify(q.options || []),
       JSON.stringify(q.correctAnswer ?? null),
       JSON.stringify(q.matchingPairs || []),
-      q.stcwStandard,
+      q.stcwStandard || 'Table A-II/1',
       q.bloomLevel,
       req.params.id
     )
-    logAuditEvent('SYSTEM', 'UPDATE_QUESTION', q.code)
+    logAuditEvent('SYSTEM', 'UPDATE_QUESTION', itemCode)
     res.json({ success: true })
   } catch (err) {
     res.status(400).json({ success: false, error: err.message })
@@ -297,18 +310,20 @@ app.post('/api/questions/bulk', (req, res) => {
 
   const stmt = db.prepare(`
     INSERT OR REPLACE INTO questions 
-    (program, courseId, courseOutcomeId, learningOutcomeId, code, type, text, imageUrl, options, correctAnswer, matchingPairs, stcwStandard, bloomLevel)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (program, term, courseId, courseOutcomeId, learningOutcomeId, code, type, text, imageUrl, options, correctAnswer, matchingPairs, stcwStandard, bloomLevel)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
   const insertMany = db.transaction((items) => {
     for (const q of items) {
+      const generatedCode = q.code || `Q-${Date.now()}-${Math.floor(Math.random() * 10000)}`
       stmt.run(
         q.program || 'Both',
-        q.courseId,
-        q.courseOutcomeId,
-        q.learningOutcomeId,
-        q.code,
+        q.term || 'Midterm',
+        q.courseId || '',
+        q.courseOutcomeId || '',
+        q.learningOutcomeId || '',
+        generatedCode,
         q.type,
         q.text,
         q.imageUrl || '',
@@ -331,7 +346,7 @@ app.post('/api/questions/bulk', (req, res) => {
 
 // --- EXAM GENERATOR & CADET SUBMISSIONS ---
 app.post('/api/exams/generate', (req, res) => {
-  const { program, courseId, courseOutcomeId, learningOutcomeId, totalItems, bloomRatios } = req.body
+  const { program, term, courseId, courseOutcomeId, learningOutcomeId, totalItems, bloomRatios } = req.body
 
   try {
     let query = 'SELECT * FROM questions WHERE 1=1'
@@ -340,6 +355,10 @@ app.post('/api/exams/generate', (req, res) => {
     if (program && program !== 'Both') {
       query += ' AND (program = ? OR program = "Both")'
       params.push(program)
+    }
+    if (term) {
+      query += ' AND term = ?'
+      params.push(term)
     }
     if (courseId) {
       query += ' AND courseId = ?'
