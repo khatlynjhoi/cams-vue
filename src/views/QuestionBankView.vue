@@ -1,82 +1,79 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { Plus, Trash2, Image, Save, HelpCircle, Check, X, Eye } from 'lucide-vue-next'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { HelpCircle, Save, Plus, Trash2, Image, X } from 'lucide-vue-next'
 
 const questions = ref([])
 const courses = ref([])
 const isSubmitting = ref(false)
 
 const form = reactive({
-  code: '',
+  program: 'Both', // BSMarE | BSMT | Both
   courseId: '',
-  courseOutcomeId: 'CO1',
-  learningOutcomeId: 'LO1.1',
+  courseOutcomeId: '',
+  learningOutcomeId: '',
+  code: '',
   stcwStandard: 'Table A-II/1',
   bloomLevel: 'Understanding',
-  type: 'multiple_choice', // multiple_choice | true_false | short_answer | matching
+  type: 'multiple_choice',
   text: '',
   imageUrl: '',
-  
-  // Type: Multiple Choice Options
   options: [
     { text: '', imageUrl: '', isCorrect: false },
     { text: '', imageUrl: '', isCorrect: false }
   ],
-  
-  // Type: True/False
   tfCorrect: 'true',
-  
-  // Type: Short Answer
   shortAnswerKeywords: '',
-  
-  // Type: Matching
   matchingPairs: [
     { prompt: '', promptImage: '', match: '', matchImage: '' },
     { prompt: '', promptImage: '', match: '', matchImage: '' }
   ]
 })
 
-// Image Upload Handler (Converts File to Base64 String)
+// Filter courses based on program selection
+const filteredCourses = computed(() => {
+  if (form.program === 'Both') return courses.value
+  return courses.value.filter(c => !c.program || c.program === form.program || c.program === 'Both')
+})
+
+// Cascading Course Outcomes
+const availableCourseOutcomes = computed(() => {
+  const selectedCourse = courses.value.find(c => c.id === form.courseId)
+  if (!selectedCourse || !selectedCourse.courseOutcomes) return []
+  return selectedCourse.courseOutcomes
+})
+
+// Cascading Learning Outcomes
+const availableLearningOutcomes = computed(() => {
+  const selectedCO = availableCourseOutcomes.value.find(co => (co.id || co.code) === form.courseOutcomeId)
+  if (!selectedCO || !selectedCO.learningOutcomes) return []
+  return selectedCO.learningOutcomes
+})
+
+function onProgramChange() {
+  form.courseId = ''
+  form.courseOutcomeId = ''
+  form.learningOutcomeId = ''
+}
+
+function onCourseChange() {
+  form.courseOutcomeId = ''
+  form.learningOutcomeId = ''
+}
+
+function onCOChange() {
+  form.learningOutcomeId = ''
+}
+
 function handleFileUpload(event, targetObj, propertyName) {
   const file = event.target.files[0]
   if (!file) return
-  
-  if (file.size > 2 * 1024 * 1024) {
-    alert('File size exceeds 2MB limit.')
-    return
-  }
-
   const reader = new FileReader()
-  reader.onload = (e) => {
-    targetObj[propertyName] = e.target.result
-  }
+  reader.onload = (e) => { targetObj[propertyName] = e.target.result }
   reader.readAsDataURL(file)
 }
 
 function removeImage(targetObj, propertyName) {
   targetObj[propertyName] = ''
-}
-
-// Option Management for Multiple Choice
-function addOption() {
-  form.options.push({ text: '', imageUrl: '', isCorrect: false })
-}
-
-function removeOption(index) {
-  if (form.options.length > 2) {
-    form.options.splice(index, 1)
-  }
-}
-
-// Pair Management for Matching
-function addPair() {
-  form.matchingPairs.push({ prompt: '', promptImage: '', match: '', matchImage: '' })
-}
-
-function removePair(index) {
-  if (form.matchingPairs.length > 2) {
-    form.matchingPairs.splice(index, 1)
-  }
 }
 
 async function fetchQuestions() {
@@ -85,7 +82,7 @@ async function fetchQuestions() {
     const data = await res.json()
     if (data.success) questions.value = data.data
   } catch (err) {
-    console.error('Failed to load question bank:', err)
+    console.error('Failed to load questions:', err)
   }
 }
 
@@ -100,25 +97,23 @@ async function fetchCourses() {
 }
 
 async function saveQuestion() {
-  if (!form.code || !form.text) {
-    alert('Please complete the question code and stem text.')
+  if (!form.courseId || !form.code || !form.text) {
+    alert('Please complete the Program, Course, Item Code, and Question Text fields.')
     return
   }
 
-  // Format payload based on question type
   let formattedOptions = []
   let formattedCorrectAnswer = null
   let formattedMatchingPairs = []
 
   if (form.type === 'multiple_choice') {
     formattedOptions = form.options.map(opt => ({ text: opt.text, imageUrl: opt.imageUrl }))
-    // Array of indices marked as correct (supports single or multiple)
     formattedCorrectAnswer = form.options
       .map((opt, idx) => opt.isCorrect ? idx : null)
       .filter(val => val !== null)
     
     if (formattedCorrectAnswer.length === 0) {
-      alert('Please mark at least one option as the correct answer.')
+      alert('Please select at least one correct option.')
       return
     }
   } else if (form.type === 'true_false') {
@@ -130,20 +125,7 @@ async function saveQuestion() {
     formattedMatchingPairs = form.matchingPairs
   }
 
-  const payload = {
-    code: form.code,
-    courseId: form.courseId || (courses.value[0]?.id || 'CRS-NAV101'),
-    courseOutcomeId: form.courseOutcomeId,
-    learningOutcomeId: form.learningOutcomeId,
-    stcwStandard: form.stcwStandard,
-    bloomLevel: form.bloomLevel,
-    type: form.type,
-    text: form.text,
-    imageUrl: form.imageUrl,
-    options: formattedOptions,
-    correctAnswer: formattedCorrectAnswer,
-    matchingPairs: formattedMatchingPairs
-  }
+  const payload = { ...form, options: formattedOptions, correctAnswer: formattedCorrectAnswer, matchingPairs: formattedMatchingPairs }
 
   isSubmitting.value = true
   try {
@@ -153,34 +135,17 @@ async function saveQuestion() {
       body: JSON.stringify(payload)
     })
     const data = await res.json()
-
     if (data.success) {
-      alert('Question saved to database.')
-      resetForm()
+      alert('Question created successfully.')
       fetchQuestions()
     } else {
-      alert(`Save error: ${data.error}`)
+      alert(`Error: ${data.error}`)
     }
   } catch (err) {
-    alert('Failed to connect to backend server on port 3001.')
+    alert('Failed to connect to backend server.')
   } finally {
     isSubmitting.value = false
   }
-}
-
-function resetForm() {
-  form.code = ''
-  form.text = ''
-  form.imageUrl = ''
-  form.shortAnswerKeywords = ''
-  form.options = [
-    { text: '', imageUrl: '', isCorrect: false },
-    { text: '', imageUrl: '', isCorrect: false }
-  ]
-  form.matchingPairs = [
-    { prompt: '', promptImage: '', match: '', matchImage: '' },
-    { prompt: '', promptImage: '', match: '', matchImage: '' }
-  ]
 }
 
 onMounted(() => {
@@ -190,42 +155,84 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="p-6 max-w-7xl mx-auto space-y-8">
-    <!-- Header -->
+  <div class="p-6 max-w-7xl mx-auto space-y-6">
     <div class="bg-slate-900 text-white p-6 rounded-2xl flex justify-between items-center shadow-md">
       <div>
         <h1 class="text-xl font-bold flex items-center gap-2">
-          <HelpCircle class="text-emerald-400" :size="22" /> STCW Question Authoring Suite
+          <HelpCircle class="text-emerald-400" :size="22" /> Assessment Question Authoring
         </h1>
-        <p class="text-xs text-slate-300">Create and manage multi-type assessment items with image media support.</p>
+        <p class="text-xs text-slate-300">Map items by Program, Course Code, Outcomes, and Bloom's Taxonomy.</p>
       </div>
-      <span class="px-3 py-1 bg-slate-800 border border-slate-700 text-emerald-400 text-xs font-mono font-bold rounded-lg">
-        Bank Size: {{ questions.length }} Items
-      </span>
     </div>
 
-    <!-- Question Authoring Form -->
+    <!-- Curriculum Mapping & Metadata Panel -->
     <div class="bg-white border rounded-2xl p-6 shadow-sm space-y-6">
-      <h2 class="text-sm font-bold text-slate-900 border-b pb-3 uppercase tracking-wide">Question Metadata & Type Selection</h2>
+      <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider border-b pb-2">1. Program & Curriculum Mapping</h2>
       
-      <!-- Metadata Row -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+        <!-- Program Selector -->
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Program</label>
+          <select v-model="form.program" @change="onProgramChange" class="w-full p-2.5 border rounded-lg bg-slate-50 font-bold text-slate-900">
+            <option value="Both">Both (BSMT & BSMarE)</option>
+            <option value="BSMT">BSMT (Marine Transportation)</option>
+            <option value="BSMarE">BSMarE (Marine Engineering)</option>
+          </select>
+        </div>
+
+        <!-- Course Code Selector -->
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Course Code</label>
+          <select v-model="form.courseId" @change="onCourseChange" class="w-full p-2.5 border rounded-lg font-medium">
+            <option value="">Select Course Code</option>
+            <option v-for="c in filteredCourses" :key="c.id" :value="c.id">
+              {{ c.code }} - {{ c.title }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Course Outcome (CO) Selector -->
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Course Outcome (CO)</label>
+          <select v-model="form.courseOutcomeId" @change="onCOChange" :disabled="!form.courseId" class="w-full p-2.5 border rounded-lg disabled:bg-slate-100">
+            <option value="">Select Course Outcome</option>
+            <option v-for="co in availableCourseOutcomes" :key="co.id || co.code" :value="co.id || co.code">
+              {{ co.code || co.id }}: {{ co.description || co.title }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Learning Outcome (LO) Selector -->
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Learning Outcome (LO)</label>
+          <select v-model="form.learningOutcomeId" :disabled="!form.courseOutcomeId" class="w-full p-2.5 border rounded-lg disabled:bg-slate-100">
+            <option value="">Select Learning Outcome</option>
+            <option v-for="lo in availableLearningOutcomes" :key="lo.id || lo.code" :value="lo.id || lo.code">
+              {{ lo.code || lo.id }}: {{ lo.description || lo.title }}
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider border-b pb-2 pt-2">2. Item Details & Classification</h2>
+
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
         <div>
-          <label class="font-bold text-slate-700 block mb-1">Item Code / Reference</label>
-          <input v-model="form.code" placeholder="e.g. NAV-Q104" class="w-full p-2.5 border rounded-lg font-mono" />
+          <label class="font-bold text-slate-700 block mb-1">Item Code</label>
+          <input v-model="form.code" placeholder="e.g. NAV-2026-Q1" class="w-full p-2.5 border rounded-lg font-mono" />
         </div>
 
         <div>
           <label class="font-bold text-slate-700 block mb-1">STCW Standard</label>
           <select v-model="form.stcwStandard" class="w-full p-2.5 border rounded-lg">
-            <option value="Table A-II/1">Table A-II/1 (Deck Officers)</option>
-            <option value="Table A-III/1">Table A-III/1 (Engine Officers)</option>
-            <option value="Table A-VI/1">Table A-VI/1 (Safety Training)</option>
+            <option value="Table A-II/1">Table A-II/1 (Deck Officer)</option>
+            <option value="Table A-III/1">Table A-III/1 (Engine Officer)</option>
+            <option value="Table A-VI/1">Table A-VI/1 (Basic Safety)</option>
           </select>
         </div>
 
         <div>
-          <label class="font-bold text-slate-700 block mb-1">Bloom's Taxonomy Level</label>
+          <label class="font-bold text-slate-700 block mb-1">Bloom's Taxonomy</label>
           <select v-model="form.bloomLevel" class="w-full p-2.5 border rounded-lg">
             <option value="Remembering">Remembering</option>
             <option value="Understanding">Understanding</option>
@@ -237,152 +244,33 @@ onMounted(() => {
 
         <div>
           <label class="font-bold text-slate-700 block mb-1">Question Type</label>
-          <select v-model="form.type" class="w-full p-2.5 border rounded-lg bg-emerald-50 text-emerald-900 font-bold">
-            <option value="multiple_choice">Multiple Choice (Single/Multi Answer)</option>
+          <select v-model="form.type" class="w-full p-2.5 border rounded-lg font-bold bg-emerald-50 text-emerald-900">
+            <option value="multiple_choice">Multiple Choice</option>
             <option value="true_false">True / False</option>
-            <option value="short_answer">Short Answer / Keywords</option>
+            <option value="short_answer">Short Answer</option>
             <option value="matching">Matching Pairs</option>
           </select>
         </div>
       </div>
 
-      <!-- Question Stem Section -->
+      <!-- Stem Input -->
       <div class="space-y-3">
-        <label class="font-bold text-xs text-slate-700 block">Question Stem / Scenario Text</label>
-        <textarea v-model="form.text" rows="3" placeholder="Enter full question statement..." class="w-full p-3 border rounded-xl text-xs font-medium"></textarea>
+        <label class="font-bold text-xs text-slate-700 block">Question Stem</label>
+        <textarea v-model="form.text" rows="3" placeholder="Enter question statement..." class="w-full p-3 border rounded-xl text-xs"></textarea>
 
-        <!-- Question Stem Image Attachment -->
         <div class="flex items-center gap-4 bg-slate-50 p-3 rounded-xl border border-dashed">
           <div class="flex-1">
-            <span class="text-[11px] font-bold text-slate-700 block mb-1">Question Stem Diagram / Image (Optional)</span>
-            <input type="file" accept="image/*" @change="e => handleFileUpload(e, form, 'imageUrl')" class="text-xs text-slate-500" />
+            <span class="text-[11px] font-bold text-slate-700 block mb-1">Question Image (Optional)</span>
+            <input type="file" accept="image/*" @change="e => handleFileUpload(e, form, 'imageUrl')" class="text-xs" />
           </div>
-          <div v-if="form.imageUrl" class="relative group">
-            <img :src="form.imageUrl" class="h-16 w-16 object-cover rounded-lg border" />
-            <button @click="removeImage(form, 'imageUrl')" class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 shadow">
-              <X :size="12" />
-            </button>
-          </div>
+          <img v-if="form.imageUrl" :src="form.imageUrl" class="h-14 w-14 object-cover rounded border" />
         </div>
       </div>
 
-      <hr class="border-slate-200" />
-
-      <!-- TYPE 1: Multiple Choice Config -->
-      <div v-if="form.type === 'multiple_choice'" class="space-y-4">
-        <div class="flex justify-between items-center">
-          <span class="text-xs font-bold text-slate-800">Multiple Choice Items (Check all correct answers)</span>
-          <button @click="addOption" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1">
-            <Plus :size="14" /> Add Option
-          </button>
-        </div>
-
-        <div v-for="(opt, idx) in form.options" :key="idx" class="p-3 border rounded-xl space-y-2 bg-slate-50/50">
-          <div class="flex items-center gap-3">
-            <input type="checkbox" v-model="opt.isCorrect" title="Mark as correct answer" class="w-4 h-4 text-emerald-600 rounded" />
-            <span class="font-mono text-xs font-bold">{{ String.fromCharCode(65 + idx) }}.</span>
-            <input v-model="opt.text" :placeholder="'Option ' + String.fromCharCode(65 + idx) + ' text...'" class="flex-1 p-2 border rounded-lg text-xs bg-white" />
-            
-            <label class="cursor-pointer text-slate-500 hover:text-slate-800 p-2">
-              <Image :size="16" />
-              <input type="file" accept="image/*" @change="e => handleFileUpload(e, opt, 'imageUrl')" class="hidden" />
-            </label>
-
-            <button v-if="form.options.length > 2" @click="removeOption(idx)" class="text-red-500 hover:text-red-700 p-2">
-              <Trash2 :size="16" />
-            </button>
-          </div>
-
-          <!-- Option Image Preview -->
-          <div v-if="opt.imageUrl" class="flex items-center gap-2 pl-10">
-            <img :src="opt.imageUrl" class="h-12 w-12 object-cover rounded border" />
-            <button @click="removeImage(opt, 'imageUrl')" class="text-xs text-red-600 font-bold">Remove Image</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- TYPE 2: True / False Config -->
-      <div v-else-if="form.type === 'true_false'" class="space-y-3">
-        <span class="text-xs font-bold text-slate-800 block">Correct Statement Answer</span>
-        <div class="flex gap-4">
-          <label class="flex-1 p-4 border rounded-xl flex items-center gap-3 cursor-pointer hover:bg-slate-50">
-            <input type="radio" value="true" v-model="form.tfCorrect" class="text-emerald-600" />
-            <span class="text-xs font-bold">True</span>
-          </label>
-          <label class="flex-1 p-4 border rounded-xl flex items-center gap-3 cursor-pointer hover:bg-slate-50">
-            <input type="radio" value="false" v-model="form.tfCorrect" class="text-emerald-600" />
-            <span class="text-xs font-bold">False</span>
-          </label>
-        </div>
-      </div>
-
-      <!-- TYPE 3: Short Answer Config -->
-      <div v-else-if="form.type === 'short_answer'" class="space-y-2">
-        <span class="text-xs font-bold text-slate-800 block">Accepted Keywords / Exact Phrases (Comma Separated)</span>
-        <input v-model="form.shortAnswerKeywords" placeholder="e.g. Deviation, Magnetic Error, Compass Deviation" class="w-full p-3 border rounded-xl text-xs font-mono" />
-      </div>
-
-      <!-- TYPE 4: Matching Pairs Config -->
-      <div v-else-if="form.type === 'matching'" class="space-y-4">
-        <div class="flex justify-between items-center">
-          <span class="text-xs font-bold text-slate-800">Matching Pairs Configurator</span>
-          <button @click="addPair" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1">
-            <Plus :size="14" /> Add Matching Pair
-          </button>
-        </div>
-
-        <div v-for="(pair, idx) in form.matchingPairs" :key="idx" class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-xl bg-slate-50 relative">
-          <!-- Left Item -->
-          <div class="space-y-2">
-            <span class="text-[11px] font-bold text-slate-700 block">Premise Item {{ idx + 1 }}</span>
-            <input v-model="pair.prompt" placeholder="Premise text..." class="w-full p-2 border rounded-lg text-xs bg-white" />
-            <div class="flex items-center gap-2">
-              <input type="file" accept="image/*" @change="e => handleFileUpload(e, pair, 'promptImage')" class="text-[10px]" />
-              <img v-if="pair.promptImage" :src="pair.promptImage" class="h-8 w-8 object-cover rounded border" />
-            </div>
-          </div>
-
-          <!-- Right Item -->
-          <div class="space-y-2">
-            <span class="text-[11px] font-bold text-slate-700 block">Target Match {{ idx + 1 }}</span>
-            <input v-model="pair.match" placeholder="Matching target text..." class="w-full p-2 border rounded-lg text-xs bg-white" />
-            <div class="flex items-center gap-2">
-              <input type="file" accept="image/*" @change="e => handleFileUpload(e, pair, 'matchImage')" class="text-[10px]" />
-              <img v-if="pair.matchImage" :src="pair.matchImage" class="h-8 w-8 object-cover rounded border" />
-            </div>
-          </div>
-
-          <button v-if="form.matchingPairs.length > 2" @click="removePair(idx)" class="absolute top-2 right-2 text-red-500 hover:text-red-700">
-            <X :size="14" />
-          </button>
-        </div>
-      </div>
-
-      <!-- Action Button -->
-      <button @click="saveQuestion" :disabled="isSubmitting" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2">
-        <Save :size="16" /> {{ isSubmitting ? 'Saving to Database...' : 'Save Assessment Item' }}
+      <!-- Action -->
+      <button @click="saveQuestion" :disabled="isSubmitting" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2">
+        <Save :size="16" /> Save Question Item
       </button>
-    </div>
-
-    <!-- Questions Bank List View -->
-    <div class="bg-white border rounded-2xl p-6 shadow-sm space-y-4">
-      <h2 class="text-sm font-bold text-slate-900 border-b pb-3 uppercase tracking-wide">Existing STCW Item Repository</h2>
-
-      <div class="divide-y">
-        <div v-for="q in questions" :key="q.id" class="py-4 space-y-2">
-          <div class="flex justify-between items-start">
-            <div class="space-x-2">
-              <span class="font-mono text-xs font-bold text-slate-900 px-2 py-0.5 bg-slate-100 rounded">{{ q.code }}</span>
-              <span class="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold uppercase">{{ q.type }}</span>
-              <span class="text-xs text-slate-500 font-medium">{{ q.stcwStandard }} | {{ q.bloomLevel }}</span>
-            </div>
-          </div>
-
-          <p class="text-xs font-semibold text-slate-800">{{ q.text }}</p>
-
-          <img v-if="q.imageUrl" :src="q.imageUrl" class="h-20 w-auto object-cover rounded-lg border" />
-        </div>
-      </div>
     </div>
   </div>
 </template>

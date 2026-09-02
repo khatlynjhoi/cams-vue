@@ -22,6 +22,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS questions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    program TEXT DEFAULT 'Both',
     courseId TEXT NOT NULL,
     courseOutcomeId TEXT NOT NULL,
     learningOutcomeId TEXT NOT NULL,
@@ -65,6 +66,13 @@ db.exec(`
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `)
+
+// Schema migration safety check for existing SQLite databases
+try {
+  db.exec("ALTER TABLE questions ADD COLUMN program TEXT DEFAULT 'Both';")
+} catch (e) {
+  // Column already exists
+}
 
 // Audit Helper Function
 function logAuditEvent(userId, action, target, details = '') {
@@ -163,13 +171,25 @@ app.delete('/api/courses/:id', (req, res) => {
 
 // --- QUESTION BANK ENDPOINTS WITH FILTERING & CRUD ---
 app.get('/api/questions', (req, res) => {
-  const { courseId, bloomLevel, type, search } = req.query
+  const { program, courseId, courseOutcomeId, learningOutcomeId, bloomLevel, type, search } = req.query
   let query = 'SELECT * FROM questions WHERE 1=1'
   const params = []
 
+  if (program && program !== 'Both') {
+    query += ' AND (program = ? OR program = "Both")'
+    params.push(program)
+  }
   if (courseId) {
     query += ' AND courseId = ?'
     params.push(courseId)
+  }
+  if (courseOutcomeId) {
+    query += ' AND courseOutcomeId = ?'
+    params.push(courseOutcomeId)
+  }
+  if (learningOutcomeId) {
+    query += ' AND learningOutcomeId = ?'
+    params.push(learningOutcomeId)
   }
   if (bloomLevel) {
     query += ' AND bloomLevel = ?'
@@ -205,10 +225,11 @@ app.post('/api/questions', (req, res) => {
   try {
     const stmt = db.prepare(`
       INSERT INTO questions 
-      (courseId, courseOutcomeId, learningOutcomeId, code, type, text, imageUrl, options, correctAnswer, matchingPairs, stcwStandard, bloomLevel)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (program, courseId, courseOutcomeId, learningOutcomeId, code, type, text, imageUrl, options, correctAnswer, matchingPairs, stcwStandard, bloomLevel)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     const info = stmt.run(
+      q.program || 'Both',
       q.courseId || '',
       q.courseOutcomeId || '',
       q.learningOutcomeId || '',
@@ -234,10 +255,11 @@ app.put('/api/questions/:id', (req, res) => {
   try {
     const stmt = db.prepare(`
       UPDATE questions 
-      SET courseId = ?, courseOutcomeId = ?, learningOutcomeId = ?, code = ?, type = ?, text = ?, imageUrl = ?, options = ?, correctAnswer = ?, matchingPairs = ?, stcwStandard = ?, bloomLevel = ?
+      SET program = ?, courseId = ?, courseOutcomeId = ?, learningOutcomeId = ?, code = ?, type = ?, text = ?, imageUrl = ?, options = ?, correctAnswer = ?, matchingPairs = ?, stcwStandard = ?, bloomLevel = ?
       WHERE id = ?
     `)
     stmt.run(
+      q.program || 'Both',
       q.courseId,
       q.courseOutcomeId,
       q.learningOutcomeId,
@@ -275,13 +297,14 @@ app.post('/api/questions/bulk', (req, res) => {
 
   const stmt = db.prepare(`
     INSERT OR REPLACE INTO questions 
-    (courseId, courseOutcomeId, learningOutcomeId, code, type, text, imageUrl, options, correctAnswer, matchingPairs, stcwStandard, bloomLevel)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (program, courseId, courseOutcomeId, learningOutcomeId, code, type, text, imageUrl, options, correctAnswer, matchingPairs, stcwStandard, bloomLevel)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
   const insertMany = db.transaction((items) => {
     for (const q of items) {
       stmt.run(
+        q.program || 'Both',
         q.courseId,
         q.courseOutcomeId,
         q.learningOutcomeId,
@@ -308,14 +331,27 @@ app.post('/api/questions/bulk', (req, res) => {
 
 // --- EXAM GENERATOR & CADET SUBMISSIONS ---
 app.post('/api/exams/generate', (req, res) => {
-  const { courseId, totalItems, bloomRatios } = req.body
+  const { program, courseId, courseOutcomeId, learningOutcomeId, totalItems, bloomRatios } = req.body
 
   try {
-    let query = 'SELECT * FROM questions'
+    let query = 'SELECT * FROM questions WHERE 1=1'
     const params = []
+
+    if (program && program !== 'Both') {
+      query += ' AND (program = ? OR program = "Both")'
+      params.push(program)
+    }
     if (courseId) {
-      query += ' WHERE courseId = ?'
+      query += ' AND courseId = ?'
       params.push(courseId)
+    }
+    if (courseOutcomeId) {
+      query += ' AND courseOutcomeId = ?'
+      params.push(courseOutcomeId)
+    }
+    if (learningOutcomeId) {
+      query += ' AND learningOutcomeId = ?'
+      params.push(learningOutcomeId)
     }
 
     const rows = db.prepare(query).all(...params)
@@ -327,7 +363,7 @@ app.post('/api/exams/generate', (req, res) => {
     }))
 
     if (allQuestions.length === 0) {
-      return res.status(400).json({ success: false, message: 'No questions available for this course.' })
+      return res.status(400).json({ success: false, message: 'No questions available matching these filters.' })
     }
 
     const selected = []
@@ -372,7 +408,7 @@ app.post('/api/exams/submit', (req, res) => {
 // --- PSYCHOMETRICS & AUDIT LOGS ENDPOINTS ---
 app.get('/api/psychometrics/item-analysis', (req, res) => {
   try {
-    const questions = db.prepare('SELECT id, code, text, type, bloomLevel FROM questions').all()
+    const questions = db.prepare('SELECT id, code, text, type, bloomLevel, program FROM questions').all()
 
     const analysis = questions.map(q => {
       const totalAttempts = Math.floor(20 + Math.random() * 80)
@@ -390,6 +426,7 @@ app.get('/api/psychometrics/item-analysis', (req, res) => {
         code: q.code,
         text: q.text,
         bloomLevel: q.bloomLevel,
+        program: q.program,
         totalAttempts,
         difficultyIndex,
         discriminationIndex,
