@@ -976,7 +976,7 @@ async function saveQuestion() {
     alert('Question item saved locally!')
     resetForm()
     activeTab.value = 'repository'
-  } font-mediumally {
+  } finally {
     isSubmitting.value = false
   }
 }
