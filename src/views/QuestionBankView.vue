@@ -82,7 +82,7 @@
 
     <!-- TAB 1: QUESTION BANK REPOSITORY -->
     <div v-show="activeTab === 'repository'" class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-5">
-      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
           <div class="flex items-center gap-2.5">
             <h2 class="text-base font-bold text-slate-900 tracking-tight">Question Bank Repository</h2>
@@ -95,9 +95,9 @@
           </p>
         </div>
 
-        <!-- Right Side Filter Controls -->
-        <div class="flex flex-col items-end gap-2 w-full md:w-auto">
-          <div class="w-full md:w-60">
+        <!-- Right Side Filter & Sort Controls -->
+        <div class="flex flex-col items-end gap-2 w-full lg:w-auto">
+          <div class="w-full lg:w-64">
             <input 
               v-model="searchQuery" 
               placeholder="Search questions..." 
@@ -105,21 +105,67 @@
             />
           </div>
           
-          <div class="flex items-center gap-2 w-full md:w-auto">
-            <select v-model="filterStatus" class="px-3 py-1.5 border border-slate-300/80 rounded-lg bg-white text-xs text-slate-700 font-medium outline-none cursor-pointer shadow-2xs">
+          <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+            <select v-model="filterStatus" class="px-2.5 py-1.5 border border-slate-300/80 rounded-lg bg-white text-xs text-slate-700 font-medium outline-none cursor-pointer shadow-2xs">
               <option value="All">All Statuses</option>
               <option value="Pending">Pending</option>
               <option value="Approved">Approved</option>
               <option value="Disapproved">Disapproved</option>
             </select>
 
-            <select v-model="filterProgram" class="px-3 py-1.5 border border-slate-300/80 rounded-lg bg-white text-xs text-slate-700 font-medium outline-none cursor-pointer shadow-2xs">
+            <select v-model="filterProgram" class="px-2.5 py-1.5 border border-slate-300/80 rounded-lg bg-white text-xs text-slate-700 font-medium outline-none cursor-pointer shadow-2xs">
               <option value="All">All Programs</option>
               <option value="BSMT">BSMT</option>
               <option value="BSMarE">BSMarE</option>
               <option value="Both">Both</option>
             </select>
+
+            <select v-model="filterType" class="px-2.5 py-1.5 border border-slate-300/80 rounded-lg bg-white text-xs text-slate-700 font-medium outline-none cursor-pointer shadow-2xs">
+              <option value="All">All Types</option>
+              <option value="multiple_choice">Multiple Choice</option>
+              <option value="matching">Matching Type</option>
+              <option value="true_false">True / False</option>
+              <option value="short_answer">Short Answer</option>
+            </select>
+
+            <!-- Sorting Dropdown -->
+            <select v-model="sortBy" class="px-2.5 py-1.5 border border-slate-300/80 rounded-lg bg-slate-100 text-xs text-slate-800 font-bold outline-none cursor-pointer shadow-2xs border-slate-400">
+              <option value="default">Sort: Default</option>
+              <option value="type">Sort by Question Type</option>
+              <option value="co">Sort by Course Outcome (CO)</option>
+              <option value="lo">Sort by Learning Outcome (LO)</option>
+            </select>
           </div>
+        </div>
+      </div>
+
+      <!-- Bulk Actions Bar & Select All Button -->
+      <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200/90 text-xs">
+        <div class="flex items-center gap-3">
+          <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-700 select-none">
+            <input 
+              type="checkbox" 
+              :checked="isAllSelected" 
+              @change="toggleSelectAll" 
+              class="h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer" 
+            />
+            <span>Select All Visible ({{ filteredQuestions.length }})</span>
+          </label>
+          <span v-if="selectedQuestionIds.length > 0" class="text-slate-500 font-semibold">
+            ({{ selectedQuestionIds.length }} selected)
+          </span>
+        </div>
+
+        <div v-if="selectedQuestionIds.length > 0" class="flex items-center gap-2">
+          <button @click="bulkUpdateStatus('Approved')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer">
+            <CheckCircle :size="13" /> Bulk Approve
+          </button>
+          <button @click="bulkUpdateStatus('Disapproved')" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer">
+            <XCircle :size="13" /> Bulk Disapprove
+          </button>
+          <button @click="bulkDeleteQuestions" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer">
+            <Trash2 :size="13" /> Bulk Delete
+          </button>
         </div>
       </div>
 
@@ -163,35 +209,48 @@
               :key="q.id || idx" 
               class="border border-slate-200 rounded-xl p-4 bg-slate-50/40 hover:bg-white hover:shadow-sm transition space-y-3"
             >
-              <!-- Badges & Controls -->
+              <!-- Checkbox, Badges & Controls -->
               <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-200/60 pb-2.5">
                 <div class="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+                  <input 
+                    type="checkbox" 
+                    :checked="selectedQuestionIds.includes(q.id)" 
+                    @change="toggleSelectQuestion(q.id)" 
+                    class="h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer mr-1" 
+                  />
                   <span class="bg-slate-800 text-white px-2 py-0.5 rounded">{{ q.program || 'Both' }}</span>
                   <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{{ q.term || 'Midterm' }}</span>
                   <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded">{{ q.courseId || 'Unassigned' }}</span>
+                  <span v-if="q.courseOutcomeId" class="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">CO: {{ q.courseOutcomeId }}</span>
+                  <span v-if="q.learningOutcomeId" class="bg-teal-100 text-teal-800 px-2 py-0.5 rounded">LO: {{ q.learningOutcomeId }}</span>
                   <span class="bg-amber-100 text-amber-900 px-2 py-0.5 rounded">Bloom's: {{ q.bloomLevel || 'Understanding' }}</span>
                   <span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded uppercase">{{ q.type }}</span>
                 </div>
 
                 <!-- Status & Action Buttons -->
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1.5">
                   <span :class="{
                     'bg-amber-100 text-amber-800 border-amber-300': (q.status || 'Pending') === 'Pending',
                     'bg-emerald-100 text-emerald-800 border-emerald-300': q.status === 'Approved',
                     'bg-red-100 text-red-800 border-red-300': q.status === 'Disapproved'
-                  }" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border">
+                  }" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border mr-1">
                     {{ q.status || 'Pending' }}
                   </span>
 
-                  <button @click="updateQuestionStatus(q.id, 'Approved')" title="Approve Question" class="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg border border-emerald-200 transition">
+                  <button @click="updateQuestionStatus(q.id, 'Approved')" title="Approve Question" class="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg border border-emerald-200 transition cursor-pointer">
                     <CheckCircle :size="15" />
                   </button>
 
-                  <button @click="updateQuestionStatus(q.id, 'Disapproved')" title="Disapprove Question" class="p-1.5 bg-red-50 text-red-700 hover:bg-red-600 hover:text-white rounded-lg border border-red-200 transition">
+                  <button @click="updateQuestionStatus(q.id, 'Disapproved')" title="Disapprove Question" class="p-1.5 bg-red-50 text-red-700 hover:bg-red-600 hover:text-white rounded-lg border border-red-200 transition cursor-pointer">
                     <XCircle :size="15" />
                   </button>
 
-                  <button @click="deleteQuestion(q.id)" title="Delete Item" class="p-1.5 bg-slate-100 text-slate-500 hover:bg-slate-200 rounded-lg transition">
+                  <!-- Edit Button -->
+                  <button @click="openEditModal(q)" title="Edit / Revise Item" class="p-1.5 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white rounded-lg border border-blue-200 transition cursor-pointer">
+                    <Edit :size="15" />
+                  </button>
+
+                  <button @click="deleteQuestion(q.id)" title="Delete Item" class="p-1.5 bg-slate-100 text-slate-500 hover:bg-slate-200 rounded-lg transition cursor-pointer">
                     <Trash2 :size="15" />
                   </button>
                 </div>
@@ -200,7 +259,7 @@
               <!-- Stem -->
               <div>
                 <p class="text-xs font-semibold text-slate-800">{{ q.text }}</p>
-                <img v-if="q.imageUrl" :src="q.imageUrl" class="mt-2 h-24 object-cover rounded-lg border" />
+                <img v-if="q.imageUrl" :src="q.imageUrl" class="mt-2 h-28 object-cover rounded-lg border shadow-2xs" />
               </div>
 
               <!-- Multiple Choice Options -->
@@ -247,10 +306,10 @@
                 </div>
 
                 <div v-if="generateAiSuggestion(q).type === 'warning'" class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                  <button @click="applyAiCorrection(q)" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition shadow-2xs flex items-center gap-1">
+                  <button @click="applyAiCorrection(q)" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition shadow-2xs flex items-center gap-1 cursor-pointer">
                     <Check :size="12" /> Apply Suggestion
                   </button>
-                  <button @click="retainOriginalSettings(q)" class="px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white font-bold text-[10px] rounded-lg transition shadow-2xs flex items-center gap-1">
+                  <button @click="retainOriginalSettings(q)" class="px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white font-bold text-[10px] rounded-lg transition shadow-2xs flex items-center gap-1 cursor-pointer">
                     <RotateCcw :size="12" /> Retain Original
                   </button>
                 </div>
@@ -262,7 +321,7 @@
       </div>
     </div>
 
-    <!-- TAB 2: AUTHORING FORM (ExamView Layout Matched) -->
+    <!-- TAB 2: AUTHORING FORM -->
     <div v-show="activeTab === 'create'" class="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-2xs space-y-6 max-w-5xl mx-auto">
       
       <!-- 1. PROGRAM & CURRICULUM MAPPING -->
@@ -366,7 +425,7 @@
           <div class="border border-dashed border-slate-300 rounded-xl p-3 text-xs bg-slate-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
               <span class="font-bold text-slate-700 block">Question Image (Optional)</span>
-              <input type="file" accept="image/*" @change="e => handleFileUpload(e, form, 'imageUrl')" class="text-xs mt-1 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300" />
+              <input type="file" accept="image/*" @change="e => handleFileUpload(e, form, 'imageUrl')" class="text-xs mt-1 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer" />
             </div>
             <div v-if="form.imageUrl" class="relative shrink-0">
               <img :src="form.imageUrl" class="h-16 w-16 object-cover rounded-lg border shadow-2xs" />
@@ -388,26 +447,24 @@
         <div v-if="form.type === 'multiple_choice'" class="space-y-3 border border-slate-200 p-4 rounded-xl bg-slate-50/30">
           <div class="flex justify-between items-center mb-1">
             <span class="text-xs font-bold text-slate-700">Options & Correct Answer(s) (Check all that apply)</span>
-            <button @click="addOption" type="button" class="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1">
+            <button @click="addOption" type="button" class="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 cursor-pointer">
               <Plus :size="14" /> Add Option
             </button>
           </div>
 
           <div v-for="(opt, idx) in form.options" :key="idx" class="flex flex-col sm:flex-row sm:items-center gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
             <div class="flex items-center gap-3 flex-1">
-              <input type="checkbox" v-model="opt.isCorrect" title="Mark as correct answer" class="h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 shrink-0" />
+              <input type="checkbox" v-model="opt.isCorrect" title="Mark as correct answer" class="h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 shrink-0 cursor-pointer" />
               <input v-model="opt.text" :placeholder="`Option ${idx + 1} text...`" class="flex-1 p-2 border border-slate-300 rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500" />
             </div>
 
             <div class="flex items-center gap-2 self-end sm:self-auto">
-              <!-- Option Image Upload Button -->
               <label class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300/80 cursor-pointer flex items-center gap-1.5 transition">
                 <Image :size="14" class="text-slate-500" />
                 <span>Image</span>
                 <input type="file" accept="image/*" @change="e => handleFileUpload(e, opt, 'imageUrl')" class="hidden" />
               </label>
 
-              <!-- Image Preview -->
               <div v-if="opt.imageUrl" class="relative">
                 <img :src="opt.imageUrl" class="h-8 w-8 object-cover rounded border" />
                 <button @click="removeImage(opt, 'imageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600">
@@ -415,8 +472,7 @@
                 </button>
               </div>
 
-              <!-- Delete Option Button -->
-              <button v-if="form.options.length > 2" @click="removeOption(idx)" title="Remove option" class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition">
+              <button v-if="form.options.length > 2" @click="removeOption(idx)" title="Remove option" class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition cursor-pointer">
                 <Trash2 :size="16" />
               </button>
             </div>
@@ -427,7 +483,7 @@
         <div v-if="form.type === 'matching'" class="space-y-3 border border-slate-200 p-4 rounded-xl bg-slate-50/30">
           <div class="flex justify-between items-center mb-1">
             <span class="text-xs font-bold text-slate-700">Matching Pairs (Item ⟶ Correct Match)</span>
-            <button @click="addMatchingPair" type="button" class="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1">
+            <button @click="addMatchingPair" type="button" class="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 cursor-pointer">
               <Plus :size="14" /> Add Matching Pair
             </button>
           </div>
@@ -435,13 +491,12 @@
           <div v-for="(pair, idx) in form.matchingPairs" :key="idx" class="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-2">
             <div class="flex items-center justify-between">
               <span class="font-bold text-xs text-slate-600">Pair #{{ idx + 1 }}</span>
-              <button v-if="form.matchingPairs.length > 2" @click="removeMatchingPair(idx)" title="Remove Pair" class="text-red-500 hover:bg-red-50 p-1 rounded">
+              <button v-if="form.matchingPairs.length > 2" @click="removeMatchingPair(idx)" title="Remove Pair" class="text-red-500 hover:bg-red-50 p-1 rounded cursor-pointer">
                 <Trash2 :size="14" />
               </button>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-              <!-- Left Side Item -->
               <div class="space-y-2 border p-2.5 rounded-lg bg-slate-50/50">
                 <span class="font-bold text-[11px] text-slate-500">Premise Item / Question</span>
                 <input v-model="pair.leftText" placeholder="Left item text..." class="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none bg-white" />
@@ -460,7 +515,6 @@
                 </div>
               </div>
 
-              <!-- Right Side Match -->
               <div class="space-y-2 border p-2.5 rounded-lg bg-slate-50/50">
                 <span class="font-bold text-[11px] text-slate-500">Matching Target / Answer</span>
                 <input v-model="pair.rightText" placeholder="Right matching text..." class="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none bg-white" />
@@ -526,7 +580,7 @@
           <p class="text-xs text-slate-500">View question counts, approval status, and AI overrides grouped per course.</p>
         </div>
 
-        <button @click="exportCourseReportCSV" type="button" class="px-4 py-2 bg-[#00c068] hover:bg-[#00a358] text-white text-xs font-bold rounded-xl flex items-center gap-2 transition shadow-2xs">
+        <button @click="exportCourseReportCSV" type="button" class="px-4 py-2 bg-[#00c068] hover:bg-[#00a358] text-white text-xs font-bold rounded-xl flex items-center gap-2 transition shadow-2xs cursor-pointer">
           <Download :size="14" /> Export Report CSV
         </button>
       </div>
@@ -592,6 +646,182 @@
       </div>
     </div>
 
+    <!-- EDIT QUESTION MODAL -->
+    <div v-if="editingQuestion" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div class="bg-white border border-slate-200 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-5 my-8 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b pb-3">
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <Edit class="text-blue-600" :size="18" /> Edit / Revise Question Item
+          </h3>
+          <button @click="closeEditModal" class="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer">
+            <X :size="18" />
+          </button>
+        </div>
+
+        <div class="space-y-4 text-xs">
+          <!-- Mapping Metadata -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Program</label>
+              <select v-model="editingQuestion.program" class="w-full p-2 border rounded-lg bg-white">
+                <option value="Both">Both</option>
+                <option value="BSMT">BSMT</option>
+                <option value="BSMarE">BSMarE</option>
+              </select>
+            </div>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Term</label>
+              <select v-model="editingQuestion.term" class="w-full p-2 border rounded-lg bg-white">
+                <option value="Midterm">Midterm</option>
+                <option value="Final">Final</option>
+              </select>
+            </div>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Course Code</label>
+              <input v-model="editingQuestion.courseId" class="w-full p-2 border rounded-lg bg-white" placeholder="e.g. CRS-101" />
+            </div>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Course Outcome (CO)</label>
+              <input v-model="editingQuestion.courseOutcomeId" class="w-full p-2 border rounded-lg bg-white" placeholder="e.g. CO1" />
+            </div>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Learning Outcome (LO)</label>
+              <input v-model="editingQuestion.learningOutcomeId" class="w-full p-2 border rounded-lg bg-white" placeholder="e.g. LO1.1" />
+            </div>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Bloom's Level</label>
+              <select v-model="editingQuestion.bloomLevel" class="w-full p-2 border rounded-lg bg-white">
+                <option value="Remembering">Remembering</option>
+                <option value="Understanding">Understanding</option>
+                <option value="Application">Application</option>
+                <option value="Analysis">Analysis</option>
+                <option value="Evaluation">Evaluation</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Question Stem Text -->
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Question Stem</label>
+            <textarea v-model="editingQuestion.text" rows="3" class="w-full p-2.5 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+          </div>
+
+          <!-- Question Image Upload / Preview -->
+          <div class="border border-dashed p-3 rounded-xl bg-slate-50/80 flex items-center justify-between">
+            <div>
+              <span class="font-bold text-slate-700 block">Stem Image</span>
+              <input type="file" accept="image/*" @change="e => handleFileUpload(e, editingQuestion, 'imageUrl')" class="text-xs mt-1 cursor-pointer" />
+            </div>
+            <div v-if="editingQuestion.imageUrl" class="relative">
+              <img :src="editingQuestion.imageUrl" class="h-14 w-14 object-cover rounded border" />
+              <button @click="removeImage(editingQuestion, 'imageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 cursor-pointer">
+                <X :size="10" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Edit Multiple Choice Options -->
+          <div v-if="editingQuestion.type === 'multiple_choice'" class="space-y-3 border p-3 rounded-xl bg-slate-50/50">
+            <div class="flex justify-between items-center">
+              <span class="font-bold text-slate-700">Multiple Choice Options</span>
+              <button @click="editingQuestion.options.push({ text: '', imageUrl: '' })" type="button" class="text-emerald-600 font-bold text-xs flex items-center gap-1 cursor-pointer">
+                <Plus :size="12" /> Add Option
+              </button>
+            </div>
+
+            <div v-for="(opt, oIdx) in editingQuestion.options" :key="oIdx" class="p-2.5 bg-white border rounded-lg space-y-2 shadow-2xs">
+              <div class="flex items-center gap-2">
+                <input type="checkbox" :checked="Array.isArray(editingQuestion.correctAnswer) ? editingQuestion.correctAnswer.includes(oIdx) : editingQuestion.correctAnswer === oIdx" @change="toggleEditCorrectOption(oIdx)" class="h-4 w-4 text-emerald-600 rounded cursor-pointer" />
+                <input v-model="opt.text" class="flex-1 p-1.5 border rounded text-xs outline-none" :placeholder="`Option ${oIdx + 1} text...`" />
+                <button v-if="editingQuestion.options.length > 2" @click="editingQuestion.options.splice(oIdx, 1)" class="text-red-500 p-1 cursor-pointer">
+                  <Trash2 :size="14" />
+                </button>
+              </div>
+
+              <div class="flex items-center justify-between pt-1 border-t border-slate-100">
+                <label class="px-2 py-1 bg-slate-100 text-slate-700 text-[11px] font-semibold rounded cursor-pointer flex items-center gap-1">
+                  <Image :size="12" /> {{ opt.imageUrl ? 'Change Image' : 'Add Image' }}
+                  <input type="file" accept="image/*" @change="e => handleFileUpload(e, opt, 'imageUrl')" class="hidden" />
+                </label>
+                <div v-if="opt.imageUrl" class="relative">
+                  <img :src="opt.imageUrl" class="h-8 w-8 object-cover rounded border" />
+                  <button @click="removeImage(opt, 'imageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 cursor-pointer">
+                    <X :size="8" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Edit Matching Type Pairs -->
+          <div v-if="editingQuestion.type === 'matching'" class="space-y-3 border p-3 rounded-xl bg-slate-50/50">
+            <div class="flex justify-between items-center">
+              <span class="font-bold text-slate-700">Matching Type Pairs</span>
+              <button @click="editingQuestion.matchingPairs.push({ leftText: '', leftImageUrl: '', rightText: '', rightImageUrl: '' })" type="button" class="text-emerald-600 font-bold text-xs flex items-center gap-1 cursor-pointer">
+                <Plus :size="12" /> Add Pair
+              </button>
+            </div>
+
+            <div v-for="(pair, pIdx) in editingQuestion.matchingPairs" :key="pIdx" class="p-2.5 bg-white border rounded-lg space-y-2 shadow-2xs">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-slate-500">Pair #{{ pIdx + 1 }}</span>
+                <button v-if="editingQuestion.matchingPairs.length > 2" @click="editingQuestion.matchingPairs.splice(pIdx, 1)" class="text-red-500 p-1 cursor-pointer">
+                  <Trash2 :size="14" />
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <!-- Left side -->
+                <div class="space-y-1 border p-2 rounded bg-slate-50/50">
+                  <span class="font-semibold text-[10px] text-slate-500">Left Item</span>
+                  <input v-model="pair.leftText" class="w-full p-1.5 border rounded text-xs bg-white outline-none" />
+                  <div class="flex items-center justify-between pt-1">
+                    <label class="px-2 py-0.5 bg-white border text-[10px] font-semibold rounded cursor-pointer flex items-center gap-1">
+                      <Image :size="10" /> Image
+                      <input type="file" accept="image/*" @change="e => handleFileUpload(e, pair, 'leftImageUrl')" class="hidden" />
+                    </label>
+                    <div v-if="pair.leftImageUrl" class="relative">
+                      <img :src="pair.leftImageUrl" class="h-6 w-6 object-cover rounded border" />
+                      <button @click="removeImage(pair, 'leftImageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 cursor-pointer">
+                        <X :size="6" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Right side -->
+                <div class="space-y-1 border p-2 rounded bg-slate-50/50">
+                  <span class="font-semibold text-[10px] text-slate-500">Right Target</span>
+                  <input v-model="pair.rightText" class="w-full p-1.5 border rounded text-xs bg-white outline-none" />
+                  <div class="flex items-center justify-between pt-1">
+                    <label class="px-2 py-0.5 bg-white border text-[10px] font-semibold rounded cursor-pointer flex items-center gap-1">
+                      <Image :size="10" /> Image
+                      <input type="file" accept="image/*" @change="e => handleFileUpload(e, pair, 'rightImageUrl')" class="hidden" />
+                    </label>
+                    <div v-if="pair.rightImageUrl" class="relative">
+                      <img :src="pair.rightImageUrl" class="h-6 w-6 object-cover rounded border" />
+                      <button @click="removeImage(pair, 'rightImageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 cursor-pointer">
+                        <X :size="6" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t">
+          <button @click="closeEditModal" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl cursor-pointer">
+            Cancel
+          </button>
+          <button @click="saveEditedQuestion" class="px-4 py-2 bg-[#00c068] hover:bg-[#00a358] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs">
+            <Save :size="14" /> Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -600,7 +830,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { 
   Plus, Trash2, X, Upload, Download, Image,
   CheckCircle, XCircle, Sparkles, ChevronDown, ChevronRight, Check,
-  Database, PlusCircle, BarChart2, Save, FileText, RotateCcw
+  Database, PlusCircle, BarChart2, Save, FileText, RotateCcw, Edit
 } from 'lucide-vue-next'
 
 const questions = ref([])
@@ -615,7 +845,11 @@ const collapsedCourses = ref({})
 const filterStatus = ref('All')
 const filterProgram = ref('All')
 const filterType = ref('All')
+const sortBy = ref('default')
 const searchQuery = ref('')
+
+const selectedQuestionIds = ref([])
+const editingQuestion = ref(null)
 
 const STORAGE_COURSES_KEY = 'cams_courses_data'
 const STORAGE_QUESTIONS_KEY = 'cams_questions_data'
@@ -678,7 +912,7 @@ const availableLearningOutcomes = computed(() => {
 })
 
 const filteredQuestions = computed(() => {
-  return questions.value.filter(q => {
+  let list = questions.value.filter(q => {
     const matchesStatus = filterStatus.value === 'All' || (q.status || 'Pending') === filterStatus.value
     const matchesProgram = filterProgram.value === 'All' || q.program === filterProgram.value || q.program === 'Both'
     const matchesType = filterType.value === 'All' || q.type === filterType.value
@@ -687,7 +921,92 @@ const filteredQuestions = computed(() => {
       (q.courseId && q.courseId.toLowerCase().includes(searchQuery.value.toLowerCase()))
     return matchesStatus && matchesProgram && matchesType && matchesSearch
   })
+
+  if (sortBy.value === 'type') {
+    list.sort((a, b) => (a.type || '').localeCompare(b.type || ''))
+  } else if (sortBy.value === 'co') {
+    list.sort((a, b) => (a.courseOutcomeId || '').localeCompare(b.courseOutcomeId || ''))
+  } else if (sortBy.value === 'lo') {
+    list.sort((a, b) => (a.learningOutcomeId || '').localeCompare(b.learningOutcomeId || ''))
+  }
+
+  return list
 })
+
+const isAllSelected = computed(() => {
+  if (filteredQuestions.value.length === 0) return false
+  return filteredQuestions.value.every(q => selectedQuestionIds.value.includes(q.id))
+})
+
+function toggleSelectAll() {
+  if (isAllSelected.value) {
+    selectedQuestionIds.value = []
+  } else {
+    selectedQuestionIds.value = filteredQuestions.value.map(q => q.id)
+  }
+}
+
+function toggleSelectQuestion(id) {
+  const idx = selectedQuestionIds.value.indexOf(id)
+  if (idx > -1) {
+    selectedQuestionIds.value.splice(idx, 1)
+  } else {
+    selectedQuestionIds.value.push(id)
+  }
+}
+
+function bulkUpdateStatus(status) {
+  questions.value.forEach(q => {
+    if (selectedQuestionIds.value.includes(q.id)) {
+      q.status = status
+    }
+  })
+  syncQuestionsStorage()
+}
+
+function bulkDeleteQuestions() {
+  if (confirm(`Are you sure you want to delete ${selectedQuestionIds.value.length} selected items?`)) {
+    questions.value = questions.value.filter(q => !selectedQuestionIds.value.includes(q.id))
+    selectedQuestionIds.value = []
+    syncQuestionsStorage()
+  }
+}
+
+function openEditModal(q) {
+  editingQuestion.value = JSON.parse(JSON.stringify(q))
+  if (!editingQuestion.value.options) editingQuestion.value.options = []
+  if (!editingQuestion.value.matchingPairs) editingQuestion.value.matchingPairs = []
+}
+
+function closeEditModal() {
+  editingQuestion.value = null
+}
+
+function toggleEditCorrectOption(index) {
+  if (!editingQuestion.value) return
+  let currentAnswers = editingQuestion.value.correctAnswer
+  if (!Array.isArray(currentAnswers)) {
+    currentAnswers = currentAnswers !== null && currentAnswers !== undefined ? [currentAnswers] : []
+  }
+  const pos = currentAnswers.indexOf(index)
+  if (pos > -1) {
+    currentAnswers.splice(pos, 1)
+  } else {
+    currentAnswers.push(index)
+  }
+  editingQuestion.value.correctAnswer = currentAnswers
+}
+
+function saveEditedQuestion() {
+  if (!editingQuestion.value) return
+  const index = questions.value.findIndex(q => q.id === editingQuestion.value.id)
+  if (index !== -1) {
+    questions.value[index] = { ...editingQuestion.value }
+    syncQuestionsStorage()
+    alert('Question revised and saved successfully!')
+  }
+  closeEditModal()
+}
 
 const groupedQuestions = computed(() => {
   const groups = {}
@@ -875,6 +1194,7 @@ function retainOriginalSettings(q) {
 async function deleteQuestion(id) {
   if (confirm('Are you sure you want to remove this question item?')) {
     questions.value = questions.value.filter(q => q.id !== id)
+    selectedQuestionIds.value = selectedQuestionIds.value.filter(selectedId => selectedId !== id)
     syncQuestionsStorage()
     try {
       await fetch('http://localhost:3001/api/questions/' + id, { method: 'DELETE' })
@@ -885,21 +1205,29 @@ async function deleteQuestion(id) {
 }
 
 async function fetchQuestions() {
+  const saved = localStorage.getItem(STORAGE_QUESTIONS_KEY)
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        questions.value = parsed
+      }
+    } catch (e) {
+      console.warn('Error reading from storage:', e)
+    }
+  }
+
   try {
     const res = await fetch('http://localhost:3001/api/questions')
     const data = await res.json()
-    if (data && data.success && Array.isArray(data.data)) {
-      questions.value = data.data
-      syncQuestionsStorage()
-      return
+    if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
+      if (questions.value.length === 0) {
+        questions.value = data.data
+        syncQuestionsStorage()
+      }
     }
   } catch (err) {
-    console.warn('Backend unavailable, reading questions from local storage')
-  }
-
-  const saved = localStorage.getItem(STORAGE_QUESTIONS_KEY)
-  if (saved) {
-    try { questions.value = JSON.parse(saved) } catch (e) { questions.value = [] }
+    console.warn('Backend unavailable, using persistent local storage.')
   }
 }
 
@@ -963,8 +1291,9 @@ async function saveQuestion() {
     })
     const data = await res.json()
     if (data.success) {
+      questions.value.unshift(payload)
+      syncQuestionsStorage()
       alert('Question saved successfully!')
-      await fetchQuestions()
       resetForm()
       activeTab.value = 'repository'
     } else {
