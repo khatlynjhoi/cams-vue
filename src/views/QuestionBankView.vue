@@ -2,7 +2,8 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { 
   HelpCircle, Save, Plus, Trash2, Image, X, Upload, Download, 
-  CheckCircle, XCircle, Sparkles, Filter, AlertTriangle, RefreshCw 
+  CheckCircle, XCircle, Sparkles, Filter, AlertTriangle, RefreshCw,
+  Database, PlusCircle
 } from 'lucide-vue-next'
 
 const questions = ref([])
@@ -10,6 +11,9 @@ const courses = ref([])
 const isSubmitting = ref(false)
 const isUploadingBulk = ref(false)
 const bulkFileInput = ref(null)
+
+// Tab Navigation State: 'repository' | 'create'
+const activeTab = ref('repository')
 
 // Repository Filters & Search
 const filterStatus = ref('All')
@@ -44,6 +48,23 @@ const form = reactive({
     { prompt: '', promptImage: '', match: '', matchImage: '' }
   ]
 })
+
+function resetForm() {
+  form.text = ''
+  form.imageUrl = ''
+  form.options = [
+    { text: '', imageUrl: '', isCorrect: false },
+    { text: '', imageUrl: '', isCorrect: false },
+    { text: '', imageUrl: '', isCorrect: false },
+    { text: '', imageUrl: '', isCorrect: false }
+  ]
+  form.tfCorrect = 'true'
+  form.shortAnswerKeywords = ''
+  form.matchingPairs = [
+    { prompt: '', promptImage: '', match: '', matchImage: '' },
+    { prompt: '', promptImage: '', match: '', matchImage: '' }
+  ]
+}
 
 // Cascading Courses (Subjects) filtered by Program
 const filteredCourses = computed(() => {
@@ -281,6 +302,8 @@ async function saveQuestion() {
     if (data.success) {
       alert('Question saved successfully!')
       fetchQuestions()
+      resetForm()
+      activeTab.value = 'repository'
     } else {
       throw new Error(data.error)
     }
@@ -288,6 +311,8 @@ async function saveQuestion() {
     questions.value.unshift(payload)
     syncQuestionsStorage()
     alert('Question item saved locally!')
+    resetForm()
+    activeTab.value = 'repository'
   } finally {
     isSubmitting.value = false
   }
@@ -459,6 +484,7 @@ function handleBulkCSVUpload(event) {
         if (data.success) {
           alert(`Successfully imported ${data.count} questions!`)
           fetchQuestions()
+          activeTab.value = 'repository'
         } else {
           throw new Error(data.error)
         }
@@ -466,6 +492,7 @@ function handleBulkCSVUpload(event) {
         questions.value.unshift(...parsedQuestions)
         syncQuestionsStorage()
         alert(`Successfully imported ${parsedQuestions.length} questions locally!`)
+        activeTab.value = 'repository'
       }
     } catch (err) {
       alert('Error parsing CSV file.')
@@ -484,7 +511,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="p-6 max-w-7xl mx-auto space-y-8">
+  <div class="p-6 max-w-7xl mx-auto space-y-6">
     <!-- Header Banner & CSV Upload Actions -->
     <div class="bg-slate-900 text-white p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-md">
       <div>
@@ -507,8 +534,41 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Main Container: Authoring Form -->
-    <div class="bg-white border rounded-2xl p-6 shadow-sm space-y-6">
+    <!-- Navigation Tabs -->
+    <div class="flex items-center gap-2 border-b border-slate-200 pb-2">
+      <button 
+        @click="activeTab = 'repository'"
+        :class="[
+          'px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all',
+          activeTab === 'repository' 
+            ? 'bg-slate-900 text-white shadow-sm' 
+            : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+        ]"
+      >
+        <Database :size="15" /> Question Bank Repository
+        <span 
+          :class="activeTab === 'repository' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-700'"
+          class="text-[10px] px-2 py-0.5 rounded-full font-bold"
+        >
+          {{ questions.length }}
+        </span>
+      </button>
+
+      <button 
+        @click="activeTab = 'create'"
+        :class="[
+          'px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all',
+          activeTab === 'create' 
+            ? 'bg-slate-900 text-white shadow-sm' 
+            : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+        ]"
+      >
+        <PlusCircle :size="15" /> Author New Question
+      </button>
+    </div>
+
+    <!-- TAB 1: AUTHORING FORM -->
+    <div v-show="activeTab === 'create'" class="bg-white border rounded-2xl p-6 shadow-sm space-y-6">
       
       <!-- 1. Program & Curriculum Mapping -->
       <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider border-b pb-2">1. Program & Curriculum Mapping</h2>
@@ -724,8 +784,8 @@ onMounted(() => {
 
     </div>
 
-    <!-- 4. QUESTION BANK REPOSITORY & VALIDATION TABLE -->
-    <div class="bg-white border rounded-2xl p-6 shadow-sm space-y-4">
+    <!-- TAB 2: QUESTION BANK REPOSITORY -->
+    <div v-show="activeTab === 'repository'" class="bg-white border rounded-2xl p-6 shadow-sm space-y-4">
       <div class="flex flex-col md:flex-row justify-between md:items-center border-b pb-4 gap-4">
         <div>
           <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
