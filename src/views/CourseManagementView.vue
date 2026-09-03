@@ -265,7 +265,6 @@ function generateAiSuggestion(q) {
   const textLower = (q.text || '').toLowerCase().trim()
   const bloom = (q.bloomLevel || '').toLowerCase()
 
-  // Cognitive Level checks based on Bloom's action verbs
   if ((textLower.startsWith('what is') || textLower.startsWith('define') || textLower.startsWith('list') || textLower.startsWith('name') || textLower.startsWith('identify')) && bloom !== 'remembering') {
     suggestions.push(`Cognitive Level Mismatch: Stem uses recall verbs ("What is/Define/List"). Suggested Bloom's level is "Remembering" instead of "${q.bloomLevel}".`)
   } else if ((textLower.includes('calculate') || textLower.includes('solve') || textLower.includes('determine') || textLower.includes('apply')) && (bloom !== 'applying' && bloom !== 'application')) {
@@ -274,7 +273,6 @@ function generateAiSuggestion(q) {
     suggestions.push(`Cognitive Level Mismatch: Question involves analytical comparison. Suggested Bloom's level is "Analysis" instead of "${q.bloomLevel}".`)
   }
 
-  // Stem quality & option checks
   if (q.text && q.text.length < 15) {
     suggestions.push('Stem Clarity: Item statement is short. Consider expanding the context.')
   }
@@ -431,7 +429,6 @@ async function saveQuestion() {
   }
 }
 
-// --- CSV HELPER & TEMPLATE DOWNLOAD & BULK UPLOAD ---
 function parseCSVLine(line) {
   const result = []
   let cur = ''
@@ -624,44 +621,57 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="p-6 max-w-7xl mx-auto space-y-6">
-    <!-- Header Banner & CSV Upload Actions -->
-    <div class="bg-slate-900 text-white p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-md">
-      <div>
-        <h1 class="text-xl font-bold flex items-center gap-2">
-          <HelpCircle class="text-emerald-400" :size="22" /> Assessment Question Authoring & Validation
+  <div class="p-6 max-w-7xl mx-auto space-y-6 font-sans">
+    
+    <!-- Dark Top Header Banner (Matching Question Bank_3.jpg layout & palette) -->
+    <div class="bg-[#0b132b] text-white p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
+      <div class="space-y-1">
+        <h1 class="text-xl font-bold flex items-center gap-2.5 text-white tracking-tight">
+          <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">?</span>
+          Assessment Question Authoring & Validation
         </h1>
-        <p class="text-xs text-slate-300">Map items by Program, Term, Course Code, Outcomes, and Bloom's Taxonomy with AI Cognitive Validation.</p>
+        <p class="text-xs text-slate-300 font-normal">
+          Map items by Program, Term, Course Code, Outcomes, and Bloom's Taxonomy with AI Cognitive Validation.
+        </p>
       </div>
 
-      <!-- CSV Actions -->
-      <div class="flex items-center gap-3">
-        <button @click="downloadCSVTemplate" type="button" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 flex items-center gap-2 transition">
-          <Download :size="14" /> Download CSV Template
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-3 shrink-0">
+        <button 
+          @click="downloadCSVTemplate" 
+          type="button" 
+          class="px-4 py-2 bg-[#1c2538] hover:bg-[#25314a] text-slate-200 text-xs font-medium rounded-xl border border-slate-700/60 flex items-center gap-2 transition shadow-sm"
+        >
+          <Download :size="14" class="text-slate-300" /> 
+          Download CSV Template
         </button>
 
-        <label class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-sm">
-          <Upload :size="14" /> {{ isUploadingBulk ? 'Importing...' : 'Bulk Upload CSV' }}
+        <label class="px-4 py-2 bg-[#00c068] hover:bg-[#00a358] text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-sm">
+          <Upload :size="14" /> 
+          <span class="text-center leading-tight">
+            {{ isUploadingBulk ? 'Importing...' : 'Bulk Upload CSV' }}
+          </span>
           <input ref="bulkFileInput" type="file" accept=".csv" @change="handleBulkCSVUpload" :disabled="isUploadingBulk" class="hidden" />
         </label>
       </div>
     </div>
 
-    <!-- Navigation Tabs -->
-    <div class="flex items-center gap-2 border-b border-slate-200 pb-2">
+    <!-- Navigation Tabs (Pill style matching Question Bank_3.jpg) -->
+    <div class="flex items-center gap-3">
       <button 
         @click="activeTab = 'repository'"
         :class="[
-          'px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all',
+          'px-5 py-2.5 rounded-full font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer',
           activeTab === 'repository' 
-            ? 'bg-slate-900 text-white shadow-sm' 
-            : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            ? 'bg-[#0b132b] text-white shadow-sm' 
+            : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80 shadow-2xs'
         ]"
       >
-        <Database :size="15" /> Question Bank Repository
+        <Database :size="14" :class="activeTab === 'repository' ? 'text-white' : 'text-slate-500'" /> 
+        Question Bank Repository
         <span 
-          :class="activeTab === 'repository' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-700'"
-          class="text-[10px] px-2 py-0.5 rounded-full font-bold"
+          :class="activeTab === 'repository' ? 'bg-[#00c068] text-white' : 'bg-slate-100 text-slate-600'"
+          class="text-[10px] px-2 py-0.5 rounded-full font-bold ml-0.5"
         >
           {{ questions.length }}
         </span>
@@ -670,36 +680,223 @@ onMounted(() => {
       <button 
         @click="activeTab = 'create'"
         :class="[
-          'px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all',
+          'px-5 py-2.5 rounded-full font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer',
           activeTab === 'create' 
-            ? 'bg-slate-900 text-white shadow-sm' 
-            : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            ? 'bg-[#0b132b] text-white shadow-sm' 
+            : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80 shadow-2xs'
         ]"
       >
-        <PlusCircle :size="15" /> Author New Question
+        <PlusCircle :size="14" :class="activeTab === 'create' ? 'text-white' : 'text-slate-500'" /> 
+        Author New Question
       </button>
 
       <button 
         @click="activeTab = 'report'"
         :class="[
-          'px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all',
+          'px-5 py-2.5 rounded-full font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer',
           activeTab === 'report' 
-            ? 'bg-slate-900 text-white shadow-sm' 
-            : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            ? 'bg-[#0b132b] text-white shadow-sm' 
+            : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80 shadow-2xs'
         ]"
       >
-        <FileText :size="15" /> Course Reports & Audits
+        <FileText :size="14" :class="activeTab === 'report' ? 'text-white' : 'text-slate-500'" /> 
+        Course Reports & Audits
       </button>
     </div>
 
-    <!-- TAB 1: AUTHORING FORM -->
-    <div v-show="activeTab === 'create'" class="bg-white border rounded-2xl p-6 shadow-sm space-y-6">
+    <!-- TAB 1: QUESTION BANK REPOSITORY -->
+    <div v-show="activeTab === 'repository'" class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-5">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <div class="flex items-center gap-2.5">
+            <h2 class="text-base font-bold text-slate-900 tracking-tight">Question Bank Repository</h2>
+            <span class="bg-emerald-100 text-emerald-800 text-[11px] px-2.5 py-0.5 rounded-full font-semibold border border-emerald-200/60">
+              {{ filteredQuestions.length }} items
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Review, approve/disapprove, or apply AI cognitive suggestions organized by Course Code and Title.
+          </p>
+        </div>
+
+        <!-- Right Side Stacked Filter Controls -->
+        <div class="flex flex-col items-end gap-2 w-full md:w-auto">
+          <div class="w-full md:w-60">
+            <input 
+              v-model="searchQuery" 
+              placeholder="Search questions..." 
+              class="w-full px-3 py-1.5 border border-slate-300/80 rounded-lg bg-white text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400 placeholder-slate-400 shadow-2xs"
+            />
+          </div>
+          
+          <div class="flex items-center gap-2 w-full md:w-auto">
+            <select v-model="filterStatus" class="px-3 py-1.5 border border-slate-300/80 rounded-lg bg-white text-xs text-slate-700 font-medium outline-none cursor-pointer shadow-2xs">
+              <option value="All">All Statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="Approved">Approved</option>
+              <option value="Disapproved">Disapproved</option>
+            </select>
+
+            <select v-model="filterProgram" class="px-3 py-1.5 border border-slate-300/80 rounded-lg bg-white text-xs text-slate-700 font-medium outline-none cursor-pointer shadow-2xs">
+              <option value="All">All Programs</option>
+              <option value="BSMT">BSMT</option>
+              <option value="BSMarE">BSMarE</option>
+              <option value="Both">Both</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <hr class="border-slate-200/80" />
+
+      <!-- Questions List Empty State -->
+      <div v-if="groupedQuestions.length === 0" class="text-center py-16 text-slate-400 text-xs font-normal">
+        No questions found matching selected criteria.
+      </div>
+
+      <!-- Collapsible Course Groups Loop -->
+      <div v-else class="space-y-4">
+        <div 
+          v-for="group in groupedQuestions" 
+          :key="group.courseKey" 
+          class="border border-slate-200/80 rounded-xl bg-slate-50/50 overflow-hidden shadow-2xs"
+        >
+          <!-- Collapsible Header -->
+          <div 
+            @click="toggleCourseCollapse(group.courseKey)"
+            class="flex items-center justify-between p-4 bg-slate-100/80 hover:bg-slate-100 cursor-pointer select-none transition border-b border-slate-200/80"
+          >
+            <div class="flex items-center gap-3">
+              <component :is="collapsedCourses[group.courseKey] ? ChevronRight : ChevronDown" :size="16" class="text-slate-600" />
+              <div>
+                <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2">
+                  <span class="bg-[#0b132b] text-white px-2.5 py-0.5 rounded text-[11px] font-mono tracking-wide">{{ group.code }}</span>
+                  <span>{{ group.title }}</span>
+                </h3>
+              </div>
+            </div>
+            <span class="bg-slate-200/80 text-slate-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border border-slate-300/50">
+              {{ group.questions.length }} {{ group.questions.length === 1 ? 'item' : 'items' }}
+            </span>
+          </div>
+
+          <!-- Collapsible Group Content -->
+          <div v-show="!collapsedCourses[group.courseKey]" class="p-4 space-y-4 bg-white">
+            <div 
+              v-for="(q, idx) in group.questions" 
+              :key="q.id || idx" 
+              class="border border-slate-200 rounded-xl p-4 bg-slate-50/40 hover:bg-white hover:shadow-sm transition space-y-3"
+            >
+              
+              <!-- Top Row: Tags & Approval Controls -->
+              <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-200/60 pb-2.5">
+                <div class="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+                  <span class="bg-slate-800 text-white px-2 py-0.5 rounded">{{ q.program || 'Both' }}</span>
+                  <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{{ q.term }}</span>
+                  <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded">{{ q.courseId || 'Unassigned' }}</span>
+                  <span class="bg-amber-100 text-amber-900 px-2 py-0.5 rounded">Bloom's: {{ q.bloomLevel }}</span>
+                  <span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded uppercase">{{ q.type }}</span>
+                </div>
+
+                <!-- Approval Status Badge & Action Buttons -->
+                <div class="flex items-center gap-2">
+                  <span :class="{
+                    'bg-amber-100 text-amber-800 border-amber-300': (q.status || 'Pending') === 'Pending',
+                    'bg-emerald-100 text-emerald-800 border-emerald-300': q.status === 'Approved',
+                    'bg-red-100 text-red-800 border-red-300': q.status === 'Disapproved'
+                  }" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border">
+                    {{ q.status || 'Pending' }}
+                  </span>
+
+                  <button @click="updateQuestionStatus(q.id, 'Approved')" title="Approve Question" class="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg border border-emerald-200 transition">
+                    <CheckCircle :size="15" />
+                  </button>
+
+                  <button @click="updateQuestionStatus(q.id, 'Disapproved')" title="Disapprove Question" class="p-1.5 bg-red-50 text-red-700 hover:bg-red-600 hover:text-white rounded-lg border border-red-200 transition">
+                    <XCircle :size="15" />
+                  </button>
+
+                  <button @click="deleteQuestion(q.id)" title="Delete Item" class="p-1.5 bg-slate-100 text-slate-500 hover:bg-slate-200 rounded-lg transition">
+                    <Trash2 :size="15" />
+                  </button>
+                </div>
+              </div>
+
+              <!-- Middle: Question Stem -->
+              <div>
+                <p class="text-xs font-semibold text-slate-800">{{ q.text }}</p>
+              </div>
+
+              <!-- Options Preview -->
+              <div v-if="q.options && q.options.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div v-for="(opt, oIdx) in q.options" :key="oIdx" class="p-2 rounded-lg border text-[11px]" :class="Array.isArray(q.correctAnswer) && q.correctAnswer.includes(oIdx) ? 'bg-emerald-50 border-emerald-300 font-bold text-emerald-900' : 'bg-white text-slate-700'">
+                  <span class="font-bold mr-1">{{ String.fromCharCode(65 + oIdx) }}.</span> {{ typeof opt === 'string' ? opt : opt.text }}
+                </div>
+              </div>
+
+              <!-- Matching Pairs Preview -->
+              <div v-else-if="q.matchingPairs && q.matchingPairs.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div v-for="(pair, pIdx) in q.matchingPairs" :key="pIdx" class="p-2 rounded-lg border bg-white text-[11px] flex justify-between">
+                  <span class="font-semibold text-slate-800">{{ pair.prompt }}</span>
+                  <span class="text-emerald-700 font-bold">➔ {{ pair.match }}</span>
+                </div>
+              </div>
+
+              <!-- Bottom: AI Analysis with Retain or Apply Options -->
+              <div 
+                class="p-2.5 rounded-xl text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border" 
+                :class="{
+                  'bg-amber-50/80 border-amber-200 text-amber-900': generateAiSuggestion(q).type === 'warning',
+                  'bg-blue-50/80 border-blue-200 text-blue-900': generateAiSuggestion(q).type === 'info',
+                  'bg-emerald-50/50 border-emerald-200 text-emerald-900': generateAiSuggestion(q).type === 'success'
+                }"
+              >
+                <div class="flex items-start gap-2">
+                  <Sparkles 
+                    :size="16" 
+                    class="mt-0.5 shrink-0" 
+                    :class="{
+                      'text-amber-600': generateAiSuggestion(q).type === 'warning',
+                      'text-blue-600': generateAiSuggestion(q).type === 'info',
+                      'text-emerald-600': generateAiSuggestion(q).type === 'success'
+                    }" 
+                  />
+                  <div>
+                    <span class="font-bold block text-[11px]">AI Validation & Suggestion:</span>
+                    <span class="text-[11px] leading-tight block">{{ generateAiSuggestion(q).text }}</span>
+                  </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div v-if="generateAiSuggestion(q).type === 'warning'" class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                  <button 
+                    @click="applyAiCorrection(q)" 
+                    class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition shadow-2xs flex items-center gap-1"
+                  >
+                    <Check :size="12" /> Apply Suggestion
+                  </button>
+                  <button 
+                    @click="retainOriginalSettings(q)" 
+                    class="px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white font-bold text-[10px] rounded-lg transition shadow-2xs flex items-center gap-1"
+                  >
+                    <RotateCcw :size="12" /> Retain Original
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: AUTHORING FORM -->
+    <div v-show="activeTab === 'create'" class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-6">
       
       <!-- 1. Program & Curriculum Mapping -->
       <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider border-b pb-2">1. Program & Curriculum Mapping</h2>
       
       <div class="grid grid-cols-1 md:grid-cols-5 gap-4 text-xs">
-        <!-- Program -->
         <div>
           <label class="font-bold text-slate-700 block mb-1">Program</label>
           <select v-model="form.program" @change="onProgramChange" class="w-full p-2.5 border rounded-lg bg-slate-50 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
@@ -709,7 +906,6 @@ onMounted(() => {
           </select>
         </div>
 
-        <!-- Academic Term -->
         <div>
           <label class="font-bold text-slate-700 block mb-1">Academic Term</label>
           <select v-model="form.term" class="w-full p-2.5 border rounded-lg bg-slate-50 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
@@ -718,7 +914,6 @@ onMounted(() => {
           </select>
         </div>
 
-        <!-- Course Code -->
         <div>
           <label class="font-bold text-slate-700 block mb-1">Course / Subject</label>
           <select v-model="form.courseId" @change="onCourseChange" class="w-full p-2.5 border rounded-lg bg-slate-50 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
@@ -729,7 +924,6 @@ onMounted(() => {
           </select>
         </div>
 
-        <!-- Course Outcome (CO) -->
         <div>
           <label class="font-bold text-slate-700 block mb-1">Course Outcome (CO)</label>
           <select v-model="form.courseOutcomeId" @change="onCOChange" :disabled="!form.courseId" class="w-full p-2.5 border rounded-lg disabled:bg-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none">
@@ -740,7 +934,6 @@ onMounted(() => {
           </select>
         </div>
 
-        <!-- Learning Outcome (LO) -->
         <div>
           <label class="font-bold text-slate-700 block mb-1">Learning Outcome (LO)</label>
           <select v-model="form.learningOutcomeId" :disabled="!form.courseOutcomeId" class="w-full p-2.5 border rounded-lg disabled:bg-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none">
@@ -789,7 +982,7 @@ onMounted(() => {
             <input type="file" accept="image/*" @change="e => handleFileUpload(e, form, 'imageUrl')" class="text-xs mt-1" />
           </div>
           <div v-if="form.imageUrl" class="relative">
-            <img :src="form.imageUrl" class="h-16 w-16 object-cover rounded-lg border shadow-sm" />
+            <img :src="form.imageUrl" class="h-16 w-16 object-cover rounded-lg border shadow-2xs" />
             <button @click="removeImage(form, 'imageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600">
               <X :size="10" />
             </button>
@@ -809,7 +1002,7 @@ onMounted(() => {
           </button>
         </div>
 
-        <div v-for="(opt, idx) in form.options" :key="idx" class="flex items-center gap-3 bg-white p-3 rounded-xl border shadow-sm">
+        <div v-for="(opt, idx) in form.options" :key="idx" class="flex items-center gap-3 bg-white p-3 rounded-xl border shadow-2xs">
           <input type="checkbox" v-model="opt.isCorrect" title="Mark as correct answer" class="h-4 w-4 text-emerald-600 rounded border-slate-300" />
           <input v-model="opt.text" :placeholder="`Option ${idx + 1} text...`" class="flex-1 p-2 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500" />
 
@@ -903,194 +1096,23 @@ onMounted(() => {
       </div>
 
       <!-- Submit Action -->
-      <button @click="saveQuestion" :disabled="isSubmitting" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-sm transition">
+      <button @click="saveQuestion" :disabled="isSubmitting" class="w-full py-3 bg-[#00c068] hover:bg-[#00a358] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-2xs transition">
         <Save :size="16" /> Save Question Item
       </button>
 
     </div>
 
-    <!-- TAB 2: QUESTION BANK REPOSITORY (Collapsible per Course Code/Title) -->
-    <div v-show="activeTab === 'repository'" class="bg-white border rounded-2xl p-6 shadow-sm space-y-4">
-      <div class="flex flex-col md:flex-row justify-between md:items-center border-b pb-4 gap-4">
-        <div>
-          <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
-            Question Bank Repository <span class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 rounded-full font-bold">{{ questions.length }} items</span>
-          </h2>
-          <p class="text-xs text-slate-500">Review, approve/disapprove, or apply AI cognitive suggestions organized by Course Code and Title.</p>
-        </div>
-
-        <!-- Repository Filters -->
-        <div class="flex flex-wrap items-center gap-2 text-xs">
-          <input v-model="searchQuery" placeholder="Search questions..." class="p-2 border rounded-lg bg-slate-50 text-slate-800 focus:ring-1 focus:ring-emerald-500 outline-none w-44" />
-          
-          <select v-model="filterStatus" class="p-2 border rounded-lg bg-slate-50 font-bold text-slate-700 outline-none">
-            <option value="All">All Statuses</option>
-            <option value="Pending">Pending</option>
-            <option value="Approved">Approved</option>
-            <option value="Disapproved">Disapproved</option>
-          </select>
-
-          <select v-model="filterProgram" class="p-2 border rounded-lg bg-slate-50 font-bold text-slate-700 outline-none">
-            <option value="All">All Programs</option>
-            <option value="BSMT">BSMT</option>
-            <option value="BSMarE">BSMarE</option>
-            <option value="Both">Both</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Questions List Empty State -->
-      <div v-if="groupedQuestions.length === 0" class="text-center py-12 text-slate-400 text-xs font-semibold">
-        No questions found matching selected criteria.
-      </div>
-
-      <!-- Collapsible Course Groups Loop -->
-      <div v-else class="space-y-4">
-        <div 
-          v-for="group in groupedQuestions" 
-          :key="group.courseKey" 
-          class="border rounded-2xl bg-slate-50/50 overflow-hidden shadow-sm border-slate-200"
-        >
-          <!-- Collapsible Header -->
-          <div 
-            @click="toggleCourseCollapse(group.courseKey)"
-            class="flex items-center justify-between p-4 bg-slate-100 hover:bg-slate-200/80 cursor-pointer select-none transition border-b border-slate-200"
-          >
-            <div class="flex items-center gap-3">
-              <component :is="collapsedCourses[group.courseKey] ? ChevronRight : ChevronDown" :size="18" class="text-slate-600" />
-              <div>
-                <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2">
-                  <span class="bg-slate-900 text-white px-2.5 py-0.5 rounded text-[11px] font-mono tracking-wide">{{ group.code }}</span>
-                  <span>{{ group.title }}</span>
-                </h3>
-              </div>
-            </div>
-            <span class="bg-slate-200 text-slate-700 text-[11px] font-bold px-3 py-0.5 rounded-full border border-slate-300">
-              {{ group.questions.length }} {{ group.questions.length === 1 ? 'item' : 'items' }}
-            </span>
-          </div>
-
-          <!-- Collapsible Group Content -->
-          <div v-show="!collapsedCourses[group.courseKey]" class="p-4 space-y-4 bg-white">
-            <div 
-              v-for="(q, idx) in group.questions" 
-              :key="q.id || idx" 
-              class="border rounded-xl p-4 bg-slate-50/50 hover:bg-white hover:shadow-md transition space-y-3 border-slate-200"
-            >
-              
-              <!-- Top Row: Tags & Approval Controls -->
-              <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b pb-2">
-                <div class="flex flex-wrap items-center gap-2 text-[11px] font-bold">
-                  <span class="bg-slate-800 text-white px-2 py-0.5 rounded">{{ q.program || 'Both' }}</span>
-                  <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{{ q.term }}</span>
-                  <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded">{{ q.courseId || 'Unassigned' }}</span>
-                  <span class="bg-amber-100 text-amber-900 px-2 py-0.5 rounded">Bloom's: {{ q.bloomLevel }}</span>
-                  <span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded uppercase">{{ q.type }}</span>
-                </div>
-
-                <!-- Approval Status Badge & Action Buttons -->
-                <div class="flex items-center gap-2">
-                  <span :class="{
-                    'bg-amber-100 text-amber-800 border-amber-300': (q.status || 'Pending') === 'Pending',
-                    'bg-emerald-100 text-emerald-800 border-emerald-300': q.status === 'Approved',
-                    'bg-red-100 text-red-800 border-red-300': q.status === 'Disapproved'
-                  }" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border">
-                    {{ q.status || 'Pending' }}
-                  </span>
-
-                  <button @click="updateQuestionStatus(q.id, 'Approved')" title="Approve Question" class="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg border border-emerald-200 transition">
-                    <CheckCircle :size="15" />
-                  </button>
-
-                  <button @click="updateQuestionStatus(q.id, 'Disapproved')" title="Disapprove Question" class="p-1.5 bg-red-50 text-red-700 hover:bg-red-600 hover:text-white rounded-lg border border-red-200 transition">
-                    <XCircle :size="15" />
-                  </button>
-
-                  <button @click="deleteQuestion(q.id)" title="Delete Item" class="p-1.5 bg-slate-100 text-slate-500 hover:bg-slate-200 rounded-lg transition">
-                    <Trash2 :size="15" />
-                  </button>
-                </div>
-              </div>
-
-              <!-- Middle: Question Stem -->
-              <div>
-                <p class="text-xs font-semibold text-slate-800">{{ q.text }}</p>
-              </div>
-
-              <!-- Options Preview -->
-              <div v-if="q.options && q.options.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div v-for="(opt, oIdx) in q.options" :key="oIdx" class="p-2 rounded-lg border text-[11px]" :class="Array.isArray(q.correctAnswer) && q.correctAnswer.includes(oIdx) ? 'bg-emerald-50 border-emerald-300 font-bold text-emerald-900' : 'bg-white text-slate-700'">
-                  <span class="font-bold mr-1">{{ String.fromCharCode(65 + oIdx) }}.</span> {{ typeof opt === 'string' ? opt : opt.text }}
-                </div>
-              </div>
-
-              <!-- Matching Pairs Preview -->
-              <div v-else-if="q.matchingPairs && q.matchingPairs.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div v-for="(pair, pIdx) in q.matchingPairs" :key="pIdx" class="p-2 rounded-lg border bg-white text-[11px] flex justify-between">
-                  <span class="font-semibold text-slate-800">{{ pair.prompt }}</span>
-                  <span class="text-emerald-700 font-bold">➔ {{ pair.match }}</span>
-                </div>
-              </div>
-
-              <!-- Bottom: AI Analysis with Retain or Apply Options -->
-              <div 
-                class="p-2.5 rounded-xl text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border" 
-                :class="{
-                  'bg-amber-50/80 border-amber-200 text-amber-900': generateAiSuggestion(q).type === 'warning',
-                  'bg-blue-50/80 border-blue-200 text-blue-900': generateAiSuggestion(q).type === 'info',
-                  'bg-emerald-50/50 border-emerald-200 text-emerald-900': generateAiSuggestion(q).type === 'success'
-                }"
-              >
-                <div class="flex items-start gap-2">
-                  <Sparkles 
-                    :size="16" 
-                    class="mt-0.5 shrink-0" 
-                    :class="{
-                      'text-amber-600': generateAiSuggestion(q).type === 'warning',
-                      'text-blue-600': generateAiSuggestion(q).type === 'info',
-                      'text-emerald-600': generateAiSuggestion(q).type === 'success'
-                    }" 
-                  />
-                  <div>
-                    <span class="font-bold block text-[11px]">AI Validation & Suggestion:</span>
-                    <span class="text-[11px] leading-tight block">{{ generateAiSuggestion(q).text }}</span>
-                  </div>
-                </div>
-
-                <!-- Retain / Apply Action Buttons -->
-                <div v-if="generateAiSuggestion(q).type === 'warning'" class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                  <button 
-                    @click="applyAiCorrection(q)" 
-                    class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition shadow-sm flex items-center gap-1"
-                  >
-                    <Check :size="12" /> Apply Suggestion
-                  </button>
-                  <button 
-                    @click="retainOriginalSettings(q)" 
-                    class="px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white font-bold text-[10px] rounded-lg transition shadow-sm flex items-center gap-1"
-                  >
-                    <RotateCcw :size="12" /> Retain Original
-                  </button>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- TAB 3: COURSE REPORTS & AUDITS -->
-    <div v-show="activeTab === 'report'" class="bg-white border rounded-2xl p-6 shadow-sm space-y-6">
+    <div v-show="activeTab === 'report'" class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-6">
       <div class="flex flex-col md:flex-row justify-between md:items-center border-b pb-4 gap-4">
         <div>
-          <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <h2 class="text-base font-bold text-slate-900 flex items-center gap-2 tracking-tight">
             <BarChart2 class="text-emerald-600" :size="20" /> Course Question Changes & Audit Report
           </h2>
           <p class="text-xs text-slate-500">View question counts, approval status, and AI overrides grouped per course.</p>
         </div>
 
-        <button @click="exportCourseReportCSV" type="button" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-2 transition shadow-sm self-start md:self-auto">
+        <button @click="exportCourseReportCSV" type="button" class="px-4 py-2 bg-[#00c068] hover:bg-[#00a358] text-white text-xs font-bold rounded-xl flex items-center gap-2 transition shadow-2xs self-start md:self-auto">
           <Download :size="14" /> Export Report CSV
         </button>
       </div>
