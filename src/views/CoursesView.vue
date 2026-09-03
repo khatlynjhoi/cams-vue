@@ -339,7 +339,7 @@ function deleteCourse(id) {
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900 text-white p-6 rounded-2xl shadow-sm">
       <div>
         <h1 class="text-2xl font-bold flex items-center gap-2">
-          <BookOpen :size="24" class="text-emerald-400" /> Maritime Course Syllabus Builder
+          <BookOpen :size="24" class="text-emerald-400" /> Course Builder
         </h1>
         <p class="text-xs text-slate-300">Define Programs, Course Codes, Titles, Outcomes (COs), and Learning Objectives (LOs) with hours allocation.</p>
       </div>
@@ -388,11 +388,11 @@ function deleteCourse(id) {
         </div>
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Course Code</label>
-          <input v-model="courseCode" placeholder="e.g. NAV-101" class="w-full text-xs p-2.5 border rounded-lg font-mono font-bold focus:ring-2 focus:ring-emerald-500 outline-none" />
+          <input v-model="courseCode" placeholder="e.g. NAV1" class="w-full text-xs p-2.5 border rounded-lg font-mono font-bold focus:ring-2 focus:ring-emerald-500 outline-none" />
         </div>
         <div class="md:col-span-2">
           <label class="block text-xs font-bold text-gray-700 mb-1">Course Descriptive Title</label>
-          <input v-model="courseTitle" placeholder="e.g. Terrestrial and Coastal Navigation" class="w-full text-xs p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
+          <input v-model="courseTitle" placeholder="e.g. Navigational Instruments with Compasses" class="w-full text-xs p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
         </div>
       </div>
 
@@ -554,7 +554,7 @@ function deleteCourse(id) {
     <!-- Collapsible Course Registry -->
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
       <div class="p-4 bg-gray-50 border-b flex justify-between items-center">
-        <h3 class="text-sm font-bold text-gray-900">Registered Maritime Courses ({{ filteredAndSortedCourses.length }})</h3>
+        <h3 class="text-sm font-bold text-gray-900">Registered Courses ({{ filteredAndSortedCourses.length }})</h3>
       </div>
 
       <div v-if="filteredAndSortedCourses.length === 0" class="p-8 text-center text-slate-500 text-xs">

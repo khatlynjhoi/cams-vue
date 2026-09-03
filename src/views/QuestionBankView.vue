@@ -308,7 +308,7 @@
                   </div>
                 </div>
 
-                <div v-if="generateAiSuggestion(q).type === 'warning'" class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <div v-if="generateAiSuggestion(q).type === 'warning' && q.status !== 'Approved'" class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                   <button @click="applyAiCorrection(q)" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition shadow-2xs flex items-center gap-1 cursor-pointer">
                     <Check :size="12" /> Apply Suggestion
                   </button>
@@ -355,7 +355,7 @@
             <label class="font-bold text-slate-700 block mb-1">Course / Subject</label>
             <select v-model="form.courseId" @change="onCourseChange" class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
               <option value="" disabled>Select Subject...</option>
-              <option v-for="c in filteredCourses" :key="c.id" :value="c.id || c.code">
+              <option v-for="c in filteredCourses" :key="c.id" :value="c.code || c.id">
                 {{ c.code }} — {{ c.title }}
               </option>
             </select>
@@ -1398,20 +1398,57 @@ function handleBulkCSVUpload(event) {
       const lines = e.target.result.split(/\r?\n/).filter(l => l.trim().length > 0)
       if (lines.length < 2) return alert('CSV file appears empty.')
 
+      // Map valid courses from the system (by code or id)
+      const validCoursesMap = new Map()
+      courses.value.forEach(c => {
+        if (c.code) validCoursesMap.set(c.code.toString().trim().toLowerCase(), c.code)
+        if (c.id) validCoursesMap.set(c.id.toString().trim().toLowerCase(), c.code || c.id)
+      })
+
+      // Map existing questions to identify and reject duplicates
+      const existingQuestionKeys = new Set(
+        questions.value.map(q => `${(q.courseId || '').toString().trim().toLowerCase()}|${(q.text || '').toString().trim().toLowerCase()}`)
+      )
+
       const parsedQuestions = []
+      let skippedInvalidCourseCount = 0
+      let skippedDuplicateCount = 0
+
       for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(',').map(s => s.trim().replace(/^"|"$/g, ''))
         if (cols.length >= 8) {
+          const rawCourseId = (cols[2] || '').trim()
+          const questionText = (cols[7] || '').trim()
+
+          // 1. Verify course existence in system
+          const normalizedCourseKey = rawCourseId.toLowerCase()
+          if (!rawCourseId || !validCoursesMap.has(normalizedCourseKey)) {
+            skippedInvalidCourseCount++
+            continue
+          }
+
+          // 2. Identify and eliminate duplicate questions
+          const matchedCourseCode = validCoursesMap.get(normalizedCourseKey)
+          const duplicateKey = `${matchedCourseCode.toLowerCase()}|${questionText.toLowerCase()}`
+
+          if (existingQuestionKeys.has(duplicateKey)) {
+            skippedDuplicateCount++
+            continue
+          }
+
+          // Track question key to prevent duplicates within the same batch file
+          existingQuestionKeys.add(duplicateKey)
+
           parsedQuestions.push({
             id: Date.now().toString() + i,
             program: cols[0] || 'Both',
             term: cols[1] || 'Midterm',
-            courseId: cols[2] || '',
+            courseId: matchedCourseCode,
             courseOutcomeId: cols[3] || '',
             learningOutcomeId: cols[4] || '',
             bloomLevel: cols[5] || 'Understanding',
             type: cols[6] || 'multiple_choice',
-            text: cols[7] || '',
+            text: questionText,
             options: [cols[8], cols[9], cols[10], cols[11]].filter(Boolean).map(t => ({ text: t, imageUrl: '' })),
             correctAnswer: [0],
             status: 'Pending',
@@ -1421,9 +1458,23 @@ function handleBulkCSVUpload(event) {
         }
       }
 
+      if (parsedQuestions.length === 0) {
+        let msg = 'No questions were uploaded.'
+        if (skippedInvalidCourseCount > 0 || skippedDuplicateCount > 0) {
+          msg += `\n\nSkipped summary:\n- Non-existent courses: ${skippedInvalidCourseCount}\n- Duplicate questions: ${skippedDuplicateCount}`
+        }
+        alert(msg)
+        return
+      }
+
       questions.value = [...parsedQuestions, ...questions.value]
       syncQuestionsStorage()
-      alert(`Imported ${parsedQuestions.length} questions successfully!`)
+
+      let successMsg = `Imported ${parsedQuestions.length} questions successfully!`
+      if (skippedInvalidCourseCount > 0 || skippedDuplicateCount > 0) {
+        successMsg += `\n\nSkipped summary:\n- Course not in system: ${skippedInvalidCourseCount}\n- Duplicate question: ${skippedDuplicateCount}`
+      }
+      alert(successMsg)
       activeTab.value = 'repository'
     } catch (err) {
       alert('Error parsing CSV file.')
