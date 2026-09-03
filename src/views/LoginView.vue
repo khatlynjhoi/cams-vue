@@ -103,39 +103,48 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+
 const username = ref('')
 const password = ref('')
 const errorMessage = ref('')
 const isLoading = ref(false)
+
+const API_BASE_URL = 'http://127.0.0.1:8000/api'
 
 const handleLogin = async () => {
   errorMessage.value = ''
   isLoading.value = true
 
   try {
-    const response = await fetch('http://localhost:3001/api/auth/login', {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({
-        username: username.value,
+        email: username.value,
         password: password.value
       })
     })
 
     const data = await response.json()
 
-    if (!response.ok || !data.success) {
-      throw new Error(data.message || 'Invalid username or password')
+    if (!response.ok) {
+      throw new Error(data.message || 'Invalid email or password.')
     }
 
-    // Persist Auth State
+    // Save Laravel Sanctum token
     localStorage.setItem('token', data.token)
+
+    // Save authenticated user
     localStorage.setItem('user', JSON.stringify(data.user))
 
-    // Redirect to Main Dashboard
+    // Go to Dashboard
     router.push('/')
   } catch (err) {
-    errorMessage.value = err.message || 'Unable to connect to the authentication server.'
+    errorMessage.value =
+      err.message || 'Unable to connect to the CAMS authentication server.'
   } finally {
     isLoading.value = false
   }

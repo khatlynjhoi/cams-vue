@@ -173,13 +173,49 @@ app.post('/api/courses/bulk', (req, res) => {
   }
 })
 
-app.delete('/api/courses/:id', (req, res) => {
+app.delete('/api/questions/:id', (req, res) => {
   try {
-    db.prepare('DELETE FROM courses WHERE id = ?').run(req.params.id)
-    logAuditEvent('SYSTEM', 'DELETE_COURSE', req.params.id)
-    res.json({ success: true })
+    const id = Number(req.params.id)
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid question ID.'
+      })
+    }
+
+    const result = db
+      .prepare('DELETE FROM questions WHERE id = ?')
+      .run(id)
+
+    if (result.changes === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Question not found.'
+      })
+    }
+
+    logAuditEvent(
+      'SYSTEM',
+      'DELETE_QUESTION',
+      String(id),
+      `Deleted question ID: ${id}`
+    )
+
+    res.json({
+      success: true,
+      message: 'Question deleted successfully.',
+      deletedId: id
+    })
+
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
+    console.error('DELETE QUESTION ERROR:', err)
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete question.',
+      error: err.message
+    })
   }
 })
 

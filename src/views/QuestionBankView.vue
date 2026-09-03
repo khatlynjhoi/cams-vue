@@ -865,6 +865,47 @@ const editingQuestion = ref(null)
 const STORAGE_COURSES_KEY = 'cams_courses_data'
 const STORAGE_QUESTIONS_KEY = 'cams_questions_data'
 
+async function getApiError(response) {
+  let data = {}
+
+  try {
+    data = await response.json()
+  } catch (_) {}
+
+  if (response.status === 401) {
+    return new Error('Your session has expired. Please log in again.')
+  }
+
+  if (response.status === 422 && data.errors) {
+    const firstError = Object.values(data.errors).flat()[0]
+
+    return new Error(
+      firstError ||
+      data.message ||
+      'Please check the submitted information.'
+    )
+  }
+
+  return new Error(
+    data.message ||
+    `Request failed. HTTP ${response.status}`
+  )
+}
+
+function getAuthHeaders(includeJson = false) {
+  const token = localStorage.getItem('token')
+
+  if (!token) {
+    throw new Error('No authentication token found. Please log in again.')
+  }
+
+  return {
+    Accept: 'application/json',
+    Authorization: `Bearer ${token}`,
+    ...(includeJson ? { 'Content-Type': 'application/json' } : {})
+  }
+}
+
 const form = reactive({
   program: 'Both',
   term: 'Midterm',
@@ -1013,18 +1054,180 @@ function toggleEditCorrectOption(index) {
   editingQuestion.value.correctAnswer = currentAnswers
 }
 
-function saveEditedQuestion() {
-  if (!editingQuestion.value) return
-  if (!confirm('Are you sure you want to save changes to this question item?')) {
+async function saveEditedQuestion() {
+  if (!editingQuestion.value) {
     return
   }
-  const index = questions.value.findIndex(q => q.id === editingQuestion.value.id)
-  if (index !== -1) {
-    questions.value[index] = { ...editingQuestion.value }
-    syncQuestionsStorage()
-    alert('Question revised and saved successfully!')
+
+  if (
+    !editingQuestion.value.courseId ||
+    !editingQuestion.value.text?.trim()
+  ) {
+    alert('Please select a Course / Subject and enter Question Stem.')
+    return
   }
-  closeEditModal()
+
+  if (!confirm('Are you sure you want to save the changes to this question?')) {
+    return
+  }
+
+  const numericCourseId = resolveCourseId(
+    editingQuestion.value.courseId
+  )
+
+  if (!numericCourseId) {
+    alert(
+      'The selected course could not be matched to the Laravel course record.'
+    )
+    return
+  }
+
+  let formattedOptions = null
+  let formattedCorrectAnswer = null
+  let formattedMatchingPairs = null
+
+  // MULTIPLE CHOICE
+  if (editingQuestion.value.type === 'multiple_choice') {
+    formattedOptions = (editingQuestion.value.options || []).map(opt => ({
+      text: opt.text,
+      imageUrl: opt.imageUrl || null
+    }))
+
+    formattedCorrectAnswer = formattedOptions
+      .map((_, idx) =>
+        editingQuestion.value.correctAnswer?.includes(idx)
+          ? idx
+          : null
+      )
+      .filter(val => val !== null)
+
+    if (formattedCorrectAnswer.length === 0) {
+      alert('Please check at least one correct option.')
+      return
+    }
+  }
+
+  // TRUE / FALSE
+  else if (editingQuestion.value.type === 'true_false') {
+    formattedOptions = ['True', 'False']
+
+    formattedCorrectAnswer =
+      editingQuestion.value.correctAnswer?.[0] === 1
+        ? [1]
+        : [0]
+  }
+
+  // SHORT ANSWER
+  else if (editingQuestion.value.type === 'short_answer') {
+    if (Array.isArray(editingQuestion.value.correctAnswer)) {
+      formattedCorrectAnswer =
+        editingQuestion.value.correctAnswer
+    } else {
+      formattedCorrectAnswer =
+        String(editingQuestion.value.correctAnswer || '')
+          .split(',')
+          .map(keyword => keyword.trim())
+          .filter(Boolean)
+    }
+
+    if (formattedCorrectAnswer.length === 0) {
+      alert('Please enter at least one expected answer keyword.')
+      return
+    }
+  }
+
+  // MATCHING TYPE
+  else if (editingQuestion.value.type === 'matching') {
+    formattedMatchingPairs =
+      editingQuestion.value.matchingPairs || []
+
+    formattedCorrectAnswer = null
+  }
+
+  const payload = {
+    program: editingQuestion.value.program || null,
+    term: editingQuestion.value.term || null,
+
+    course_id: numericCourseId,
+
+    course_outcome_id:
+      editingQuestion.value.courseOutcomeId || null,
+
+    learning_outcome_id:
+      editingQuestion.value.learningOutcomeId || null,
+
+    code: editingQuestion.value.code,
+
+    type: editingQuestion.value.type,
+
+    text: editingQuestion.value.text.trim(),
+
+    image_url:
+      editingQuestion.value.imageUrl || null,
+
+    options: formattedOptions,
+
+    correct_answer: formattedCorrectAnswer
+      ? JSON.stringify(formattedCorrectAnswer)
+      : null,
+
+    matching_pairs: formattedMatchingPairs,
+
+    stcw_standard:
+      editingQuestion.value.stcwStandard || null,
+
+    bloom_level:
+      editingQuestion.value.bloomLevel || 'Understanding',
+
+    status:
+      editingQuestion.value.status || 'Pending',
+
+    ai_accepted:
+      Boolean(editingQuestion.value.aiAccepted),
+
+    retained_ai:
+      Boolean(editingQuestion.value.retainedAi)
+  }
+
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/questions/${editingQuestion.value.id}`,
+      {
+        method: 'PUT',
+        headers: getAuthHeaders(true),
+        body: JSON.stringify(payload)
+      }
+    )
+
+    if (!res.ok) {
+      throw await getApiError(res)
+    }
+
+    const data = await res.json()
+
+    const updatedQuestion = normalizeQuestion(data)
+
+    const index = questions.value.findIndex(
+      q => q.id === editingQuestion.value.id
+    )
+
+    if (index !== -1) {
+      questions.value[index] = updatedQuestion
+    }
+
+    syncQuestionsStorage()
+
+    closeEditModal()
+
+    alert('Question updated successfully in CAMS.')
+  } catch (err) {
+    console.error('Failed to update question:', err)
+
+    alert(
+      err.message ||
+      'Unable to update the question.'
+    )
+  }
 }
 
 const groupedQuestions = computed(() => {
@@ -1048,7 +1251,7 @@ const groupedQuestions = computed(() => {
 const courseReports = computed(() => {
   const map = {}
   courses.value.forEach(course => {
-    map[course.id || course.code] = {
+    map[course.code || course.id] = {
       code: course.code || course.id,
       title: course.title || `Course ${course.code}`,
       program: course.program || 'Both',
@@ -1237,126 +1440,343 @@ function retainOriginalSettings(q) {
 }
 
 async function deleteQuestion(id) {
-  if (confirm('Are you sure you want to remove this question item?')) {
-    questions.value = questions.value.filter(q => q.id !== id)
-    selectedQuestionIds.value = selectedQuestionIds.value.filter(selectedId => selectedId !== id)
-    syncQuestionsStorage()
-    try {
-      await fetch('http://localhost:3001/api/questions/' + id, { method: 'DELETE' })
-    } catch (err) {
-      console.warn('Backend delete request skipped, updated local state.')
+  if (!confirm('Are you sure you want to remove this question item?')) return
+
+  try {
+    const response = await fetch(
+      'http://localhost:3001/api/questions/' + id,
+      {
+        method: 'DELETE'
+      }
+    )
+
+    const result = await response.json()
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to delete question.')
     }
-    alert('Question item deleted.')
+
+    questions.value = questions.value.filter(q => q.id !== id)
+
+    selectedQuestionIds.value =
+      selectedQuestionIds.value.filter(
+        selectedId => selectedId !== id
+      )
+
+    syncQuestionsStorage()
+
+    alert('Question item deleted successfully.')
+
+  } catch (err) {
+    console.error('Delete question failed:', err)
+    alert('Unable to delete the question item. Please try again.')
   }
 }
 
-async function fetchQuestions() {
-  const saved = localStorage.getItem(STORAGE_QUESTIONS_KEY)
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        questions.value = parsed
-      }
-    } catch (e) {
-      console.warn('Error reading from storage:', e)
-    }
+const API_BASE_URL = 'http://127.0.0.1:8000/api'
+
+function parseCorrectAnswer(value) {
+  if (Array.isArray(value)) {
+    return value
+  }
+
+  if (value === null || value === undefined || value === '') {
+    return null
   }
 
   try {
-    const res = await fetch('http://localhost:3001/api/questions')
-    const data = await res.json()
-    if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
-      if (questions.value.length === 0) {
-        questions.value = data.data
-        syncQuestionsStorage()
-      }
-    }
-  } catch (err) {
-    console.warn('Backend unavailable, using persistent local storage.')
+    const parsed = JSON.parse(value)
+    return parsed
+  } catch (e) {
+    return value
+  }
+}
+
+function normalizeCourse(course) {
+  return {
+    ...course,
+    courseOutcomes: course.course_outcomes || []
+  }
+}
+
+function normalizeQuestion(question) {
+  const course = courses.value.find(
+    c => String(c.id) === String(question.course_id)
+  )
+
+  return {
+    ...question,
+    courseId: course?.code || question.course_id || '',
+    courseDbId: question.course_id || null,
+    courseOutcomeId: question.course_outcome_id || '',
+    learningOutcomeId: question.learning_outcome_id || '',
+    imageUrl: question.image_url || '',
+    correctAnswer: parseCorrectAnswer(question.correct_answer),
+    matchingPairs: question.matching_pairs || [],
+    bloomLevel: question.bloom_level || 'Understanding',
+    stcwStandard: question.stcw_standard || '',
+    aiAccepted: Boolean(question.ai_accepted),
+    retainedAi: Boolean(question.retained_ai)
   }
 }
 
 async function fetchCourses() {
   try {
-    const res = await fetch('http://localhost:3001/api/courses')
-    const data = await res.json()
-    if (data && data.success && Array.isArray(data.data)) {
-      courses.value = data.data
-      localStorage.setItem(STORAGE_COURSES_KEY, JSON.stringify(data.data))
-      return
-    }
-  } catch (err) {
-    console.warn('Backend unavailable, reading courses from local storage')
-  }
+    const res = await fetch(`${API_BASE_URL}/courses`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    })
 
-  const savedCourses = localStorage.getItem(STORAGE_COURSES_KEY)
-  if (savedCourses) {
-    try { courses.value = JSON.parse(savedCourses) } catch (e) { courses.value = [] }
+    if (res.status === 401) {
+      throw new Error('Your session has expired. Please log in again.')
+    }
+
+    if (!res.ok) {
+      throw new Error(`Failed to load courses. HTTP ${res.status}`)
+    }
+
+    const data = await res.json()
+
+    if (!Array.isArray(data)) {
+      throw new Error('Invalid course data received from Laravel.')
+    }
+
+    courses.value = data.map(normalizeCourse)
+
+    localStorage.setItem(
+      STORAGE_COURSES_KEY,
+      JSON.stringify(courses.value)
+    )
+
+    console.log(`CAMS: Loaded ${courses.value.length} courses from Laravel.`)
+  } catch (err) {
+    console.error('Failed to load courses from Laravel:', err)
+
+    // Only use local storage as a fallback
+    const savedCourses = localStorage.getItem(STORAGE_COURSES_KEY)
+
+    if (savedCourses) {
+      try {
+        const parsed = JSON.parse(savedCourses)
+
+        courses.value = Array.isArray(parsed)
+          ? parsed.map(normalizeCourse)
+          : []
+      } catch (e) {
+        courses.value = []
+      }
+    }
   }
 }
 
+async function fetchQuestions() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/questions`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    })
+
+    if (res.status === 401) {
+      throw new Error('Your session has expired. Please log in again.')
+    }
+
+    if (!res.ok) {
+      throw new Error(`Failed to load questions. HTTP ${res.status}`)
+    }
+
+    const data = await res.json()
+
+    if (!Array.isArray(data)) {
+      throw new Error('Invalid question data received from Laravel.')
+    }
+
+    questions.value = data.map(normalizeQuestion)
+
+    syncQuestionsStorage()
+
+    console.log(`CAMS: Loaded ${questions.value.length} questions from Laravel.`)
+  } catch (err) {
+    console.error('Failed to load questions from Laravel:', err)
+
+    // Only use local storage as a fallback
+    const saved = localStorage.getItem(STORAGE_QUESTIONS_KEY)
+
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+
+        questions.value = Array.isArray(parsed)
+          ? parsed
+          : []
+      } catch (e) {
+        questions.value = []
+      }
+    }
+  }
+}
+
+function resolveCourseId(courseValue) {
+  const course = courses.value.find(
+    c =>
+      String(c.id) === String(courseValue) ||
+      String(c.code) === String(courseValue)
+  )
+
+  return course?.id || null
+}
+
+function generateQuestionCode() {
+  return `Q-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 7)
+    .toUpperCase()}`
+}
+
 async function saveQuestion() {
-  if (!form.courseId || !form.text) {
+  if (!form.courseId || !form.text.trim()) {
     alert('Please select a Course / Subject and enter Question Stem.')
     return
   }
 
-  if (!confirm('Are you sure you want to save this new assessment question?')) {
+  if (
+    !confirm(
+      'Are you sure you want to save this new assessment question?'
+    )
+  ) {
     return
   }
 
-  let formattedOptions = []
-  let formattedCorrectAnswer = null
+  const numericCourseId = resolveCourseId(form.courseId)
 
+  if (!numericCourseId) {
+    alert(
+      'The selected course could not be matched to the Laravel course record.'
+    )
+    return
+  }
+
+  let formattedOptions = null
+  let formattedCorrectAnswer = null
+  let formattedMatchingPairs = null
+
+  // MULTIPLE CHOICE
   if (form.type === 'multiple_choice') {
-    formattedOptions = form.options.map(opt => ({ text: opt.text, imageUrl: opt.imageUrl }))
+    formattedOptions = form.options.map(opt => ({
+      text: opt.text,
+      imageUrl: opt.imageUrl
+    }))
+
     formattedCorrectAnswer = form.options
-      .map((opt, idx) => opt.isCorrect ? idx : null)
+      .map((opt, idx) => (opt.isCorrect ? idx : null))
       .filter(val => val !== null)
-    
+
     if (formattedCorrectAnswer.length === 0) {
       alert('Please check at least one correct option.')
       return
     }
-  } else if (form.type === 'true_false') {
+  }
+
+  // TRUE / FALSE
+  else if (form.type === 'true_false') {
     formattedOptions = ['True', 'False']
-    formattedCorrectAnswer = form.tfCorrect === 'true' ? 0 : 1
+
+    formattedCorrectAnswer =
+      form.tfCorrect === 'true'
+        ? [0]
+        : [1]
+  }
+
+  // SHORT ANSWER
+  else if (form.type === 'short_answer') {
+    formattedCorrectAnswer = form.shortAnswerKeywords
+      .split(',')
+      .map(keyword => keyword.trim())
+      .filter(Boolean)
+
+    if (formattedCorrectAnswer.length === 0) {
+      alert('Please enter at least one expected answer keyword.')
+      return
+    }
+  }
+
+  // MATCHING TYPE
+  else if (form.type === 'matching') {
+    formattedMatchingPairs = form.matchingPairs
+    formattedCorrectAnswer = null
   }
 
   const payload = {
-    id: Date.now().toString(),
-    ...form,
+    program: form.program,
+    term: form.term,
+
+    // Laravel expects numeric course_id
+    course_id: numericCourseId,
+
+    course_outcome_id: form.courseOutcomeId || null,
+    learning_outcome_id: form.learningOutcomeId || null,
+
+    // Required unique question code
+    code: generateQuestionCode(),
+
+    type: form.type,
+    text: form.text.trim(),
+
+    image_url: form.imageUrl || null,
+
     options: formattedOptions,
-    correctAnswer: formattedCorrectAnswer,
+
+    // Laravel database field is text,
+    // so arrays are stored as JSON strings.
+    correct_answer: formattedCorrectAnswer
+      ? JSON.stringify(formattedCorrectAnswer)
+      : null,
+
+    matching_pairs: formattedMatchingPairs,
+
+    stcw_standard: null,
+    bloom_level: form.bloomLevel,
+
     status: 'Pending',
-    aiAccepted: false,
-    retainedAi: false
+
+    // AI audit fields
+    ai_accepted: false,
+    retained_ai: false
   }
 
   isSubmitting.value = true
+
   try {
-    const res = await fetch('http://localhost:3001/api/questions', {
+    const res = await fetch(`${API_BASE_URL}/questions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(true),
       body: JSON.stringify(payload)
     })
-    const data = await res.json()
-    if (data.success) {
-      questions.value.unshift(payload)
-      syncQuestionsStorage()
-      alert('Question saved successfully!')
-      resetForm()
-      activeTab.value = 'repository'
-    } else {
-      throw new Error(data.error)
+
+    if (!res.ok) {
+      throw await getApiError(res)
     }
-  } catch (err) {
-    questions.value.unshift(payload)
+
+    const data = await res.json()
+
+    // Use the actual Laravel/MySQL record returned by the server
+    const savedQuestion = normalizeQuestion(data)
+
+    questions.value.unshift(savedQuestion)
+
     syncQuestionsStorage()
-    alert('Question item saved locally!')
+
+    alert('Question saved successfully to CAMS.')
+
     resetForm()
+
     activeTab.value = 'repository'
+  } catch (err) {
+    console.error('Failed to save question:', err)
+
+    alert(
+      err.message ||
+      'Unable to save the question.'
+    )
   } finally {
     isSubmitting.value = false
   }
@@ -1486,8 +1906,8 @@ function handleBulkCSVUpload(event) {
   reader.readAsText(file)
 }
 
-onMounted(() => {
-  fetchQuestions()
-  fetchCourses()
+onMounted(async () => {
+  await fetchCourses()
+  await fetchQuestions()
 })
 </script>

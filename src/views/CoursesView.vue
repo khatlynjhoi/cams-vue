@@ -1,14 +1,15 @@
+```vue
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { 
-  Plus, Trash2, Clock, BookOpen, FileSpreadsheet, Download, 
+import {
+  Plus, Trash2, Clock, BookOpen, FileSpreadsheet, Download,
   Upload, ChevronDown, ChevronRight, Search, Filter, ArrowUpDown,
   Pencil, RotateCcw
 } from 'lucide-vue-next'
 
 const courses = ref([])
 const isLoading = ref(true)
-const entryMode = ref('manual') // 'manual' | 'bulk'
+const entryMode = ref('manual')
 
 // Accordion State
 const expandedCourses = ref(new Set())
@@ -24,6 +25,7 @@ const editingCourseId = ref(null)
 const courseCode = ref('')
 const courseTitle = ref('')
 const courseProgram = ref('BSMT')
+
 const courseOutcomes = ref([
   {
     id: 'CO1',
@@ -39,79 +41,189 @@ const csvFileName = ref('')
 const csvParseError = ref('')
 const bulkPreview = ref([])
 
-// --- LOCAL STORAGE PERSISTENCE ---
+// Local Storage Cache
 const STORAGE_KEY = 'cams_courses_data'
 
-function loadCoursesFromStorage() {
+// Laravel API
+const API_BASE_URL = 'http://127.0.0.1:8000/api'
+
+// --------------------------------------------------
+// AUTHENTICATION HELPER
+// --------------------------------------------------
+
+function getAuthHeaders() {
+  const token = localStorage.getItem('token')
+
+  if (!token) {
+    throw new Error('No authentication token found. Please log in again.')
+  }
+
+  return {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'Authorization': `Bearer ${token}`
+  }
+}
+
+// --------------------------------------------------
+// LOAD COURSES FROM LARAVEL
+// --------------------------------------------------
+
+async function loadCoursesFromStorage() {
   isLoading.value = true
+
   try {
-    const savedData = localStorage.getItem(STORAGE_KEY)
-    if (savedData) {
-      courses.value = JSON.parse(savedData)
-    } else {
+    const response = await fetch(`${API_BASE_URL}/courses`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+
+      throw new Error(
+        errorData.message ||
+        `Failed to load courses. HTTP ${response.status}`
+      )
+    }
+
+    const data = await response.json()
+
+    courses.value = Array.isArray(data)
+      ? data.map(course => ({
+          ...course,
+
+          // Laravel stores this as course_outcomes.
+          // Vue continues using courseOutcomes.
+          courseOutcomes: course.course_outcomes || []
+        }))
+      : []
+
+    // Keep localStorage synchronized as a temporary cache.
+    saveCoursesToStorage()
+
+  } catch (err) {
+    console.error('Failed to load courses from Laravel:', err)
+
+    // Temporary fallback to existing localStorage.
+    try {
+      const savedData = localStorage.getItem(STORAGE_KEY)
+
+      if (savedData) {
+        courses.value = JSON.parse(savedData)
+      } else {
+        courses.value = []
+      }
+    } catch (storageError) {
+      console.error(
+        'Failed to load courses from localStorage:',
+        storageError
+      )
+
       courses.value = []
     }
-  } catch (err) {
-    console.error('Failed to load courses from localStorage:', err)
   } finally {
     isLoading.value = false
   }
 }
 
+// --------------------------------------------------
+// LOCAL STORAGE CACHE
+// --------------------------------------------------
+
 function saveCoursesToStorage() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(courses.value))
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify(courses.value)
+  )
 }
+
+// --------------------------------------------------
+// INITIAL LOAD
+// --------------------------------------------------
 
 onMounted(() => {
   loadCoursesFromStorage()
 })
 
-// Accordion Toggle Functions (Reassigning Set to ensure Vue reactivity)
+// --------------------------------------------------
+// ACCORDION FUNCTIONS
+// --------------------------------------------------
+
 function toggleCourse(courseId) {
   const next = new Set(expandedCourses.value)
+
   if (next.has(courseId)) {
     next.delete(courseId)
   } else {
     next.add(courseId)
   }
+
   expandedCourses.value = next
 }
 
 function toggleOutcome(coKey) {
   const next = new Set(expandedOutcomes.value)
+
   if (next.has(coKey)) {
     next.delete(coKey)
   } else {
     next.add(coKey)
   }
+
   expandedOutcomes.value = next
 }
 
-// Filter and Sort Computed Property
+// --------------------------------------------------
+// FILTER AND SORT
+// --------------------------------------------------
+
 const filteredAndSortedCourses = computed(() => {
   return courses.value
     .filter(c => {
-      const matchesProgram = filterProgram.value === 'All' || c.program === filterProgram.value || c.program === 'Both' || !c.program
+      const matchesProgram =
+        filterProgram.value === 'All' ||
+        c.program === filterProgram.value ||
+        c.program === 'Both' ||
+        !c.program
+
       const query = searchQuery.value.toLowerCase()
-      const matchesSearch = (c.code || '').toLowerCase().includes(query) ||
-                            (c.title || '').toLowerCase().includes(query)
+
+      const matchesSearch =
+        (c.code || '').toLowerCase().includes(query) ||
+        (c.title || '').toLowerCase().includes(query)
+
       return matchesProgram && matchesSearch
     })
     .sort((a, b) => {
-      if (sortBy.value === 'code') return (a.code || '').localeCompare(b.code || '')
-      if (sortBy.value === 'title') return (a.title || '').localeCompare(b.title || '')
+      if (sortBy.value === 'code') {
+        return (a.code || '').localeCompare(b.code || '')
+      }
+
+      if (sortBy.value === 'title') {
+        return (a.title || '').localeCompare(b.title || '')
+      }
+
       return 0
     })
 })
 
-// CO & LO Helpers for Manual Form
+// --------------------------------------------------
+// CO & LO HELPERS
+// --------------------------------------------------
+
 function addCourseOutcome() {
   const nextCoNum = courseOutcomes.value.length + 1
+
   courseOutcomes.value.push({
     id: `CO${nextCoNum}`,
     title: '',
     learningOutcomes: [
-      { id: `LO${nextCoNum}.1`, description: '', hours: 0 }
+      {
+        id: `LO${nextCoNum}.1`,
+        description: '',
+        hours: 0
+      }
     ]
   })
 }
@@ -125,6 +237,7 @@ function removeCourseOutcome(coIndex) {
 function addLearningOutcome(coIndex) {
   const co = courseOutcomes.value[coIndex]
   const loNum = co.learningOutcomes.length + 1
+
   co.learningOutcomes.push({
     id: `LO${coIndex + 1}.${loNum}`,
     description: '',
@@ -133,138 +246,367 @@ function addLearningOutcome(coIndex) {
 }
 
 function removeLearningOutcome(coIndex, loIndex) {
-  if (courseOutcomes.value[coIndex].learningOutcomes.length > 1) {
-    courseOutcomes.value[coIndex].learningOutcomes.splice(loIndex, 1)
+  if (
+    courseOutcomes.value[coIndex].learningOutcomes.length > 1
+  ) {
+    courseOutcomes.value[coIndex].learningOutcomes.splice(
+      loIndex,
+      1
+    )
   }
 }
 
 const totalCourseHours = computed(() => {
   let total = 0
+
   courseOutcomes.value.forEach(co => {
     co.learningOutcomes.forEach(lo => {
       total += Number(lo.hours) || 0
     })
   })
+
   return total
 })
 
-// Edit Course Trigger
+// --------------------------------------------------
+// EDIT COURSE
+// --------------------------------------------------
+
 function startEditCourse(course) {
   editingCourseId.value = course.id
   courseCode.value = course.code || ''
   courseTitle.value = course.title || ''
   courseProgram.value = course.program || 'BSMT'
-  courseOutcomes.value = JSON.parse(JSON.stringify(course.courseOutcomes || []))
+
+  courseOutcomes.value = JSON.parse(
+    JSON.stringify(course.courseOutcomes || [])
+  )
 
   if (courseOutcomes.value.length === 0) {
     addCourseOutcome()
   }
 
   entryMode.value = 'manual'
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+
+  window.scrollTo({
+    top: 0,
+    behavior: 'smooth'
+  })
 }
+
+// --------------------------------------------------
+// RESET / CANCEL EDIT
+// --------------------------------------------------
 
 function cancelEdit() {
   editingCourseId.value = null
   courseCode.value = ''
   courseTitle.value = ''
   courseProgram.value = 'BSMT'
+
   courseOutcomes.value = [
     {
       id: 'CO1',
       title: '',
-      learningOutcomes: [{ id: 'LO1.1', description: '', hours: 0 }]
+      learningOutcomes: [
+        {
+          id: 'LO1.1',
+          description: '',
+          hours: 0
+        }
+      ]
     }
   ]
 }
 
-function handleSaveCourse() {
+// --------------------------------------------------
+// SAVE / UPDATE COURSE
+// --------------------------------------------------
+
+async function handleSaveCourse() {
   if (!courseCode.value || !courseTitle.value) {
     alert('Please enter both Course Code and Course Title.')
     return
   }
 
-  if (editingCourseId.value) {
-    // Update existing course
-    const index = courses.value.findIndex(c => c.id === editingCourseId.value)
-    if (index !== -1) {
-      courses.value[index] = {
-        ...courses.value[index],
-        code: courseCode.value,
-        title: courseTitle.value,
-        program: courseProgram.value,
-        courseOutcomes: JSON.parse(JSON.stringify(courseOutcomes.value))
-      }
+  let token
+
+  try {
+    token = localStorage.getItem('token')
+
+    if (!token) {
+      alert('Your session has expired. Please log in again.')
+      return
     }
-  } else {
-    // Create new course
-    const newCourse = {
-      id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
-      code: courseCode.value,
-      title: courseTitle.value,
-      program: courseProgram.value,
-      courseOutcomes: JSON.parse(JSON.stringify(courseOutcomes.value))
-    }
-    courses.value.unshift(newCourse)
+  } catch (err) {
+    alert('Unable to access your login session.')
+    return
   }
 
-  saveCoursesToStorage()
-  cancelEdit()
+  const payload = {
+    code: courseCode.value.trim(),
+    title: courseTitle.value.trim(),
+    program: courseProgram.value,
+    course_outcomes: JSON.parse(
+      JSON.stringify(courseOutcomes.value)
+    )
+  }
+
+  isLoading.value = true
+
+  try {
+    let response
+
+    // ----------------------------------------------
+    // UPDATE EXISTING COURSE
+    // ----------------------------------------------
+
+    if (editingCourseId.value) {
+      response = await fetch(
+        `${API_BASE_URL}/courses/${editingCourseId.value}`,
+        {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload)
+        }
+      )
+    }
+
+    // ----------------------------------------------
+    // CREATE NEW COURSE
+    // ----------------------------------------------
+
+    else {
+      response = await fetch(
+        `${API_BASE_URL}/courses`,
+        {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload)
+        }
+      )
+    }
+
+    const data = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      throw new Error(
+        data.message ||
+        `Failed to save course. HTTP ${response.status}`
+      )
+    }
+
+    // Laravel returns course_outcomes.
+    // Vue continues using courseOutcomes.
+    const savedCourse = {
+      ...data,
+      courseOutcomes: data.course_outcomes || []
+    }
+
+    // ----------------------------------------------
+    // UPDATE LOCAL ARRAY
+    // ----------------------------------------------
+
+    if (editingCourseId.value) {
+      const index = courses.value.findIndex(
+        c => c.id === editingCourseId.value
+      )
+
+      if (index !== -1) {
+        courses.value[index] = savedCourse
+      }
+
+      alert('Course syllabus updated successfully!')
+    }
+
+    // ----------------------------------------------
+    // ADD NEW COURSE TO LOCAL ARRAY
+    // ----------------------------------------------
+
+    else {
+      courses.value.unshift(savedCourse)
+
+      alert('Course syllabus saved successfully!')
+    }
+
+    // Keep temporary cache synchronized.
+    saveCoursesToStorage()
+
+    // Reset form.
+    cancelEdit()
+
+  } catch (err) {
+    console.error('Course save error:', err)
+
+    alert(
+      err.message ||
+      'Unable to save course to Laravel.'
+    )
+
+  } finally {
+    isLoading.value = false
+  }
 }
 
-// Download Sample CSV Template
+// --------------------------------------------------
+// CSV TEMPLATE
+// --------------------------------------------------
+
 function downloadCSVTemplate() {
-  const headers = ['program', 'courseCode', 'courseTitle', 'courseOutcomeId', 'courseOutcomeTitle', 'learningOutcomeId', 'learningOutcomeDescription', 'hours']
-  const sampleRows = [
-    ['BSMT', 'NAV-101', 'Terrestrial and Coastal Navigation', 'CO1', 'Demonstrate competence in maintaining watch', 'LO1.1', 'Apply COLREG Rules 1 to 19', '12'],
-    ['BSMT', 'NAV-101', 'Terrestrial and Coastal Navigation', 'CO1', 'Demonstrate competence in maintaining watch', 'LO1.2', 'Calculate variation and deviation', '8'],
-    ['BSMT', 'NAV-101', 'Terrestrial and Coastal Navigation', 'CO2', 'Plan coastal passage', 'LO2.1', 'Plot DR positions and EP', '10'],
-    ['BSMarE', 'ENG-201', 'Marine Engineering Systems', 'CO1', 'Operate main propulsion machinery', 'LO1.1', 'Perform pre-start checks on main engine', '15']
+  const headers = [
+    'program',
+    'courseCode',
+    'courseTitle',
+    'courseOutcomeId',
+    'courseOutcomeTitle',
+    'learningOutcomeId',
+    'learningOutcomeDescription',
+    'hours'
   ]
 
-  const csvContent = 'data:text/csv;charset=utf-8,' 
-    + [headers.join(','), ...sampleRows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n')
+  const sampleRows = [
+    [
+      'BSMT',
+      'NAV-101',
+      'Terrestrial and Coastal Navigation',
+      'CO1',
+      'Demonstrate competence in maintaining watch',
+      'LO1.1',
+      'Apply COLREG Rules 1 to 19',
+      '12'
+    ],
+    [
+      'BSMT',
+      'NAV-101',
+      'Terrestrial and Coastal Navigation',
+      'CO1',
+      'Demonstrate competence in maintaining watch',
+      'LO1.2',
+      'Calculate variation and deviation',
+      '8'
+    ],
+    [
+      'BSMT',
+      'NAV-101',
+      'Terrestrial and Coastal Navigation',
+      'CO2',
+      'Plan coastal passage',
+      'LO2.1',
+      'Plot DR positions and EP',
+      '10'
+    ],
+    [
+      'BSMarE',
+      'ENG-201',
+      'Marine Engineering Systems',
+      'CO1',
+      'Operate main propulsion machinery',
+      'LO1.1',
+      'Perform pre-start checks on main engine',
+      '15'
+    ]
+  ]
+
+  const csvContent =
+    'data:text/csv;charset=utf-8,' +
+    [
+      headers.join(','),
+      ...sampleRows.map(
+        row =>
+          row
+            .map(cell => `"${cell}"`)
+            .join(',')
+      )
+    ].join('\n')
 
   const encodedUri = encodeURI(csvContent)
+
   const link = document.createElement('a')
+
   link.setAttribute('href', encodedUri)
-  link.setAttribute('download', 'course_import_template.csv')
+  link.setAttribute(
+    'download',
+    'course_import_template.csv'
+  )
+
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
 }
 
-// Parse Flattened Course CSV into Nested Course Tree
-function parseCourseCSVText(csvText) {
-  const lines = csvText.split(/\r\n|\n/).filter(line => line.trim() !== '')
-  if (lines.length < 2) throw new Error('CSV file must contain a header row.')
+// --------------------------------------------------
+// PARSE COURSE CSV
+// --------------------------------------------------
 
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
+function parseCourseCSVText(csvText) {
+  const lines = csvText
+    .split(/\r\n|\n/)
+    .filter(line => line.trim() !== '')
+
+  if (lines.length < 2) {
+    throw new Error(
+      'CSV file must contain a header row.'
+    )
+  }
+
+  const headers = lines[0]
+    .split(',')
+    .map(h =>
+      h.trim().replace(/^"|"$/g, '')
+    )
+
   const courseMap = new Map()
 
   for (let i = 1; i < lines.length; i++) {
-    const row = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || lines[i].split(',')
-    const cleanRow = row.map(cell => cell.trim().replace(/^"|"$/g, '').replace(/""/g, '"'))
+    const row =
+      lines[i].match(
+        /(".*?"|[^",\s]+)(?=\s*,|\s*$)/g
+      ) ||
+      lines[i].split(',')
+
+    const cleanRow = row.map(cell =>
+      cell
+        .trim()
+        .replace(/^"|"$/g, '')
+        .replace(/""/g, '"')
+    )
 
     if (cleanRow.length < 2) continue
 
     const rowObj = {}
-    headers.forEach((header, idx) => { rowObj[header] = cleanRow[idx] || '' })
 
-    const program = rowObj.program || 'BSMT'
+    headers.forEach((header, idx) => {
+      rowObj[header] =
+        cleanRow[idx] || ''
+    })
+
+    const program =
+      rowObj.program || 'BSMT'
+
     const code = rowObj.courseCode
     const title = rowObj.courseTitle
     const coId = rowObj.courseOutcomeId
     const coTitle = rowObj.courseOutcomeTitle
     const loId = rowObj.learningOutcomeId
-    const loDesc = rowObj.learningOutcomeDescription
-    const hours = Number(rowObj.hours) || 0
+    const loDesc =
+      rowObj.learningOutcomeDescription
+
+    const hours =
+      Number(rowObj.hours) || 0
 
     if (!code || !title) continue
 
     if (!courseMap.has(code)) {
       courseMap.set(code, {
-        id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
+        // Temporary frontend ID.
+        // Laravel will generate the real database ID
+        // when the course is imported.
+        id:
+          Date.now().toString() +
+          Math.random()
+            .toString(36)
+            .substring(2, 7),
+
         program,
         code,
         title,
@@ -275,9 +617,18 @@ function parseCourseCSVText(csvText) {
     const course = courseMap.get(code)
 
     if (coId) {
-      let co = course.courseOutcomes.find(c => c.id === coId)
+      let co =
+        course.courseOutcomes.find(
+          c => c.id === coId
+        )
+
       if (!co) {
-        co = { id: coId, title: coTitle || coId, learningOutcomes: [] }
+        co = {
+          id: coId,
+          title: coTitle || coId,
+          learningOutcomes: []
+        }
+
         course.courseOutcomes.push(co)
       }
 
@@ -294,44 +645,202 @@ function parseCourseCSVText(csvText) {
   return Array.from(courseMap.values())
 }
 
+// --------------------------------------------------
+// CSV UPLOAD
+// --------------------------------------------------
+
 function handleCSVUpload(event) {
   const file = event.target.files[0]
+
   csvParseError.value = ''
+
   if (!file) return
 
   csvFileName.value = file.name
+
   const reader = new FileReader()
-  reader.onload = (e) => {
+
+  reader.onload = e => {
     try {
-      bulkPreview.value = parseCourseCSVText(e.target.result)
+      bulkPreview.value =
+        parseCourseCSVText(e.target.result)
+
     } catch (err) {
       csvParseError.value = err.message
       bulkPreview.value = []
     }
   }
+
   reader.readAsText(file)
 }
 
-function submitBulkCourses() {
-  if (bulkPreview.value.length === 0) return
+// --------------------------------------------------
+// BULK COURSE IMPORT
+// --------------------------------------------------
 
-  courses.value = [...bulkPreview.value, ...courses.value]
-  saveCoursesToStorage()
+async function submitBulkCourses() {
+  if (bulkPreview.value.length === 0) {
+    return
+  }
 
-  bulkPreview.value = []
-  csvFileName.value = ''
-  entryMode.value = 'manual'
+  const token = localStorage.getItem('token')
+
+  if (!token) {
+    alert('Your session has expired. Please log in again.')
+    return
+  }
+
+  if (
+    !confirm(
+      `Are you sure you want to import ${bulkPreview.value.length} course(s) into CAMS?`
+    )
+  ) {
+    return
+  }
+
+  isLoading.value = true
+
+  try {
+    const importedCourses = []
+
+    for (const course of bulkPreview.value) {
+      const payload = {
+        code: course.code,
+        title: course.title,
+        program: course.program,
+        course_outcomes: course.courseOutcomes || []
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/courses`,
+        {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload)
+        }
+      )
+
+      const data =
+        await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+          `Failed to import course ${course.code}.`
+        )
+      }
+
+      importedCourses.push({
+        ...data,
+        courseOutcomes:
+          data.course_outcomes || []
+      })
+    }
+
+    courses.value = [
+      ...importedCourses,
+      ...courses.value
+    ]
+
+    saveCoursesToStorage()
+
+    bulkPreview.value = []
+    csvFileName.value = ''
+    entryMode.value = 'manual'
+
+    alert(
+      `${importedCourses.length} course(s) imported successfully!`
+    )
+
+  } catch (err) {
+    console.error(
+      'Bulk course import error:',
+      err
+    )
+
+    alert(
+      err.message ||
+      'Unable to import courses to Laravel.'
+    )
+
+  } finally {
+    isLoading.value = false
+  }
 }
 
-function deleteCourse(id) {
-  if (!confirm('Are you sure you want to delete this course structure?')) return
-  courses.value = courses.value.filter(c => c.id !== id)
-  if (editingCourseId.value === id) {
-    cancelEdit()
+// --------------------------------------------------
+// DELETE COURSE
+// --------------------------------------------------
+
+async function deleteCourse(id) {
+  if (
+    !confirm(
+      'Are you sure you want to delete this course structure?'
+    )
+  ) {
+    return
   }
-  saveCoursesToStorage()
+
+  const token = localStorage.getItem('token')
+
+  if (!token) {
+    alert('Your session has expired. Please log in again.')
+    return
+  }
+
+  isLoading.value = true
+
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/courses/${id}`,
+      {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      }
+    )
+
+    const data =
+      await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      throw new Error(
+        data.message ||
+        `Failed to delete course. HTTP ${response.status}`
+      )
+    }
+
+    // Remove from Vue state only after Laravel confirms deletion.
+    courses.value =
+      courses.value.filter(
+        c => c.id !== id
+      )
+
+    if (editingCourseId.value === id) {
+      cancelEdit()
+    }
+
+    saveCoursesToStorage()
+
+    alert('Course deleted successfully!')
+
+  } catch (err) {
+    console.error(
+      'Course deletion error:',
+      err
+    )
+
+    alert(
+      err.message ||
+      'Unable to delete course from Laravel.'
+    )
+
+  } finally {
+    isLoading.value = false
+  }
 }
 </script>
+```
+
 
 <template>
   <div class="p-6 max-w-7xl mx-auto space-y-6 font-sans text-slate-800">
