@@ -1,491 +1,548 @@
 <template>
-  <div class="p-6 max-w-[1600px] mx-auto space-y-6">
-    <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200 pb-5">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900 tracking-tight">STCW Question Bank & Assessor Audit</h1>
-        <p class="text-sm text-gray-500 mt-1">
-          Manage assessment items, verify Bloom's cognitive alignment, and generate course audit summaries.
-        </p>
+  <div class="flex min-h-screen bg-[#f4f6f9] font-sans text-slate-800">
+    <!-- Left Sidebar -->
+    <aside class="w-64 bg-white border-r border-slate-200/80 flex flex-col justify-between shrink-0 p-5">
+      <div class="space-y-6">
+        <!-- System Logo & Title -->
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-black text-white rounded-lg flex items-center justify-center font-bold text-lg">
+            B
+          </div>
+          <div>
+            <h1 class="font-bold text-slate-900 text-sm leading-tight">BMA Pilot System</h1>
+            <p class="text-[11px] text-slate-400 font-medium">STCW Exam Engine v2.4</p>
+          </div>
+        </div>
+
+        <!-- Navigation Menu -->
+        <nav class="space-y-1">
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition">
+            <LayoutDashboard :size="16" />
+            <span>Dashboard</span>
+          </a>
+
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold bg-[#e8f7f0] text-[#00a358] transition">
+            <HelpCircle :size="16" />
+            <span>Question Bank</span>
+          </a>
+
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition">
+            <BookOpen :size="16" />
+            <span>Courses</span>
+          </a>
+
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition">
+            <Wrench :size="16" />
+            <span>Test Builder</span>
+          </a>
+
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition">
+            <Sliders :size="16" />
+            <span>Pilot Administration</span>
+          </a>
+
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition">
+            <BarChart2 :size="16" />
+            <span>Reports & Analysis</span>
+          </a>
+
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition">
+            <Users :size="16" />
+            <span>User Management</span>
+          </a>
+
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition">
+            <GraduationCap :size="16" />
+            <span>Student Exam Portal</span>
+          </a>
+        </nav>
       </div>
+
+      <!-- Bottom Profile -->
+      <div class="border-t border-slate-100 pt-4 flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-[#00a358] text-white flex items-center justify-center font-bold text-xs shrink-0">
+          BMA
+        </div>
+        <div class="truncate">
+          <p class="text-xs font-bold text-slate-900 truncate">Assessment Officer</p>
+          <p class="text-[10px] text-slate-400 truncate">admin@bma.edu.ph</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Panel -->
+    <main class="flex-1 p-8 space-y-6 overflow-y-auto">
       
-      <!-- Top Action Controls -->
+      <!-- Dark Hero Banner -->
+      <div class="bg-[#0b132b] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-sm">
+        <div class="space-y-1">
+          <h1 class="text-xl font-bold flex items-center gap-2 text-white tracking-tight">
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">?</span>
+            Assessment Question Authoring & Validation
+          </h1>
+          <p class="text-xs text-slate-300 font-normal">
+            Map items by Program, Term, Course Code, Outcomes, and Bloom's Taxonomy with AI Cognitive Validation.
+          </p>
+        </div>
+
+        <!-- Top Action Buttons -->
+        <div class="flex items-center gap-3 shrink-0">
+          <button 
+            @click="downloadCSVTemplate" 
+            type="button" 
+            class="px-4 py-2.5 bg-[#1c2538] hover:bg-[#25314a] text-slate-200 text-xs font-semibold rounded-xl border border-slate-700/60 flex items-center gap-2 transition shadow-sm"
+          >
+            <Download :size="14" class="text-slate-300" /> 
+            Download CSV Template
+          </button>
+
+          <label class="px-4 py-2.5 bg-[#00c068] hover:bg-[#00a358] text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-sm">
+            <Upload :size="14" /> 
+            <span>{{ isUploadingBulk ? 'Uploading...' : 'Bulk Upload CSV' }}</span>
+            <input ref="bulkFileInput" type="file" accept=".csv" @change="handleBulkCSVUpload" :disabled="isUploadingBulk" class="hidden" />
+          </label>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs (Pill style matching Question Bank_4.jpg) -->
       <div class="flex items-center gap-3">
         <button 
-          @click="downloadCSVTemplate"
-          class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition shadow-sm"
+          @click="activeTab = 'repository'"
+          :class="[
+            'px-5 py-2.5 rounded-full font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer',
+            activeTab === 'repository' 
+              ? 'bg-[#0b132b] text-white shadow-sm' 
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80 shadow-2xs'
+          ]"
         >
-          <Download class="w-4 h-4 text-gray-500" />
-          CSV Template
+          <Database :size="14" :class="activeTab === 'repository' ? 'text-white' : 'text-slate-500'" /> 
+          Question Bank Repository
+          <span 
+            :class="activeTab === 'repository' ? 'bg-[#00c068] text-white' : 'bg-slate-100 text-slate-600'"
+            class="text-[10px] px-2 py-0.5 rounded-full font-bold ml-0.5"
+          >
+            {{ questions.length }}
+          </span>
         </button>
-        <label class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer transition shadow-sm">
-          <Upload class="w-4 h-4 text-gray-500" />
-          <span>{{ isUploadingBulk ? 'Uploading...' : 'Bulk Upload CSV' }}</span>
-          <input 
-            type="file" 
-            ref="bulkFileInput" 
-            accept=".csv" 
-            @change="handleBulkCSVUpload" 
-            class="hidden" 
-            :disabled="isUploadingBulk"
-          />
-        </label>
+
         <button 
-          @click="activeTab = 'create'" 
-          class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow"
+          @click="activeTab = 'create'"
+          :class="[
+            'px-5 py-2.5 rounded-full font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer',
+            activeTab === 'create' 
+              ? 'bg-[#0b132b] text-white shadow-sm' 
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80 shadow-2xs'
+          ]"
         >
-          <Plus class="w-4 h-4" />
-          New Question
+          <PlusCircle :size="14" :class="activeTab === 'create' ? 'text-white' : 'text-slate-500'" /> 
+          Author New Question
+        </button>
+
+        <button 
+          @click="activeTab = 'report'"
+          :class="[
+            'px-5 py-2.5 rounded-full font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer',
+            activeTab === 'report' 
+              ? 'bg-[#0b132b] text-white shadow-sm' 
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80 shadow-2xs'
+          ]"
+        >
+          <FileText :size="14" :class="activeTab === 'report' ? 'text-white' : 'text-slate-500'" /> 
+          Course Reports & Audits
         </button>
       </div>
-    </div>
 
-    <!-- Main Navigation Tabs -->
-    <div class="flex border-b border-gray-200 space-x-8">
-      <button 
-        @click="activeTab = 'repository'"
-        :class="[
-          'py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2',
-          activeTab === 'repository' 
-            ? 'border-emerald-600 text-emerald-600' 
-            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-        ]"
-      >
-        <Database class="w-4 h-4" />
-        Question Repository ({{ questions.length }})
-      </button>
-
-      <button 
-        @click="activeTab = 'create'"
-        :class="[
-          'py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2',
-          activeTab === 'create' 
-            ? 'border-emerald-600 text-emerald-600' 
-            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-        ]"
-      >
-        <PlusCircle class="w-4 h-4" />
-        Question Item Builder
-      </button>
-
-      <button 
-        @click="activeTab = 'report'"
-        :class="[
-          'py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2',
-          activeTab === 'report' 
-            ? 'border-emerald-600 text-emerald-600' 
-            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-        ]"
-      >
-        <BarChart2 class="w-4 h-4" />
-        Assessor Audit Summary
-      </button>
-    </div>
-
-    <!-- TAB 1: QUESTION REPOSITORY -->
-    <div v-if="activeTab === 'repository'" class="space-y-6">
-      <!-- Filter Bar -->
-      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
-        <div class="flex items-center gap-3 flex-1 min-w-[280px]">
-          <div class="relative w-full">
-            <input 
-              v-model="searchQuery" 
-              type="text" 
-              placeholder="Search items by question text or course code..."
-              class="w-full pl-3 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-            />
+      <!-- TAB 1: QUESTION BANK REPOSITORY -->
+      <div v-show="activeTab === 'repository'" class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-5">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <div class="flex items-center gap-2.5">
+              <h2 class="text-base font-bold text-slate-900 tracking-tight">Question Bank Repository</h2>
+              <span class="bg-emerald-100 text-emerald-800 text-[11px] px-2.5 py-0.5 rounded-full font-semibold border border-emerald-200/60">
+                {{ filteredQuestions.length }} items
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Review, approve/disapprove, or apply AI cognitive suggestions organized by Course Code and Title.
+            </p>
           </div>
-        </div>
 
-        <div class="flex flex-wrap items-center gap-3">
-          <select v-model="filterProgram" class="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-emerald-500">
-            <option value="All">All Programs</option>
-            <option value="BSMT">BSMT</option>
-            <option value="BSMarE">BSMarE</option>
-            <option value="Both">Both Programs</option>
-          </select>
+          <!-- Right Side Filter Controls -->
+          <div class="flex flex-col items-end gap-2 w-full md:w-auto">
+            <div class="w-full md:w-60">
+              <input 
+                v-model="searchQuery" 
+                placeholder="Search questions..." 
+                class="w-full px-3 py-1.5 border border-slate-300/80 rounded-lg bg-white text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400 placeholder-slate-400 shadow-2xs"
+              />
+            </div>
+            
+            <div class="flex items-center gap-2 w-full md:w-auto">
+              <select v-model="filterStatus" class="px-3 py-1.5 border border-slate-300/80 rounded-lg bg-white text-xs text-slate-700 font-medium outline-none cursor-pointer shadow-2xs">
+                <option value="All">All Statuses</option>
+                <option value="Pending">Pending</option>
+                <option value="Approved">Approved</option>
+                <option value="Disapproved">Disapproved</option>
+              </select>
 
-          <select v-model="filterType" class="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-emerald-500">
-            <option value="All">All Question Types</option>
-            <option value="multiple_choice">Multiple Choice</option>
-            <option value="true_false">True / False</option>
-            <option value="short_answer">Short Answer</option>
-            <option value="matching">Matching Type</option>
-          </select>
-
-          <select v-model="filterStatus" class="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-emerald-500">
-            <option value="All">All Statuses</option>
-            <option value="Pending">Pending Review</option>
-            <option value="Approved">Approved</option>
-            <option value="Disapproved">Disapproved</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Empty State -->
-      <div v-if="groupedQuestions.length === 0" class="bg-white p-12 rounded-xl border border-gray-200 text-center space-y-3">
-        <HelpCircle class="w-12 h-12 text-gray-300 mx-auto" />
-        <h3 class="text-lg font-medium text-gray-900">No questions found</h3>
-        <p class="text-sm text-gray-500">Try adjusting your filter criteria or create a new question item.</p>
-      </div>
-
-      <!-- Grouped Questions by Subject / Course Code -->
-      <div v-for="group in groupedQuestions" :key="group.courseKey" class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div 
-          @click="toggleCourseCollapse(group.courseKey)"
-          class="bg-slate-50 px-5 py-4 flex items-center justify-between border-b border-gray-200 cursor-pointer hover:bg-slate-100 transition"
-        >
-          <div class="flex items-center gap-3">
-            <component :is="collapsedCourses[group.courseKey] ? ChevronRight : ChevronDown" class="w-5 h-5 text-gray-500" />
-            <div>
-              <span class="font-bold text-gray-900 text-base">{{ group.code }}</span>
-              <span class="text-sm text-gray-500 ml-2">— {{ group.title }}</span>
+              <select v-model="filterProgram" class="px-3 py-1.5 border border-slate-300/80 rounded-lg bg-white text-xs text-slate-700 font-medium outline-none cursor-pointer shadow-2xs">
+                <option value="All">All Programs</option>
+                <option value="BSMT">BSMT</option>
+                <option value="BSMarE">BSMarE</option>
+                <option value="Both">Both</option>
+              </select>
             </div>
           </div>
-          <span class="bg-slate-200 text-slate-800 text-xs font-semibold px-2.5 py-1 rounded-full">
-            {{ group.questions.length }} {{ group.questions.length === 1 ? 'Item' : 'Items' }}
-          </span>
         </div>
 
-        <!-- Course Question List -->
-        <div v-if="!collapsedCourses[group.courseKey]" class="divide-y divide-gray-100">
-          <div v-for="q in group.questions" :key="q.id" class="p-5 hover:bg-slate-50/50 transition">
-            <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-              <div class="space-y-3 flex-1">
-                <!-- Meta badges -->
-                <div class="flex flex-wrap items-center gap-2 text-xs">
-                  <span class="bg-emerald-50 text-emerald-700 font-medium px-2 py-0.5 rounded border border-emerald-200">
-                    {{ q.program || 'Both' }}
-                  </span>
-                  <span class="bg-indigo-50 text-indigo-700 font-medium px-2 py-0.5 rounded border border-indigo-200">
-                    {{ q.term || 'Midterm' }}
-                  </span>
-                  <span class="bg-gray-100 text-gray-700 font-medium px-2 py-0.5 rounded">
-                    Type: {{ q.type ? q.type.replace('_', ' ').toUpperCase() : 'MULTIPLE CHOICE' }}
-                  </span>
-                  <span class="bg-purple-50 text-purple-700 font-medium px-2 py-0.5 rounded border border-purple-200">
-                    Bloom's: {{ q.bloomLevel || 'Understanding' }}
-                  </span>
-                  <span 
-                    :class="[
-                      'font-semibold px-2.5 py-0.5 rounded-full text-xs',
-                      q.status === 'Approved' ? 'bg-green-100 text-green-800' :
-                      q.status === 'Disapproved' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                    ]"
-                  >
-                    {{ q.status || 'Pending Review' }}
-                  </span>
+        <hr class="border-slate-200/80" />
+
+        <!-- Questions List Empty State -->
+        <div v-if="groupedQuestions.length === 0" class="text-center py-20 text-slate-400 text-xs font-normal">
+          No questions found matching selected criteria.
+        </div>
+
+        <!-- Collapsible Course Groups Loop -->
+        <div v-else class="space-y-4">
+          <div 
+            v-for="group in groupedQuestions" 
+            :key="group.courseKey" 
+            class="border border-slate-200/80 rounded-xl bg-slate-50/50 overflow-hidden shadow-2xs"
+          >
+            <!-- Collapsible Header -->
+            <div 
+              @click="toggleCourseCollapse(group.courseKey)"
+              class="flex items-center justify-between p-4 bg-slate-100/80 hover:bg-slate-100 cursor-pointer select-none transition border-b border-slate-200/80"
+            >
+              <div class="flex items-center gap-3">
+                <component :is="collapsedCourses[group.courseKey] ? ChevronRight : ChevronDown" :size="16" class="text-slate-600" />
+                <div>
+                  <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2">
+                    <span class="bg-[#0b132b] text-white px-2.5 py-0.5 rounded text-[11px] font-mono tracking-wide">{{ group.code }}</span>
+                    <span>{{ group.title }}</span>
+                  </h3>
+                </div>
+              </div>
+              <span class="bg-slate-200/80 text-slate-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border border-slate-300/50">
+                {{ group.questions.length }} {{ group.questions.length === 1 ? 'item' : 'items' }}
+              </span>
+            </div>
+
+            <!-- Collapsible Group Content -->
+            <div v-show="!collapsedCourses[group.courseKey]" class="p-4 space-y-4 bg-white">
+              <div 
+                v-for="(q, idx) in group.questions" 
+                :key="q.id || idx" 
+                class="border border-slate-200 rounded-xl p-4 bg-slate-50/40 hover:bg-white hover:shadow-sm transition space-y-3"
+              >
+                <!-- Badges & Controls -->
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-200/60 pb-2.5">
+                  <div class="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+                    <span class="bg-slate-800 text-white px-2 py-0.5 rounded">{{ q.program || 'Both' }}</span>
+                    <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{{ q.term || 'Midterm' }}</span>
+                    <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded">{{ q.courseId || 'Unassigned' }}</span>
+                    <span class="bg-amber-100 text-amber-900 px-2 py-0.5 rounded">Bloom's: {{ q.bloomLevel || 'Understanding' }}</span>
+                    <span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded uppercase">{{ q.type }}</span>
+                  </div>
+
+                  <!-- Status & Action Buttons -->
+                  <div class="flex items-center gap-2">
+                    <span :class="{
+                      'bg-amber-100 text-amber-800 border-amber-300': (q.status || 'Pending') === 'Pending',
+                      'bg-emerald-100 text-emerald-800 border-emerald-300': q.status === 'Approved',
+                      'bg-red-100 text-red-800 border-red-300': q.status === 'Disapproved'
+                    }" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border">
+                      {{ q.status || 'Pending' }}
+                    </span>
+
+                    <button @click="updateQuestionStatus(q.id, 'Approved')" title="Approve Question" class="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg border border-emerald-200 transition">
+                      <CheckCircle :size="15" />
+                    </button>
+
+                    <button @click="updateQuestionStatus(q.id, 'Disapproved')" title="Disapprove Question" class="p-1.5 bg-red-50 text-red-700 hover:bg-red-600 hover:text-white rounded-lg border border-red-200 transition">
+                      <XCircle :size="15" />
+                    </button>
+
+                    <button @click="deleteQuestion(q.id)" title="Delete Item" class="p-1.5 bg-slate-100 text-slate-500 hover:bg-slate-200 rounded-lg transition">
+                      <Trash2 :size="15" />
+                    </button>
+                  </div>
                 </div>
 
-                <!-- Question Text -->
-                <p class="text-gray-900 font-medium text-base">{{ q.text }}</p>
-
-                <!-- Attached Stem Image -->
-                <div v-if="q.imageUrl" class="mt-2">
-                  <img :src="q.imageUrl" alt="Question diagram" class="max-h-40 rounded border border-gray-200 object-contain bg-gray-50" />
+                <!-- Stem -->
+                <div>
+                  <p class="text-xs font-semibold text-slate-800">{{ q.text }}</p>
                 </div>
 
                 <!-- Multiple Choice Options -->
-                <div v-if="q.type === 'multiple_choice' && q.options" class="grid grid-cols-1 md:grid-cols-2 gap-2 pt-2">
-                  <div 
-                    v-for="(opt, oIdx) in q.options" 
-                    :key="oIdx"
-                    :class="[
-                      'p-2.5 rounded-lg border text-sm flex items-center justify-between',
-                      (Array.isArray(q.correctAnswer) && q.correctAnswer.includes(oIdx)) || q.correctAnswer === oIdx
-                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-medium'
-                        : 'bg-white border-gray-200 text-gray-700'
-                    ]"
-                  >
-                    <span><strong>{{ String.fromCharCode(65 + oIdx) }}.</strong> {{ opt.text || opt }}</span>
-                    <Check v-if="(Array.isArray(q.correctAnswer) && q.correctAnswer.includes(oIdx)) || q.correctAnswer === oIdx" class="w-4 h-4 text-emerald-600" />
+                <div v-if="q.options && q.options.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div v-for="(opt, oIdx) in q.options" :key="oIdx" class="p-2 rounded-lg border text-[11px]" :class="(Array.isArray(q.correctAnswer) && q.correctAnswer.includes(oIdx)) || q.correctAnswer === oIdx ? 'bg-emerald-50 border-emerald-300 font-bold text-emerald-900' : 'bg-white text-slate-700'">
+                    <span class="font-bold mr-1">{{ String.fromCharCode(65 + oIdx) }}.</span> {{ typeof opt === 'string' ? opt : opt.text }}
                   </div>
                 </div>
 
-                <!-- AI Audit Assistant Panel -->
-                <div class="mt-3 bg-amber-50/70 border border-amber-200 rounded-lg p-3 text-xs space-y-2">
-                  <div class="flex items-center gap-2 text-amber-900 font-semibold">
-                    <Sparkles class="w-4 h-4 text-amber-600" />
-                    <span>AI Cognitive Alignment Audit</span>
+                <!-- AI Audit Bar -->
+                <div 
+                  class="p-2.5 rounded-xl text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border" 
+                  :class="{
+                    'bg-amber-50/80 border-amber-200 text-amber-900': generateAiSuggestion(q).type === 'warning',
+                    'bg-blue-50/80 border-blue-200 text-blue-900': generateAiSuggestion(q).type === 'info',
+                    'bg-emerald-50/50 border-emerald-200 text-emerald-900': generateAiSuggestion(q).type === 'success'
+                  }"
+                >
+                  <div class="flex items-start gap-2">
+                    <Sparkles :size="16" class="mt-0.5 shrink-0 text-amber-600" />
+                    <div>
+                      <span class="font-bold block text-[11px]">AI Validation & Suggestion:</span>
+                      <span class="text-[11px] leading-tight block">{{ generateAiSuggestion(q).text }}</span>
+                    </div>
                   </div>
-                  <p class="text-amber-800">{{ generateAiSuggestion(q).text }}</p>
-                  
-                  <div v-if="generateAiSuggestion(q).type === 'warning' && !q.retainedAi" class="flex items-center gap-2 pt-1">
-                    <button 
-                      @click="applyAiCorrection(q)" 
-                      class="px-2.5 py-1 bg-amber-600 text-white rounded text-xs hover:bg-amber-700 transition"
-                    >
-                      Apply AI Recommended Level
+
+                  <div v-if="generateAiSuggestion(q).type === 'warning'" class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                    <button @click="applyAiCorrection(q)" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition shadow-2xs flex items-center gap-1">
+                      <Check :size="12" /> Apply Suggestion
                     </button>
-                    <button 
-                      @click="retainOriginalSettings(q)" 
-                      class="px-2.5 py-1 bg-white border border-amber-300 text-amber-800 rounded text-xs hover:bg-amber-100 transition"
-                    >
-                      Retain Original Classification
+                    <button @click="retainOriginalSettings(q)" class="px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white font-bold text-[10px] rounded-lg transition shadow-2xs flex items-center gap-1">
+                      <RotateCcw :size="12" /> Retain Original
                     </button>
                   </div>
                 </div>
-              </div>
 
-              <!-- Assessor Verification Actions -->
-              <div class="flex lg:flex-col items-center gap-2 pt-2 lg:pt-0">
-                <button 
-                  @click="updateQuestionStatus(q.id, 'Approved')"
-                  class="flex-1 lg:w-32 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition"
-                >
-                  <CheckCircle class="w-3.5 h-3.5" />
-                  Approve
-                </button>
-                <button 
-                  @click="updateQuestionStatus(q.id, 'Disapproved')"
-                  class="flex-1 lg:w-32 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition"
-                >
-                  <XCircle class="w-3.5 h-3.5" />
-                  Disapprove
-                </button>
-                <button 
-                  @click="deleteQuestion(q.id)"
-                  class="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100 transition"
-                  title="Delete item"
-                >
-                  <Trash2 class="w-4 h-4" />
-                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- TAB 2: QUESTION ITEM BUILDER -->
-    <div v-if="activeTab === 'create'" class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-6">
-      <h2 class="text-lg font-bold text-gray-900 border-b border-gray-200 pb-3">Create New Question Item</h2>
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1">Target Academic Program</label>
-          <select v-model="form.program" @change="onProgramChange" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500">
-            <option value="Both">Both (BSMT & BSMarE)</option>
-            <option value="BSMT">BSMT (Marine Transportation)</option>
-            <option value="BSMarE">BSMarE (Marine Engineering)</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1">Examination Term</label>
-          <select v-model="form.term" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500">
-            <option value="Midterm">Midterm Examination</option>
-            <option value="Final">Final Examination</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1">Course / Subject Code *</label>
-          <select v-model="form.courseId" @change="onCourseChange" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500">
-            <option value="" disabled>Select Subject...</option>
-            <option v-for="course in filteredCourses" :key="course.id" :value="course.id || course.code">
-              {{ course.code }} — {{ course.title }}
-            </option>
-          </select>
-        </div>
-      </div>
-
-      <!-- STCW Outcomes Cascading -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1">Course Outcome (CO)</label>
-          <select v-model="form.courseOutcomeId" @change="onCOChange" class="w-full border border-gray-300 rounded-lg p-2 text-sm">
-            <option value="">Select CO...</option>
-            <option v-for="co in availableCourseOutcomes" :key="co.id || co.code" :value="co.id || co.code">
-              {{ co.code }}: {{ co.description || co.title }}
-            </option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1">Learning Outcome (LO)</label>
-          <select v-model="form.learningOutcomeId" class="w-full border border-gray-300 rounded-lg p-2 text-sm">
-            <option value="">Select LO...</option>
-            <option v-for="lo in availableLearningOutcomes" :key="lo.id || lo.code" :value="lo.id || lo.code">
-              {{ lo.code }}: {{ lo.description || lo.title }}
-            </option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1">Bloom's Taxonomy Level</label>
-          <select v-model="form.bloomLevel" class="w-full border border-gray-300 rounded-lg p-2 text-sm">
-            <option value="Remembering">Remembering (Knowledge Recall)</option>
-            <option value="Understanding">Understanding (Comprehension)</option>
-            <option value="Application">Application (Practical Calculation/Execution)</option>
-            <option value="Analysis">Analysis (Analytical Comparison)</option>
-            <option value="Evaluation">Evaluation (Assessment)</option>
-            <option value="Creation">Creation (Synthesis)</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Question Type -->
-      <div>
-        <label class="block text-xs font-semibold text-gray-700 mb-1">Question Type</label>
-        <div class="flex flex-wrap gap-4">
-          <label class="inline-flex items-center text-sm cursor-pointer">
-            <input type="radio" v-model="form.type" value="multiple_choice" class="text-emerald-600" />
-            <span class="ml-2">Multiple Choice</span>
-          </label>
-          <label class="inline-flex items-center text-sm cursor-pointer">
-            <input type="radio" v-model="form.type" value="true_false" class="text-emerald-600" />
-            <span class="ml-2">True / False</span>
-          </label>
-          <label class="inline-flex items-center text-sm cursor-pointer">
-            <input type="radio" v-model="form.type" value="short_answer" class="text-emerald-600" />
-            <span class="ml-2">Short Answer</span>
-          </label>
-        </div>
-      </div>
-
-      <!-- Question Text Stem -->
-      <div>
-        <label class="block text-xs font-semibold text-gray-700 mb-1">Question Stem / Statement *</label>
-        <textarea 
-          v-model="form.text" 
-          rows="3" 
-          placeholder="Enter the item stem or question text here..."
-          class="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-emerald-500"
-        ></textarea>
+      <!-- TAB 2: AUTHORING FORM -->
+      <div v-show="activeTab === 'create'" class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-6">
+        <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider border-b pb-2">1. Program & Curriculum Mapping</h2>
         
-        <div class="mt-2 flex items-center gap-3">
-          <label class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded cursor-pointer transition">
-            <ImageIcon class="w-3.5 h-3.5" />
-            <span>Attach Diagram / Image</span>
-            <input type="file" accept="image/*" @change="(e) => handleFileUpload(e, form, 'imageUrl')" class="hidden" />
-          </label>
-          <div v-if="form.imageUrl" class="flex items-center gap-2">
-            <span class="text-xs text-emerald-600 font-medium">Image attached</span>
-            <button @click="removeImage(form, 'imageUrl')" class="text-gray-400 hover:text-red-500"><X class="w-3.5 h-3.5" /></button>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Target Academic Program</label>
+            <select v-model="form.program" @change="onProgramChange" class="w-full p-2.5 border rounded-lg bg-slate-50 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="Both">Both (BSMT & BSMarE)</option>
+              <option value="BSMT">BSMT (Marine Transportation)</option>
+              <option value="BSMarE">BSMarE (Marine Engineering)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Examination Term</label>
+            <select v-model="form.term" class="w-full p-2.5 border rounded-lg bg-slate-50 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="Midterm">Midterm Examination</option>
+              <option value="Final">Final Examination</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Course / Subject Code *</label>
+            <select v-model="form.courseId" @change="onCourseChange" class="w-full p-2.5 border rounded-lg bg-slate-50 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="" disabled>Select Subject...</option>
+              <option v-for="c in filteredCourses" :key="c.id" :value="c.id || c.code">
+                {{ c.code }} — {{ c.title }}
+              </option>
+            </select>
           </div>
         </div>
-      </div>
 
-      <!-- Multiple Choice Options Input -->
-      <div v-if="form.type === 'multiple_choice'" class="space-y-3 border-t border-gray-100 pt-4">
-        <label class="block text-xs font-semibold text-gray-700">Answer Options (Check correct choice)</label>
-        <div v-for="(opt, idx) in form.options" :key="idx" class="flex items-center gap-3 bg-gray-50 p-2.5 rounded-lg border border-gray-200">
-          <input 
-            type="checkbox" 
-            v-model="opt.isCorrect" 
-            class="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500" 
-          />
-          <span class="font-bold text-gray-600 text-sm w-4">{{ String.fromCharCode(65 + idx) }}.</span>
-          <input 
-            v-model="opt.text" 
-            type="text" 
-            :placeholder="'Option ' + String.fromCharCode(65 + idx) + ' text...'" 
-            class="flex-1 border border-gray-300 rounded p-1.5 text-sm"
-          />
-          <button v-if="form.options.length > 2" @click="removeOption(idx)" class="text-gray-400 hover:text-red-500">
-            <Trash2 class="w-4 h-4" />
+        <!-- Outcomes & Classification -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-xs">
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Course Outcome (CO)</label>
+            <select v-model="form.courseOutcomeId" @change="onCOChange" class="w-full p-2 border rounded-lg bg-white outline-none">
+              <option value="">Select Course Outcome...</option>
+              <option v-for="co in availableCourseOutcomes" :key="co.id || co.code" :value="co.id || co.code">
+                {{ co.code }}: {{ co.description || co.title }}
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Learning Outcome (LO)</label>
+            <select v-model="form.learningOutcomeId" class="w-full p-2 border rounded-lg bg-white outline-none">
+              <option value="">Select Learning Outcome...</option>
+              <option v-for="lo in availableLearningOutcomes" :key="lo.id || lo.code" :value="lo.id || lo.code">
+                {{ lo.code }}: {{ lo.description || lo.title }}
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Bloom's Taxonomy Level</label>
+            <select v-model="form.bloomLevel" class="w-full p-2 border rounded-lg bg-white outline-none">
+              <option value="Remembering">Remembering (Knowledge Recall)</option>
+              <option value="Understanding">Understanding (Comprehension)</option>
+              <option value="Application">Application (Practical Calculation/Execution)</option>
+              <option value="Analysis">Analysis (Analytical Comparison)</option>
+              <option value="Evaluation">Evaluation (Assessment)</option>
+            </select>
+          </div>
+        </div>
+
+        <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider border-b pb-2 pt-2">2. Item Statement & Type</h2>
+
+        <div>
+          <label class="font-bold text-xs text-slate-700 block mb-1">Question Type</label>
+          <div class="flex items-center gap-6 text-xs">
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+              <input type="radio" v-model="form.type" value="multiple_choice" class="text-emerald-600" />
+              <span>Multiple Choice</span>
+            </label>
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+              <input type="radio" v-model="form.type" value="true_false" class="text-emerald-600" />
+              <span>True / False</span>
+            </label>
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+              <input type="radio" v-model="form.type" value="short_answer" class="text-emerald-600" />
+              <span>Short Answer</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Stem textarea -->
+        <div class="space-y-3">
+          <label class="font-bold text-xs text-slate-700 block">Question Stem / Statement *</label>
+          <textarea v-model="form.text" rows="3" placeholder="Enter question statement..." class="w-full p-3 border rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none"></textarea>
+
+          <div class="bg-slate-50 p-3 rounded-xl border border-dashed flex items-center justify-between">
+            <div>
+              <span class="text-[11px] font-bold text-slate-700 block">Question Diagram / Image (Optional)</span>
+              <input type="file" accept="image/*" @change="e => handleFileUpload(e, form, 'imageUrl')" class="text-xs mt-1" />
+            </div>
+            <div v-if="form.imageUrl" class="relative">
+              <img :src="form.imageUrl" class="h-14 w-14 object-cover rounded-lg border shadow-2xs" />
+              <button @click="removeImage(form, 'imageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600">
+                <X :size="10" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dynamic Answer Options -->
+        <div v-if="form.type === 'multiple_choice'" class="space-y-3 bg-slate-50 p-4 rounded-xl border">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold text-slate-700">Options & Correct Choice</span>
+            <button @click="addOption" type="button" class="text-xs text-emerald-600 font-bold flex items-center gap-1 hover:underline">
+              <Plus :size="14" /> Add Option
+            </button>
+          </div>
+
+          <div v-for="(opt, idx) in form.options" :key="idx" class="flex items-center gap-3 bg-white p-3 rounded-xl border shadow-2xs">
+            <input type="checkbox" v-model="opt.isCorrect" title="Mark as correct answer" class="h-4 w-4 text-emerald-600 rounded border-slate-300" />
+            <span class="font-bold text-slate-500 text-xs w-4">{{ String.fromCharCode(65 + idx) }}.</span>
+            <input v-model="opt.text" :placeholder="`Option ${String.fromCharCode(65 + idx)} text...`" class="flex-1 p-2 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500" />
+
+            <button v-if="form.options.length > 2" @click="removeOption(idx)" class="text-slate-400 hover:text-red-500 p-1">
+              <Trash2 :size="16" />
+            </button>
+          </div>
+        </div>
+
+        <div v-if="form.type === 'true_false'" class="space-y-3 bg-slate-50 p-4 rounded-xl border">
+          <label class="font-bold text-xs text-slate-700 block">Select Correct Answer</label>
+          <div class="flex gap-6 text-xs font-bold text-slate-800">
+            <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-xl border hover:border-emerald-500">
+              <input type="radio" value="true" v-model="form.tfCorrect" name="tf_answer" class="text-emerald-600" /> True
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-xl border hover:border-emerald-500">
+              <input type="radio" value="false" v-model="form.tfCorrect" name="tf_answer" class="text-emerald-600" /> False
+            </label>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3 border-t pt-4">
+          <button @click="resetForm" class="px-4 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50">Reset</button>
+          <button @click="saveQuestion" :disabled="isSubmitting" class="px-5 py-2 bg-[#00c068] hover:bg-[#00a358] text-white font-bold text-xs rounded-xl shadow-2xs transition flex items-center gap-2">
+            <Save :size="16" /> {{ isSubmitting ? 'Saving...' : 'Save Question Item' }}
           </button>
         </div>
-        <button @click="addOption" class="text-xs font-medium text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1">
-          <Plus class="w-3.5 h-3.5" /> Add Choice Option
-        </button>
       </div>
 
-      <!-- True / False Input -->
-      <div v-if="form.type === 'true_false'" class="space-y-2 border-t border-gray-100 pt-4">
-        <label class="block text-xs font-semibold text-gray-700">Select Correct Answer</label>
-        <div class="flex gap-4">
-          <label class="inline-flex items-center text-sm">
-            <input type="radio" v-model="form.tfCorrect" value="true" class="text-emerald-600" />
-            <span class="ml-2 font-medium">True</span>
-          </label>
-          <label class="inline-flex items-center text-sm">
-            <input type="radio" v-model="form.tfCorrect" value="false" class="text-emerald-600" />
-            <span class="ml-2 font-medium">False</span>
-          </label>
-        </div>
-      </div>
+      <!-- TAB 3: COURSE REPORTS & AUDITS -->
+      <div v-show="activeTab === 'report'" class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-6">
+        <div class="flex flex-col md:flex-row justify-between md:items-center border-b pb-4 gap-4">
+          <div>
+            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2 tracking-tight">
+              <BarChart2 class="text-emerald-600" :size="20" /> Course Question Changes & Audit Report
+            </h2>
+            <p class="text-xs text-slate-500">View question counts, approval status, and AI overrides grouped per course.</p>
+          </div>
 
-      <!-- Action Buttons -->
-      <div class="flex justify-end gap-3 border-t border-gray-200 pt-4">
-        <button @click="resetForm" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Reset</button>
-        <button 
-          @click="saveQuestion" 
-          :disabled="isSubmitting" 
-          class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg text-sm shadow transition"
-        >
-          {{ isSubmitting ? 'Saving...' : 'Save Question Item' }}
-        </button>
-      </div>
-    </div>
-
-    <!-- TAB 3: ASSESSOR AUDIT SUMMARY -->
-    <div v-if="activeTab === 'report'" class="space-y-6">
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm text-center">
-          <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Items</p>
-          <p class="text-2xl font-bold text-gray-900 mt-1">{{ overallReportSummary.total }}</p>
-        </div>
-        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm text-center">
-          <p class="text-xs font-medium text-green-600 uppercase tracking-wider">Approved</p>
-          <p class="text-2xl font-bold text-green-700 mt-1">{{ overallReportSummary.approved }}</p>
-        </div>
-        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm text-center">
-          <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Disapproved</p>
-          <p class="text-2xl font-bold text-red-700 mt-1">{{ overallReportSummary.disapproved }}</p>
-        </div>
-        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm text-center">
-          <p class="text-xs font-medium text-yellow-600 uppercase tracking-wider">Pending Review</p>
-          <p class="text-2xl font-bold text-yellow-700 mt-1">{{ overallReportSummary.pending }}</p>
-        </div>
-        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm text-center">
-          <p class="text-xs font-medium text-indigo-600 uppercase tracking-wider">AI Overrides</p>
-          <p class="text-2xl font-bold text-indigo-700 mt-1">{{ overallReportSummary.retainedAi }}</p>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div class="p-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 class="font-bold text-gray-900 text-base">Course Audit Summary Report</h3>
-          <button 
-            @click="exportCourseReportCSV" 
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition"
-          >
-            <Download class="w-3.5 h-3.5" />
-            Export Audit CSV
+          <button @click="exportCourseReportCSV" type="button" class="px-4 py-2 bg-[#00c068] hover:bg-[#00a358] text-white text-xs font-bold rounded-xl flex items-center gap-2 transition shadow-2xs">
+            <Download :size="14" /> Export Report CSV
           </button>
         </div>
 
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-sm text-gray-600">
-            <thead class="bg-slate-50 text-xs text-gray-700 uppercase border-b border-gray-200">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div class="bg-slate-50 border p-4 rounded-xl">
+            <span class="text-[11px] font-bold text-slate-500 block uppercase">Total Questions</span>
+            <span class="text-xl font-extrabold text-slate-900">{{ overallReportSummary.total }}</span>
+          </div>
+          <div class="bg-emerald-50 border border-emerald-100 p-4 rounded-xl">
+            <span class="text-[11px] font-bold text-emerald-700 block uppercase">Approved</span>
+            <span class="text-xl font-extrabold text-emerald-800">{{ overallReportSummary.approved }}</span>
+          </div>
+          <div class="bg-amber-50 border border-amber-100 p-4 rounded-xl">
+            <span class="text-[11px] font-bold text-amber-700 block uppercase">Pending Review</span>
+            <span class="text-xl font-extrabold text-amber-800">{{ overallReportSummary.pending }}</span>
+          </div>
+          <div class="bg-red-50 border border-red-100 p-4 rounded-xl">
+            <span class="text-[11px] font-bold text-red-700 block uppercase">Disapproved</span>
+            <span class="text-xl font-extrabold text-red-800">{{ overallReportSummary.disapproved }}</span>
+          </div>
+          <div class="bg-blue-50 border border-blue-100 p-4 rounded-xl">
+            <span class="text-[11px] font-bold text-blue-700 block uppercase">AI Retained</span>
+            <span class="text-xl font-extrabold text-blue-800">{{ overallReportSummary.retainedAi }}</span>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto border rounded-xl">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b">
               <tr>
-                <th class="px-4 py-3">Course Code</th>
-                <th class="px-4 py-3">Course Title</th>
-                <th class="px-4 py-3">Program</th>
-                <th class="px-4 py-3 text-center">Total Items</th>
-                <th class="px-4 py-3 text-center">Approved</th>
-                <th class="px-4 py-3 text-center">Disapproved</th>
-                <th class="px-4 py-3 text-center">Pending</th>
-                <th class="px-4 py-3 text-center">AI Overrides</th>
+                <th class="p-3">Course Code</th>
+                <th class="p-3">Course Title</th>
+                <th class="p-3">Program</th>
+                <th class="p-3 text-center">Total Items</th>
+                <th class="p-3 text-center">Approved</th>
+                <th class="p-3 text-center">Pending</th>
+                <th class="p-3 text-center">Disapproved</th>
+                <th class="p-3 text-center">AI Overrides</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
-              <tr v-for="rpt in courseReports" :key="rpt.code" class="hover:bg-gray-50 transition">
-                <td class="px-4 py-3 font-semibold text-gray-900">{{ rpt.code }}</td>
-                <td class="px-4 py-3">{{ rpt.title }}</td>
-                <td class="px-4 py-3"><span class="bg-gray-100 px-2 py-0.5 rounded text-xs">{{ rpt.program }}</span></td>
-                <td class="px-4 py-3 text-center font-bold text-gray-900">{{ rpt.total }}</td>
-                <td class="px-4 py-3 text-center text-green-600 font-semibold">{{ rpt.approved }}</td>
-                <td class="px-4 py-3 text-center text-red-600 font-semibold">{{ rpt.disapproved }}</td>
-                <td class="px-4 py-3 text-center text-yellow-600 font-semibold">{{ rpt.pending }}</td>
-                <td class="px-4 py-3 text-center text-indigo-600">{{ rpt.retainedAi }}</td>
+            <tbody class="divide-y divide-slate-100 font-medium text-slate-800">
+              <tr v-for="report in courseReports" :key="report.code" class="hover:bg-slate-50/80">
+                <td class="p-3 font-mono font-bold text-slate-900">{{ report.code }}</td>
+                <td class="p-3 font-bold">{{ report.title }}</td>
+                <td class="p-3"><span class="bg-slate-100 px-2 py-0.5 rounded text-[11px] font-semibold">{{ report.program }}</span></td>
+                <td class="p-3 text-center font-bold">{{ report.total }}</td>
+                <td class="p-3 text-center">
+                  <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.approved }}</span>
+                </td>
+                <td class="p-3 text-center">
+                  <span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.pending }}</span>
+                </td>
+                <td class="p-3 text-center">
+                  <span class="bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.disapproved }}</span>
+                </td>
+                <td class="p-3 text-center">
+                  <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.retainedAi }}</span>
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
+
+    </main>
+
+    <!-- Floating Action Widget (Bottom-right purple/blue icon) -->
+    <div class="fixed bottom-6 right-6 z-50">
+      <button class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 text-white font-black text-sm flex items-center justify-center shadow-lg hover:opacity-90 transition">
+        M
+      </button>
     </div>
   </div>
 </template>
@@ -493,9 +550,10 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { 
-  HelpCircle, Plus, Trash2, ImageIcon, X, Upload, Download, 
+  HelpCircle, Plus, Trash2, X, Upload, Download, 
   CheckCircle, XCircle, Sparkles, ChevronDown, ChevronRight, Check,
-  Database, PlusCircle, BarChart2
+  Database, PlusCircle, BarChart2, Save, FileText, LayoutDashboard,
+  BookOpen, Wrench, Sliders, Users, GraduationCap, RotateCcw
 } from 'lucide-vue-next'
 
 const questions = ref([])
