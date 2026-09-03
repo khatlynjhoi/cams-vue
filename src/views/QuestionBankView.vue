@@ -3,7 +3,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { 
   HelpCircle, Save, Plus, Trash2, Image, X, Upload, Download, 
   CheckCircle, XCircle, Sparkles, Filter, AlertTriangle, RefreshCw,
-  Database, PlusCircle
+  Database, PlusCircle, ChevronDown, ChevronRight, Check, RotateCcw
 } from 'lucide-vue-next'
 
 const questions = ref([])
@@ -14,6 +14,9 @@ const bulkFileInput = ref(null)
 
 // Tab Navigation State: 'repository' | 'create'
 const activeTab = ref('repository')
+
+// Collapsible course groups state
+const collapsedCourses = ref({})
 
 // Repository Filters & Search
 const filterStatus = ref('All')
@@ -102,6 +105,29 @@ const filteredQuestions = computed(() => {
   })
 })
 
+// Grouped Questions per Course Code / Course Title
+const groupedQuestions = computed(() => {
+  const groups = {}
+  filteredQuestions.value.forEach(q => {
+    const courseKey = q.courseId || 'Unassigned'
+    if (!groups[courseKey]) {
+      const courseObj = courses.value.find(c => c.id === q.courseId || c.code === q.courseId)
+      groups[courseKey] = {
+        courseKey,
+        code: courseObj ? courseObj.code : (q.courseId || 'UNASSIGNED'),
+        title: courseObj ? courseObj.title : 'General / Unassigned Course Items',
+        questions: []
+      }
+    }
+    groups[courseKey].questions.push(q)
+  })
+  return Object.values(groups)
+})
+
+function toggleCourseCollapse(courseKey) {
+  collapsedCourses.value[courseKey] = !collapsedCourses.value[courseKey]
+}
+
 function onProgramChange() {
   form.courseId = ''
   form.courseOutcomeId = ''
@@ -151,6 +177,13 @@ function removeImage(targetObj, propertyName) {
 
 // AI Analysis Engine for Cognitive Alignment & Stem Quality
 function generateAiSuggestion(q) {
+  if (q.retainedAi) {
+    return {
+      type: 'info',
+      text: 'Original parameters retained by reviewer.'
+    }
+  }
+
   const suggestions = []
   const textLower = (q.text || '').toLowerCase().trim()
   const bloom = (q.bloomLevel || '').toLowerCase()
@@ -203,11 +236,14 @@ function applyAiCorrection(q) {
     if (suggestion.text.includes('"Remembering"')) q.bloomLevel = 'Remembering'
     else if (suggestion.text.includes('"Application"')) q.bloomLevel = 'Application'
     else if (suggestion.text.includes('"Analysis"')) q.bloomLevel = 'Analysis'
-    syncQuestionsStorage()
-    alert('Applied AI recommended Bloom\'s level update!')
-  } else {
-    alert(suggestion.text)
   }
+  q.retainedAi = false
+  syncQuestionsStorage()
+}
+
+function retainOriginalSettings(q) {
+  q.retainedAi = true
+  syncQuestionsStorage()
 }
 
 function deleteQuestion(id) {
@@ -313,7 +349,7 @@ async function saveQuestion() {
     alert('Question item saved locally!')
     resetForm()
     activeTab.value = 'repository'
-  } finally {
+  } fontally {
     isSubmitting.value = false
   }
 }
@@ -784,14 +820,14 @@ onMounted(() => {
 
     </div>
 
-    <!-- TAB 2: QUESTION BANK REPOSITORY -->
+    <!-- TAB 2: QUESTION BANK REPOSITORY (Collapsible per Course Code/Title) -->
     <div v-show="activeTab === 'repository'" class="bg-white border rounded-2xl p-6 shadow-sm space-y-4">
       <div class="flex flex-col md:flex-row justify-between md:items-center border-b pb-4 gap-4">
         <div>
           <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
             Question Bank Repository <span class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 rounded-full font-bold">{{ questions.length }} items</span>
           </h2>
-          <p class="text-xs text-slate-500">Review, approve/disapprove, or apply AI cognitive suggestions to imported exam items.</p>
+          <p class="text-xs text-slate-500">Review, approve/disapprove, or apply AI cognitive suggestions organized by Course Code and Title.</p>
         </div>
 
         <!-- Repository Filters -->
@@ -814,83 +850,143 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Questions List Card Loop -->
-      <div v-if="filteredQuestions.length === 0" class="text-center py-12 text-slate-400 text-xs font-semibold">
+      <!-- Questions List Empty State -->
+      <div v-if="groupedQuestions.length === 0" class="text-center py-12 text-slate-400 text-xs font-semibold">
         No questions found matching selected criteria.
       </div>
 
+      <!-- Collapsible Course Groups Loop -->
       <div v-else class="space-y-4">
-        <div v-for="(q, idx) in filteredQuestions" :key="q.id || idx" class="border rounded-xl p-4 bg-slate-50/50 hover:bg-white hover:shadow-md transition space-y-3">
-          
-          <!-- Top Row: Tags & Approval Controls -->
-          <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b pb-2">
-            <div class="flex flex-wrap items-center gap-2 text-[11px] font-bold">
-              <span class="bg-slate-800 text-white px-2 py-0.5 rounded">{{ q.program || 'Both' }}</span>
-              <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{{ q.term }}</span>
-              <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded">{{ q.courseId || 'Unassigned' }}</span>
-              <span class="bg-amber-100 text-amber-900 px-2 py-0.5 rounded">Bloom's: {{ q.bloomLevel }}</span>
-              <span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded uppercase">{{ q.type }}</span>
-            </div>
-
-            <!-- Approval Status Badge & Action Buttons -->
-            <div class="flex items-center gap-2">
-              <span :class="{
-                'bg-amber-100 text-amber-800 border-amber-300': (q.status || 'Pending') === 'Pending',
-                'bg-emerald-100 text-emerald-800 border-emerald-300': q.status === 'Approved',
-                'bg-red-100 text-red-800 border-red-300': q.status === 'Disapproved'
-              }" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border">
-                {{ q.status || 'Pending' }}
-              </span>
-
-              <button @click="updateQuestionStatus(q.id, 'Approved')" title="Approve Question" class="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg border border-emerald-200 transition">
-                <CheckCircle :size="15" />
-              </button>
-
-              <button @click="updateQuestionStatus(q.id, 'Disapproved')" title="Disapprove Question" class="p-1.5 bg-red-50 text-red-700 hover:bg-red-600 hover:text-white rounded-lg border border-red-200 transition">
-                <XCircle :size="15" />
-              </button>
-
-              <button @click="deleteQuestion(q.id)" title="Delete Item" class="p-1.5 bg-slate-100 text-slate-500 hover:bg-slate-200 rounded-lg transition">
-                <Trash2 :size="15" />
-              </button>
-            </div>
-          </div>
-
-          <!-- Middle: Question Stem -->
-          <div>
-            <p class="text-xs font-semibold text-slate-800">{{ q.text }}</p>
-          </div>
-
-          <!-- Options Preview -->
-          <div v-if="q.options && q.options.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-            <div v-for="(opt, oIdx) in q.options" :key="oIdx" class="p-2 rounded-lg border text-[11px]" :class="Array.isArray(q.correctAnswer) && q.correctAnswer.includes(oIdx) ? 'bg-emerald-50 border-emerald-300 font-bold text-emerald-900' : 'bg-white text-slate-700'">
-              <span class="font-bold mr-1">{{ String.fromCharCode(65 + oIdx) }}.</span> {{ typeof opt === 'string' ? opt : opt.text }}
-            </div>
-          </div>
-
-          <!-- Matching Pairs Preview -->
-          <div v-else-if="q.matchingPairs && q.matchingPairs.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-            <div v-for="(pair, pIdx) in q.matchingPairs" :key="pIdx" class="p-2 rounded-lg border bg-white text-[11px] flex justify-between">
-              <span class="font-semibold text-slate-800">{{ pair.prompt }}</span>
-              <span class="text-emerald-700 font-bold">➔ {{ pair.match }}</span>
-            </div>
-          </div>
-
-          <!-- Bottom: AI Analysis & Correction Suggestion -->
-          <div class="p-2.5 rounded-xl text-xs flex items-start justify-between gap-3 border" :class="generateAiSuggestion(q).type === 'warning' ? 'bg-amber-50/80 border-amber-200 text-amber-900' : 'bg-emerald-50/50 border-emerald-200 text-emerald-900'">
-            <div class="flex items-start gap-2">
-              <Sparkles :size="16" class="mt-0.5 shrink-0" :class="generateAiSuggestion(q).type === 'warning' ? 'text-amber-600' : 'text-emerald-600'" />
+        <div 
+          v-for="group in groupedQuestions" 
+          :key="group.courseKey" 
+          class="border rounded-2xl bg-slate-50/50 overflow-hidden shadow-sm border-slate-200"
+        >
+          <!-- Collapsible Header -->
+          <div 
+            @click="toggleCourseCollapse(group.courseKey)"
+            class="flex items-center justify-between p-4 bg-slate-100 hover:bg-slate-200/80 cursor-pointer select-none transition border-b border-slate-200"
+          >
+            <div class="flex items-center gap-3">
+              <component :is="collapsedCourses[group.courseKey] ? ChevronRight : ChevronDown" :size="18" class="text-slate-600" />
               <div>
-                <span class="font-bold block text-[11px]">AI Validation & Suggestion:</span>
-                <span class="text-[11px] leading-tight block">{{ generateAiSuggestion(q).text }}</span>
+                <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2">
+                  <span class="bg-slate-900 text-white px-2.5 py-0.5 rounded text-[11px] font-mono tracking-wide">{{ group.code }}</span>
+                  <span>{{ group.title }}</span>
+                </h3>
               </div>
             </div>
-
-            <button v-if="generateAiSuggestion(q).type === 'warning'" @click="applyAiCorrection(q)" class="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] rounded-lg shrink-0 transition shadow-sm">
-              Auto-Fix Level
-            </button>
+            <span class="bg-slate-200 text-slate-700 text-[11px] font-bold px-3 py-0.5 rounded-full border border-slate-300">
+              {{ group.questions.length }} {{ group.questions.length === 1 ? 'item' : 'items' }}
+            </span>
           </div>
 
+          <!-- Collapsible Group Content -->
+          <div v-show="!collapsedCourses[group.courseKey]" class="p-4 space-y-4 bg-white">
+            <div 
+              v-for="(q, idx) in group.questions" 
+              :key="q.id || idx" 
+              class="border rounded-xl p-4 bg-slate-50/50 hover:bg-white hover:shadow-md transition space-y-3 border-slate-200"
+            >
+              
+              <!-- Top Row: Tags & Approval Controls -->
+              <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b pb-2">
+                <div class="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+                  <span class="bg-slate-800 text-white px-2 py-0.5 rounded">{{ q.program || 'Both' }}</span>
+                  <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{{ q.term }}</span>
+                  <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded">{{ q.courseId || 'Unassigned' }}</span>
+                  <span class="bg-amber-100 text-amber-900 px-2 py-0.5 rounded">Bloom's: {{ q.bloomLevel }}</span>
+                  <span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded uppercase">{{ q.type }}</span>
+                </div>
+
+                <!-- Approval Status Badge & Action Buttons -->
+                <div class="flex items-center gap-2">
+                  <span :class="{
+                    'bg-amber-100 text-amber-800 border-amber-300': (q.status || 'Pending') === 'Pending',
+                    'bg-emerald-100 text-emerald-800 border-emerald-300': q.status === 'Approved',
+                    'bg-red-100 text-red-800 border-red-300': q.status === 'Disapproved'
+                  }" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border">
+                    {{ q.status || 'Pending' }}
+                  </span>
+
+                  <button @click="updateQuestionStatus(q.id, 'Approved')" title="Approve Question" class="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg border border-emerald-200 transition">
+                    <CheckCircle :size="15" />
+                  </button>
+
+                  <button @click="updateQuestionStatus(q.id, 'Disapproved')" title="Disapprove Question" class="p-1.5 bg-red-50 text-red-700 hover:bg-red-600 hover:text-white rounded-lg border border-red-200 transition">
+                    <XCircle :size="15" />
+                  </button>
+
+                  <button @click="deleteQuestion(q.id)" title="Delete Item" class="p-1.5 bg-slate-100 text-slate-500 hover:bg-slate-200 rounded-lg transition">
+                    <Trash2 :size="15" />
+                  </button>
+                </div>
+              </div>
+
+              <!-- Middle: Question Stem -->
+              <div>
+                <p class="text-xs font-semibold text-slate-800">{{ q.text }}</p>
+              </div>
+
+              <!-- Options Preview -->
+              <div v-if="q.options && q.options.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div v-for="(opt, oIdx) in q.options" :key="oIdx" class="p-2 rounded-lg border text-[11px]" :class="Array.isArray(q.correctAnswer) && q.correctAnswer.includes(oIdx) ? 'bg-emerald-50 border-emerald-300 font-bold text-emerald-900' : 'bg-white text-slate-700'">
+                  <span class="font-bold mr-1">{{ String.fromCharCode(65 + oIdx) }}.</span> {{ typeof opt === 'string' ? opt : opt.text }}
+                </div>
+              </div>
+
+              <!-- Matching Pairs Preview -->
+              <div v-else-if="q.matchingPairs && q.matchingPairs.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div v-for="(pair, pIdx) in q.matchingPairs" :key="pIdx" class="p-2 rounded-lg border bg-white text-[11px] flex justify-between">
+                  <span class="font-semibold text-slate-800">{{ pair.prompt }}</span>
+                  <span class="text-emerald-700 font-bold">➔ {{ pair.match }}</span>
+                </div>
+              </div>
+
+              <!-- Bottom: AI Analysis with Retain or Apply Options -->
+              <div 
+                class="p-2.5 rounded-xl text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border" 
+                :class="{
+                  'bg-amber-50/80 border-amber-200 text-amber-900': generateAiSuggestion(q).type === 'warning',
+                  'bg-blue-50/80 border-blue-200 text-blue-900': generateAiSuggestion(q).type === 'info',
+                  'bg-emerald-50/50 border-emerald-200 text-emerald-900': generateAiSuggestion(q).type === 'success'
+                }"
+              >
+                <div class="flex items-start gap-2">
+                  <Sparkles 
+                    :size="16" 
+                    class="mt-0.5 shrink-0" 
+                    :class="{
+                      'text-amber-600': generateAiSuggestion(q).type === 'warning',
+                      'text-blue-600': generateAiSuggestion(q).type === 'info',
+                      'text-emerald-600': generateAiSuggestion(q).type === 'success'
+                    }" 
+                  />
+                  <div>
+                    <span class="font-bold block text-[11px]">AI Validation & Suggestion:</span>
+                    <span class="text-[11px] leading-tight block">{{ generateAiSuggestion(q).text }}</span>
+                  </div>
+                </div>
+
+                <!-- Retain / Apply Action Buttons -->
+                <div v-if="generateAiSuggestion(q).type === 'warning'" class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                  <button 
+                    @click="applyAiCorrection(q)" 
+                    class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition shadow-sm flex items-center gap-1"
+                  >
+                    <Check :size="12" /> Apply Suggestion
+                  </button>
+                  <button 
+                    @click="retainOriginalSettings(q)" 
+                    class="px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white font-bold text-[10px] rounded-lg transition shadow-sm flex items-center gap-1"
+                  >
+                    <RotateCcw :size="12" /> Retain Original
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
         </div>
       </div>
     </div>
