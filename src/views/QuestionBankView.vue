@@ -1,12 +1,21 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { HelpCircle, Save, Plus, Trash2, Image, X, Upload, Download } from 'lucide-vue-next'
+import { 
+  HelpCircle, Save, Plus, Trash2, Image, X, Upload, Download, 
+  CheckCircle, XCircle, Sparkles, Filter, AlertTriangle, RefreshCw 
+} from 'lucide-vue-next'
 
 const questions = ref([])
 const courses = ref([])
 const isSubmitting = ref(false)
 const isUploadingBulk = ref(false)
 const bulkFileInput = ref(null)
+
+// Repository Filters & Search
+const filterStatus = ref('All')
+const filterProgram = ref('All')
+const filterType = ref('All')
+const searchQuery = ref('')
 
 const STORAGE_COURSES_KEY = 'cams_courses_data'
 const STORAGE_QUESTIONS_KEY = 'cams_questions_data'
@@ -36,7 +45,7 @@ const form = reactive({
   ]
 })
 
-// Cascading Courses (Subjects) strictly filtered by selected Program
+// Cascading Courses (Subjects) filtered by Program
 const filteredCourses = computed(() => {
   if (!courses.value || courses.value.length === 0) return []
   if (form.program === 'Both') {
@@ -57,6 +66,19 @@ const availableLearningOutcomes = computed(() => {
   const selectedCO = availableCourseOutcomes.value.find(co => (co.id || co.code) === form.courseOutcomeId)
   if (!selectedCO || !selectedCO.learningOutcomes) return []
   return selectedCO.learningOutcomes
+})
+
+// Filtered Question Repository
+const filteredQuestions = computed(() => {
+  return questions.value.filter(q => {
+    const matchesStatus = filterStatus.value === 'All' || (q.status || 'Pending') === filterStatus.value
+    const matchesProgram = filterProgram.value === 'All' || q.program === filterProgram.value || q.program === 'Both'
+    const matchesType = filterType.value === 'All' || q.type === filterType.value
+    const matchesSearch = !searchQuery.value || 
+      (q.text && q.text.toLowerCase().includes(searchQuery.value.toLowerCase())) || 
+      (q.courseId && q.courseId.toLowerCase().includes(searchQuery.value.toLowerCase()))
+    return matchesStatus && matchesProgram && matchesType && matchesSearch
+  })
 })
 
 function onProgramChange() {
@@ -104,6 +126,74 @@ function handleFileUpload(event, targetObj, propertyName) {
 
 function removeImage(targetObj, propertyName) {
   targetObj[propertyName] = ''
+}
+
+// AI Analysis Engine for Cognitive Alignment & Stem Quality
+function generateAiSuggestion(q) {
+  const suggestions = []
+  const textLower = (q.text || '').toLowerCase().trim()
+  const bloom = (q.bloomLevel || '').toLowerCase()
+
+  // Cognitive Level checks based on Bloom's action verbs
+  if ((textLower.startsWith('what is') || textLower.startsWith('define') || textLower.startsWith('list') || textLower.startsWith('name') || textLower.startsWith('identify')) && bloom !== 'remembering') {
+    suggestions.push(`Cognitive Level Mismatch: Stem uses recall verbs ("What is/Define/List"). Suggested Bloom's level is "Remembering" instead of "${q.bloomLevel}".`)
+  } else if ((textLower.includes('calculate') || textLower.includes('solve') || textLower.includes('determine') || textLower.includes('apply')) && (bloom !== 'applying' && bloom !== 'application')) {
+    suggestions.push(`Cognitive Level Mismatch: Question involves calculation or practical execution. Suggested Bloom's level is "Application" instead of "${q.bloomLevel}".`)
+  } else if ((textLower.includes('compare') || textLower.includes('differentiate') || textLower.includes('analyze') || textLower.includes('distinguish')) && bloom !== 'analysis') {
+    suggestions.push(`Cognitive Level Mismatch: Question involves analytical comparison. Suggested Bloom's level is "Analysis" instead of "${q.bloomLevel}".`)
+  }
+
+  // Stem quality & option checks
+  if (q.text && q.text.length < 15) {
+    suggestions.push('Stem Clarity: Item statement is short. Consider expanding the context.')
+  }
+  if (q.type === 'multiple_choice' && Array.isArray(q.options) && q.options.length < 4) {
+    suggestions.push('Distractor Count: Multiple choice items should standardly provide 4 options.')
+  }
+
+  if (suggestions.length === 0) {
+    return {
+      type: 'success',
+      text: "AI Audit: Item stem and Bloom's classification are well-aligned."
+    }
+  }
+
+  return {
+    type: 'warning',
+    text: suggestions.join(' | ')
+  }
+}
+
+function syncQuestionsStorage() {
+  localStorage.setItem(STORAGE_QUESTIONS_KEY, JSON.stringify(questions.value))
+}
+
+function updateQuestionStatus(id, status) {
+  const q = questions.value.find(item => item.id === id)
+  if (q) {
+    q.status = status
+    syncQuestionsStorage()
+  }
+}
+
+function applyAiCorrection(q) {
+  const suggestion = generateAiSuggestion(q)
+  if (suggestion.type === 'warning' && suggestion.text.includes('Suggested Bloom\'s level is')) {
+    if (suggestion.text.includes('"Remembering"')) q.bloomLevel = 'Remembering'
+    else if (suggestion.text.includes('"Application"')) q.bloomLevel = 'Application'
+    else if (suggestion.text.includes('"Analysis"')) q.bloomLevel = 'Analysis'
+    syncQuestionsStorage()
+    alert('Applied AI recommended Bloom\'s level update!')
+  } else {
+    alert(suggestion.text)
+  }
+}
+
+function deleteQuestion(id) {
+  if (confirm('Are you sure you want to remove this question item?')) {
+    questions.value = questions.value.filter(q => q.id !== id)
+    syncQuestionsStorage()
+  }
 }
 
 async function fetchQuestions() {
@@ -176,7 +266,8 @@ async function saveQuestion() {
     ...form,
     options: formattedOptions,
     correctAnswer: formattedCorrectAnswer,
-    matchingPairs: formattedMatchingPairs
+    matchingPairs: formattedMatchingPairs,
+    status: 'Pending'
   }
 
   isSubmitting.value = true
@@ -195,7 +286,7 @@ async function saveQuestion() {
     }
   } catch (err) {
     questions.value.unshift(payload)
-    localStorage.setItem(STORAGE_QUESTIONS_KEY, JSON.stringify(questions.value))
+    syncQuestionsStorage()
     alert('Question item saved locally!')
   } finally {
     isSubmitting.value = false
@@ -228,7 +319,7 @@ function downloadCSVTemplate() {
     ['BSMT', 'Midterm', 'CRS-101', 'CO1', 'LO1.1', 'Understanding', 'multiple_choice', 'What is the primary function of an ECDIS?', 'Electronic Chart Display', 'Radar Display', 'Sonar System', 'GMDSS Radio', 'A'],
     ['BSMarE', 'Final', 'CRS-102', 'CO2', 'LO2.1', 'Remembering', 'true_false', 'Is a diesel engine an internal combustion engine?', 'True', 'False', '', '', 'A'],
     ['Both', 'Midterm', 'CRS-103', 'CO1', 'LO1.2', 'Analysis', 'short_answer', 'Name the standard international maritime buoyage system.', '', '', '', '', 'IALA'],
-    ['BSMT', 'Midterm', 'CRS-101', 'CO1', 'LO1.3', 'Applying', 'matching', 'Match each vessel term with its correct location.', 'Starboard', 'Port', 'Stern', 'Bow', 'A: Right side | B: Left side | C: Rear | D: Front']
+    ['BSMT', 'Midterm', 'CRS-101', 'CO1', 'LO1.3', 'Application', 'matching', 'Match each vessel term with its correct location.', 'Starboard', 'Port', 'Stern', 'Bow', 'A: Right side | B: Left side | C: Rear | D: Front']
   ]
 
   const csvContent = [headers.join(','), ...sampleRows.map(r => r.map(field => `"${field.replace(/"/g, '""')}"`).join(','))].join('\n')
@@ -347,7 +438,8 @@ function handleBulkCSVUpload(event) {
             text: qText,
             options,
             correctAnswer,
-            matchingPairs
+            matchingPairs,
+            status: 'Pending'
           })
         }
       }
@@ -372,7 +464,7 @@ function handleBulkCSVUpload(event) {
         }
       } catch {
         questions.value.unshift(...parsedQuestions)
-        localStorage.setItem(STORAGE_QUESTIONS_KEY, JSON.stringify(questions.value))
+        syncQuestionsStorage()
         alert(`Successfully imported ${parsedQuestions.length} questions locally!`)
       }
     } catch (err) {
@@ -392,14 +484,14 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="p-6 max-w-7xl mx-auto space-y-6">
+  <div class="p-6 max-w-7xl mx-auto space-y-8">
     <!-- Header Banner & CSV Upload Actions -->
     <div class="bg-slate-900 text-white p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-md">
       <div>
         <h1 class="text-xl font-bold flex items-center gap-2">
-          <HelpCircle class="text-emerald-400" :size="22" /> Assessment Question Authoring
+          <HelpCircle class="text-emerald-400" :size="22" /> Assessment Question Authoring & Validation
         </h1>
-        <p class="text-xs text-slate-300">Map items by Program, Term, Course Code, Outcomes, and Bloom's Taxonomy.</p>
+        <p class="text-xs text-slate-300">Map items by Program, Term, Course Code, Outcomes, and Bloom's Taxonomy with AI Cognitive Validation.</p>
       </div>
 
       <!-- CSV Actions -->
@@ -415,7 +507,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Main Container -->
+    <!-- Main Container: Authoring Form -->
     <div class="bg-white border rounded-2xl p-6 shadow-sm space-y-6">
       
       <!-- 1. Program & Curriculum Mapping -->
@@ -631,5 +723,117 @@ onMounted(() => {
       </button>
 
     </div>
+
+    <!-- 4. QUESTION BANK REPOSITORY & VALIDATION TABLE -->
+    <div class="bg-white border rounded-2xl p-6 shadow-sm space-y-4">
+      <div class="flex flex-col md:flex-row justify-between md:items-center border-b pb-4 gap-4">
+        <div>
+          <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            Question Bank Repository <span class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 rounded-full font-bold">{{ questions.length }} items</span>
+          </h2>
+          <p class="text-xs text-slate-500">Review, approve/disapprove, or apply AI cognitive suggestions to imported exam items.</p>
+        </div>
+
+        <!-- Repository Filters -->
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <input v-model="searchQuery" placeholder="Search questions..." class="p-2 border rounded-lg bg-slate-50 text-slate-800 focus:ring-1 focus:ring-emerald-500 outline-none w-44" />
+          
+          <select v-model="filterStatus" class="p-2 border rounded-lg bg-slate-50 font-bold text-slate-700 outline-none">
+            <option value="All">All Statuses</option>
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Disapproved">Disapproved</option>
+          </select>
+
+          <select v-model="filterProgram" class="p-2 border rounded-lg bg-slate-50 font-bold text-slate-700 outline-none">
+            <option value="All">All Programs</option>
+            <option value="BSMT">BSMT</option>
+            <option value="BSMarE">BSMarE</option>
+            <option value="Both">Both</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Questions List Card Loop -->
+      <div v-if="filteredQuestions.length === 0" class="text-center py-12 text-slate-400 text-xs font-semibold">
+        No questions found matching selected criteria.
+      </div>
+
+      <div v-else class="space-y-4">
+        <div v-for="(q, idx) in filteredQuestions" :key="q.id || idx" class="border rounded-xl p-4 bg-slate-50/50 hover:bg-white hover:shadow-md transition space-y-3">
+          
+          <!-- Top Row: Tags & Approval Controls -->
+          <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b pb-2">
+            <div class="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+              <span class="bg-slate-800 text-white px-2 py-0.5 rounded">{{ q.program || 'Both' }}</span>
+              <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{{ q.term }}</span>
+              <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded">{{ q.courseId || 'Unassigned' }}</span>
+              <span class="bg-amber-100 text-amber-900 px-2 py-0.5 rounded">Bloom's: {{ q.bloomLevel }}</span>
+              <span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded uppercase">{{ q.type }}</span>
+            </div>
+
+            <!-- Approval Status Badge & Action Buttons -->
+            <div class="flex items-center gap-2">
+              <span :class="{
+                'bg-amber-100 text-amber-800 border-amber-300': (q.status || 'Pending') === 'Pending',
+                'bg-emerald-100 text-emerald-800 border-emerald-300': q.status === 'Approved',
+                'bg-red-100 text-red-800 border-red-300': q.status === 'Disapproved'
+              }" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border">
+                {{ q.status || 'Pending' }}
+              </span>
+
+              <button @click="updateQuestionStatus(q.id, 'Approved')" title="Approve Question" class="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg border border-emerald-200 transition">
+                <CheckCircle :size="15" />
+              </button>
+
+              <button @click="updateQuestionStatus(q.id, 'Disapproved')" title="Disapprove Question" class="p-1.5 bg-red-50 text-red-700 hover:bg-red-600 hover:text-white rounded-lg border border-red-200 transition">
+                <XCircle :size="15" />
+              </button>
+
+              <button @click="deleteQuestion(q.id)" title="Delete Item" class="p-1.5 bg-slate-100 text-slate-500 hover:bg-slate-200 rounded-lg transition">
+                <Trash2 :size="15" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Middle: Question Stem -->
+          <div>
+            <p class="text-xs font-semibold text-slate-800">{{ q.text }}</p>
+          </div>
+
+          <!-- Options Preview -->
+          <div v-if="q.options && q.options.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div v-for="(opt, oIdx) in q.options" :key="oIdx" class="p-2 rounded-lg border text-[11px]" :class="Array.isArray(q.correctAnswer) && q.correctAnswer.includes(oIdx) ? 'bg-emerald-50 border-emerald-300 font-bold text-emerald-900' : 'bg-white text-slate-700'">
+              <span class="font-bold mr-1">{{ String.fromCharCode(65 + oIdx) }}.</span> {{ typeof opt === 'string' ? opt : opt.text }}
+            </div>
+          </div>
+
+          <!-- Matching Pairs Preview -->
+          <div v-else-if="q.matchingPairs && q.matchingPairs.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div v-for="(pair, pIdx) in q.matchingPairs" :key="pIdx" class="p-2 rounded-lg border bg-white text-[11px] flex justify-between">
+              <span class="font-semibold text-slate-800">{{ pair.prompt }}</span>
+              <span class="text-emerald-700 font-bold">➔ {{ pair.match }}</span>
+            </div>
+          </div>
+
+          <!-- Bottom: AI Analysis & Correction Suggestion -->
+          <div class="p-2.5 rounded-xl text-xs flex items-start justify-between gap-3 border" :class="generateAiSuggestion(q).type === 'warning' ? 'bg-amber-50/80 border-amber-200 text-amber-900' : 'bg-emerald-50/50 border-emerald-200 text-emerald-900'">
+            <div class="flex items-start gap-2">
+              <Sparkles :size="16" class="mt-0.5 shrink-0" :class="generateAiSuggestion(q).type === 'warning' ? 'text-amber-600' : 'text-emerald-600'" />
+              <div>
+                <span class="font-bold block text-[11px]">AI Validation & Suggestion:</span>
+                <span class="text-[11px] leading-tight block">{{ generateAiSuggestion(q).text }}</span>
+              </div>
+            </div>
+
+            <button v-if="generateAiSuggestion(q).type === 'warning'" @click="applyAiCorrection(q)" class="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] rounded-lg shrink-0 transition shadow-sm">
+              Auto-Fix Level
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>

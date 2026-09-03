@@ -37,6 +37,7 @@ db.exec(`
     matchingPairs TEXT,
     stcwStandard TEXT,
     bloomLevel TEXT NOT NULL,
+    status TEXT DEFAULT 'Pending',
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -80,6 +81,10 @@ try {
 
 try {
   db.exec("ALTER TABLE questions ADD COLUMN term TEXT DEFAULT 'Midterm';")
+} catch (e) {}
+
+try {
+  db.exec("ALTER TABLE questions ADD COLUMN status TEXT DEFAULT 'Pending';")
 } catch (e) {}
 
 // Audit Helper Function
@@ -180,7 +185,7 @@ app.delete('/api/courses/:id', (req, res) => {
 
 // --- QUESTION BANK ENDPOINTS WITH FILTERING & CRUD ---
 app.get('/api/questions', (req, res) => {
-  const { program, term, courseId, courseOutcomeId, learningOutcomeId, bloomLevel, type, search } = req.query
+  const { program, term, courseId, courseOutcomeId, learningOutcomeId, bloomLevel, type, status, search } = req.query
   let query = 'SELECT * FROM questions WHERE 1=1'
   const params = []
 
@@ -212,6 +217,10 @@ app.get('/api/questions', (req, res) => {
     query += ' AND type = ?'
     params.push(type)
   }
+  if (status && status !== 'All') {
+    query += ' AND status = ?'
+    params.push(status)
+  }
   if (search) {
     query += ' AND (text LIKE ? OR code LIKE ?)'
     params.push(`%${search}%`, `%${search}%`)
@@ -240,8 +249,8 @@ app.post('/api/questions', (req, res) => {
   try {
     const stmt = db.prepare(`
       INSERT INTO questions 
-      (program, term, courseId, courseOutcomeId, learningOutcomeId, code, type, text, imageUrl, options, correctAnswer, matchingPairs, stcwStandard, bloomLevel)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (program, term, courseId, courseOutcomeId, learningOutcomeId, code, type, text, imageUrl, options, correctAnswer, matchingPairs, stcwStandard, bloomLevel, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     const info = stmt.run(
       q.program || 'Both',
@@ -257,7 +266,8 @@ app.post('/api/questions', (req, res) => {
       JSON.stringify(q.correctAnswer ?? null),
       JSON.stringify(q.matchingPairs || []),
       q.stcwStandard || 'Table A-II/1',
-      q.bloomLevel || 'Understanding'
+      q.bloomLevel || 'Understanding',
+      q.status || 'Pending'
     )
     logAuditEvent('SYSTEM', 'CREATE_QUESTION', generatedCode, q.type)
     res.status(201).json({ success: true, id: info.lastInsertRowid })
@@ -273,7 +283,7 @@ app.put('/api/questions/:id', (req, res) => {
   try {
     const stmt = db.prepare(`
       UPDATE questions 
-      SET program = ?, term = ?, courseId = ?, courseOutcomeId = ?, learningOutcomeId = ?, code = ?, type = ?, text = ?, imageUrl = ?, options = ?, correctAnswer = ?, matchingPairs = ?, stcwStandard = ?, bloomLevel = ?
+      SET program = ?, term = ?, courseId = ?, courseOutcomeId = ?, learningOutcomeId = ?, code = ?, type = ?, text = ?, imageUrl = ?, options = ?, correctAnswer = ?, matchingPairs = ?, stcwStandard = ?, bloomLevel = ?, status = ?
       WHERE id = ?
     `)
     stmt.run(
@@ -291,6 +301,7 @@ app.put('/api/questions/:id', (req, res) => {
       JSON.stringify(q.matchingPairs || []),
       q.stcwStandard || 'Table A-II/1',
       q.bloomLevel || 'Understanding',
+      q.status || 'Pending',
       req.params.id
     )
     logAuditEvent('SYSTEM', 'UPDATE_QUESTION', itemCode)
@@ -316,8 +327,8 @@ app.post('/api/questions/bulk', (req, res) => {
 
   const stmt = db.prepare(`
     INSERT OR REPLACE INTO questions 
-    (program, term, courseId, courseOutcomeId, learningOutcomeId, code, type, text, imageUrl, options, correctAnswer, matchingPairs, stcwStandard, bloomLevel)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (program, term, courseId, courseOutcomeId, learningOutcomeId, code, type, text, imageUrl, options, correctAnswer, matchingPairs, stcwStandard, bloomLevel, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
   const insertMany = db.transaction((items) => {
@@ -338,7 +349,8 @@ app.post('/api/questions/bulk', (req, res) => {
         JSON.stringify(q.correctAnswer ?? null),
         JSON.stringify(q.matchingPairs || []),
         q.stcwStandard || 'Table A-II/1',
-        q.bloomLevel || 'Understanding'
+        q.bloomLevel || 'Understanding',
+        q.status || 'Pending'
       )
     }
   })
@@ -490,5 +502,5 @@ app.post('/api/questions/validate', (req, res) => {
   })
 })
 
-const PORT = 3002
+const PORT = 3001
 app.listen(PORT, () => console.log(`Maritime Server with SQLite active on http://localhost:${PORT}`))
