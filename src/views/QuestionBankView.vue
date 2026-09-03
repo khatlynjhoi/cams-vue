@@ -126,14 +126,12 @@ async function fetchQuestions() {
 
 async function fetchCourses() {
   try {
-    // Priority: Read courses saved locally from CourseManagementView
     const savedCourses = localStorage.getItem(STORAGE_COURSES_KEY)
     if (savedCourses) {
       courses.value = JSON.parse(savedCourses)
       return
     }
 
-    // Fallback: Fetch from backend API
     const res = await fetch('http://localhost:3001/api/courses')
     const data = await res.json()
     if (data.success) {
@@ -183,7 +181,6 @@ async function saveQuestion() {
 
   isSubmitting.value = true
   try {
-    // Try API endpoint first
     const res = await fetch('http://localhost:3001/api/questions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -197,7 +194,6 @@ async function saveQuestion() {
       throw new Error(data.error)
     }
   } catch (err) {
-    // LocalStorage fallback for standalone / static environments
     questions.value.unshift(payload)
     localStorage.setItem(STORAGE_QUESTIONS_KEY, JSON.stringify(questions.value))
     alert('Question item saved locally!')
@@ -206,13 +202,33 @@ async function saveQuestion() {
   }
 }
 
-// --- CSV TEMPLATE DOWNLOAD & BULK UPLOAD ---
+// --- CSV HELPER & TEMPLATE DOWNLOAD & BULK UPLOAD ---
+function parseCSVLine(line) {
+  const result = []
+  let cur = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i]
+    if (c === '"') {
+      inQuotes = !inQuotes
+    } else if (c === ',' && !inQuotes) {
+      result.push(cur.trim().replace(/^"|"$/g, '').replace(/""/g, '"'))
+      cur = ''
+    } else {
+      cur += c
+    }
+  }
+  result.push(cur.trim().replace(/^"|"$/g, '').replace(/""/g, '"'))
+  return result
+}
+
 function downloadCSVTemplate() {
-  const headers = ['Program', 'Term', 'CourseId', 'CourseOutcomeId', 'LearningOutcomeId', 'BloomLevel', 'QuestionType', 'QuestionText', 'OptionsPipeSeparated', 'CorrectAnswerIndexOrText']
+  const headers = ['Program', 'Term', 'CourseId', 'CourseOutcomeId', 'LearningOutcomeId', 'BloomLevel', 'QuestionType', 'QuestionText', 'OptionA', 'OptionB', 'OptionC', 'OptionD', 'CorrectAnswer']
   const sampleRows = [
-    ['BSMT', 'Midterm', 'CRS-101', 'CO1', 'LO1.1', 'Understanding', 'multiple_choice', 'What is the primary function of an ECDIS?', 'Electronic Chart Display|Radar Display|Sonar System|GMDSS Radio', '0'],
-    ['BSMarE', 'Final', 'CRS-102', 'CO2', 'LO2.1', 'Remembering', 'true_false', 'Is a diesel engine an internal combustion engine?', 'True|False', '0'],
-    ['Both', 'Midterm', 'CRS-103', 'CO1', 'LO1.2', 'Analysis', 'short_answer', 'Name the standard international maritime buoyage system.', '', 'IALA, IALA System']
+    ['BSMT', 'Midterm', 'CRS-101', 'CO1', 'LO1.1', 'Understanding', 'multiple_choice', 'What is the primary function of an ECDIS?', 'Electronic Chart Display', 'Radar Display', 'Sonar System', 'GMDSS Radio', 'A'],
+    ['BSMarE', 'Final', 'CRS-102', 'CO2', 'LO2.1', 'Remembering', 'true_false', 'Is a diesel engine an internal combustion engine?', 'True', 'False', '', '', 'A'],
+    ['Both', 'Midterm', 'CRS-103', 'CO1', 'LO1.2', 'Analysis', 'short_answer', 'Name the standard international maritime buoyage system.', '', '', '', '', 'IALA'],
+    ['BSMT', 'Midterm', 'CRS-101', 'CO1', 'LO1.3', 'Applying', 'matching', 'Match each vessel term with its correct location.', 'Starboard', 'Port', 'Stern', 'Bow', 'A: Right side | B: Left side | C: Rear | D: Front']
   ]
 
   const csvContent = [headers.join(','), ...sampleRows.map(r => r.map(field => `"${field.replace(/"/g, '""')}"`).join(','))].join('\n')
@@ -234,7 +250,7 @@ function handleBulkCSVUpload(event) {
     try {
       isUploadingBulk.value = true
       const text = e.target.result
-      const lines = text.split('\n').filter(l => l.trim().length > 0)
+      const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0)
       
       if (lines.length < 2) {
         alert('CSV file appears empty or missing rows.')
@@ -243,7 +259,7 @@ function handleBulkCSVUpload(event) {
 
       const parsedQuestions = []
       for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').trim())
+        const cols = parseCSVLine(lines[i])
 
         if (cols.length >= 8) {
           const program = cols[0] || 'Both'
@@ -254,20 +270,69 @@ function handleBulkCSVUpload(event) {
           const bloomLevel = cols[5] || 'Understanding'
           const type = cols[6] || 'multiple_choice'
           const qText = cols[7] || ''
-          const rawOptions = cols[8] ? cols[8].split('|') : []
-          const rawCorrect = cols[9] || '0'
+
+          const optionA = cols[8] || ''
+          const optionB = cols[9] || ''
+          const optionC = cols[10] || ''
+          const optionD = cols[11] || ''
+          const rawCorrect = cols[12] || ''
 
           let options = []
           let correctAnswer = null
+          let matchingPairs = []
 
           if (type === 'multiple_choice') {
+            const rawOptions = [optionA, optionB, optionC, optionD].filter(Boolean)
             options = rawOptions.map(o => ({ text: o, imageUrl: '' }))
-            correctAnswer = [parseInt(rawCorrect) || 0]
+            
+            let correctIdx = 0
+            const rawUpper = rawCorrect.trim().toUpperCase()
+            if (['A', 'B', 'C', 'D'].includes(rawUpper)) {
+              correctIdx = ['A', 'B', 'C', 'D'].indexOf(rawUpper)
+            } else if (!isNaN(parseInt(rawCorrect)) && parseInt(rawCorrect) >= 0) {
+              correctIdx = parseInt(rawCorrect)
+            } else {
+              const idxFound = rawOptions.findIndex(o => o.toLowerCase() === rawCorrect.trim().toLowerCase())
+              if (idxFound !== -1) correctIdx = idxFound
+            }
+            correctAnswer = [correctIdx]
           } else if (type === 'true_false') {
             options = ['True', 'False']
-            correctAnswer = parseInt(rawCorrect) || 0
+            const rawLower = rawCorrect.trim().toLowerCase()
+            correctAnswer = (rawLower === 'b' || rawLower === 'false' || rawLower === '1') ? 1 : 0
           } else if (type === 'short_answer') {
-            correctAnswer = rawCorrect.split(',').map(s => s.trim())
+            correctAnswer = rawCorrect.split(',').map(s => s.trim()).filter(Boolean)
+          } else if (type === 'matching') {
+            const promptMap = { 'A': optionA, 'B': optionB, 'C': optionC, 'D': optionD }
+            if (rawCorrect.includes(':')) {
+              const pairsMap = {}
+              const parts = rawCorrect.split('|')
+              parts.forEach(part => {
+                if (part.includes(':')) {
+                  const [k, ...vParts] = part.split(':')
+                  if (k && vParts.length > 0) {
+                    pairsMap[k.trim().toUpperCase()] = vParts.join(':').trim()
+                  }
+                }
+              })
+              matchingPairs = ['A', 'B', 'C', 'D']
+                .filter(k => promptMap[k])
+                .map(k => ({
+                  prompt: promptMap[k],
+                  promptImage: '',
+                  match: pairsMap[k] || '',
+                  matchImage: ''
+                }))
+            } else {
+              const matches = rawCorrect.split('|').map(s => s.trim())
+              const prompts = [optionA, optionB, optionC, optionD].filter(Boolean)
+              matchingPairs = prompts.map((p, idx) => ({
+                prompt: p,
+                promptImage: '',
+                match: matches[idx] || '',
+                matchImage: ''
+              }))
+            }
           }
 
           parsedQuestions.push({
@@ -282,7 +347,7 @@ function handleBulkCSVUpload(event) {
             text: qText,
             options,
             correctAnswer,
-            matchingPairs: []
+            matchingPairs
           })
         }
       }
@@ -367,7 +432,7 @@ onMounted(() => {
           </select>
         </div>
 
-        <!-- Academic Term (Styling matched to other standard text dropdowns) -->
+        <!-- Academic Term -->
         <div>
           <label class="font-bold text-slate-700 block mb-1">Academic Term</label>
           <select v-model="form.term" class="w-full p-2.5 border rounded-lg bg-slate-50 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
@@ -376,7 +441,7 @@ onMounted(() => {
           </select>
         </div>
 
-        <!-- Course Code (Reflects created courses dynamically) -->
+        <!-- Course Code -->
         <div>
           <label class="font-bold text-slate-700 block mb-1">Course / Subject</label>
           <select v-model="form.courseId" @change="onCourseChange" class="w-full p-2.5 border rounded-lg bg-slate-50 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">

@@ -2,13 +2,15 @@
 import { ref, onMounted, computed } from 'vue'
 import { 
   Plus, Trash2, Clock, BookOpen, Layers, 
-  ChevronDown, ChevronRight, Search, Filter, ArrowUpDown 
+  ChevronDown, ChevronRight, Search, Filter, ArrowUpDown,
+  Pencil, X, RotateCcw
 } from 'lucide-vue-next'
 
 const courses = ref([])
 const isLoading = ref(true)
 
 // Form State
+const editingCourseId = ref(null)
 const courseCode = ref('')
 const courseTitle = ref('')
 const program = ref('Both')
@@ -132,30 +134,26 @@ const totalCourseHours = computed(() => {
   return total
 })
 
-function handleSaveCourse() {
-  if (!courseCode.value || !courseTitle.value) {
-    alert('Please enter both Course Code and Course Title.')
-    return
+// Edit Course Trigger
+function startEditCourse(course) {
+  editingCourseId.value = course.id
+  courseCode.value = course.code || ''
+  courseTitle.value = course.title || ''
+  program.value = course.program || 'Both'
+  
+  // Deep clone outcomes to prevent direct mutation before saving
+  courseOutcomes.value = JSON.parse(JSON.stringify(course.courseOutcomes || []))
+
+  if (courseOutcomes.value.length === 0) {
+    addCourseOutcome()
   }
 
-  const newCourse = {
-    id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
-    code: courseCode.value,
-    title: courseTitle.value,
-    program: program.value,
-    courseOutcomes: JSON.parse(JSON.stringify(courseOutcomes.value))
-  }
+  // Scroll to form smoothly
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
-  courses.value.unshift(newCourse)
-  saveCoursesToStorage()
-
-  // Auto-expand newly added course
-  expandedCourses.value[newCourse.id] = true
-  newCourse.courseOutcomes.forEach((co, idx) => {
-    expandedCOs.value[`${newCourse.id}-${co.id || idx}`] = true
-  })
-
-  // Reset form
+function cancelEdit() {
+  editingCourseId.value = null
   courseCode.value = ''
   courseTitle.value = ''
   program.value = 'Both'
@@ -168,9 +166,53 @@ function handleSaveCourse() {
   ]
 }
 
+function handleSaveCourse() {
+  if (!courseCode.value || !courseTitle.value) {
+    alert('Please enter both Course Code and Course Title.')
+    return
+  }
+
+  if (editingCourseId.value) {
+    // Update Existing Course
+    const index = courses.value.findIndex(c => c.id === editingCourseId.value)
+    if (index !== -1) {
+      courses.value[index] = {
+        ...courses.value[index],
+        code: courseCode.value,
+        title: courseTitle.value,
+        program: program.value,
+        courseOutcomes: JSON.parse(JSON.stringify(courseOutcomes.value))
+      }
+    }
+  } else {
+    // Create New Course
+    const newCourse = {
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
+      code: courseCode.value,
+      title: courseTitle.value,
+      program: program.value,
+      courseOutcomes: JSON.parse(JSON.stringify(courseOutcomes.value))
+    }
+
+    courses.value.unshift(newCourse)
+    
+    // Auto-expand newly added course
+    expandedCourses.value[newCourse.id] = true
+    newCourse.courseOutcomes.forEach((co, idx) => {
+      expandedCOs.value[`${newCourse.id}-${co.id || idx}`] = true
+    })
+  }
+
+  saveCoursesToStorage()
+  cancelEdit()
+}
+
 function deleteCourse(id) {
   if (!confirm('Are you sure you want to delete this course structure?')) return
   courses.value = courses.value.filter(c => c.id !== id)
+  if (editingCourseId.value === id) {
+    cancelEdit()
+  }
   saveCoursesToStorage()
 }
 
@@ -230,11 +272,22 @@ const filteredAndSortedCourses = computed(() => {
       </div>
     </div>
 
-    <!-- Course Creation Panel -->
+    <!-- Course Creation / Editing Panel -->
     <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
-      <h2 class="text-base font-bold text-slate-900 border-b pb-3 flex items-center gap-2">
-        <Plus :size="18" class="text-emerald-600" /> Create New Course Syllabus Structure
-      </h2>
+      <div class="flex justify-between items-center border-b pb-3">
+        <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <Pencil v-if="editingCourseId" :size="18" class="text-amber-600" />
+          <Plus v-else :size="18" class="text-emerald-600" />
+          {{ editingCourseId ? 'Edit Course Syllabus Structure' : 'Create New Course Syllabus Structure' }}
+        </h2>
+        <button 
+          v-if="editingCourseId" 
+          @click="cancelEdit" 
+          class="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 font-semibold bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 transition-colors"
+        >
+          <RotateCcw :size="14" /> Cancel Edit
+        </button>
+      </div>
 
       <!-- Basic Course Details -->
       <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
@@ -330,9 +383,22 @@ const filteredAndSortedCourses = computed(() => {
         </button>
       </div>
 
-      <button @click="handleSaveCourse" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm">
-        Save Syllabus & Structure
-      </button>
+      <div class="flex items-center gap-3">
+        <button 
+          @click="handleSaveCourse" 
+          class="px-6 py-2.5 text-xs font-bold text-white rounded-xl shadow-sm transition-colors"
+          :class="editingCourseId ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+        >
+          {{ editingCourseId ? 'Update Syllabus & Structure' : 'Save Syllabus & Structure' }}
+        </button>
+        <button 
+          v-if="editingCourseId" 
+          @click="cancelEdit" 
+          class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-300"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
 
     <!-- Registered Maritime Courses Section -->
@@ -395,6 +461,7 @@ const filteredAndSortedCourses = computed(() => {
           v-for="c in filteredAndSortedCourses" 
           :key="c.id" 
           class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden transition-all"
+          :class="{ 'ring-2 ring-amber-400 border-amber-300': editingCourseId === c.id }"
         >
           <!-- Collapsible Course Card Header -->
           <div 
@@ -424,9 +491,24 @@ const filteredAndSortedCourses = computed(() => {
               >Both Programs</span>
             </div>
 
-            <div class="flex items-center gap-3">
-              <span class="text-xs text-slate-500 font-medium">{{ c.courseOutcomes?.length || 0 }} COs</span>
-              <button @click.stop="deleteCourse(c.id)" class="text-slate-400 hover:text-red-600 p-1" title="Delete Course">
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-slate-500 font-medium mr-2">{{ c.courseOutcomes?.length || 0 }} COs</span>
+              
+              <!-- Edit Action Button -->
+              <button 
+                @click.stop="startEditCourse(c)" 
+                class="text-slate-400 hover:text-amber-600 p-1.5 hover:bg-amber-50 rounded-lg transition-colors" 
+                title="Edit Course"
+              >
+                <Pencil :size="16" />
+              </button>
+
+              <!-- Delete Action Button -->
+              <button 
+                @click.stop="deleteCourse(c.id)" 
+                class="text-slate-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors" 
+                title="Delete Course"
+              >
                 <Trash2 :size="16" />
               </button>
             </div>
