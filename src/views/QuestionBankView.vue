@@ -6,10 +6,10 @@
       <div class="space-y-1">
         <h1 class="text-xl font-bold flex items-center gap-2 text-white tracking-tight">
           <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">?</span>
-          Assessment Question Authoring & Validation
+          Assessment Question Authoring
         </h1>
         <p class="text-xs text-slate-300 font-normal">
-          Map items by Program, Term, Course Code, Outcomes, and Bloom's Taxonomy with AI Cognitive Validation.
+          Map items by Program, Term, Course Code, Outcomes, and Bloom's Taxonomy.
         </p>
       </div>
 
@@ -200,12 +200,32 @@
               <!-- Stem -->
               <div>
                 <p class="text-xs font-semibold text-slate-800">{{ q.text }}</p>
+                <img v-if="q.imageUrl" :src="q.imageUrl" class="mt-2 h-24 object-cover rounded-lg border" />
               </div>
 
               <!-- Multiple Choice Options -->
-              <div v-if="q.options && q.options.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div v-for="(opt, oIdx) in q.options" :key="oIdx" class="p-2 rounded-lg border text-[11px]" :class="(Array.isArray(q.correctAnswer) && q.correctAnswer.includes(oIdx)) || q.correctAnswer === oIdx ? 'bg-emerald-50 border-emerald-300 font-bold text-emerald-900' : 'bg-white text-slate-700'">
-                  <span class="font-bold mr-1">{{ String.fromCharCode(65 + oIdx) }}.</span> {{ typeof opt === 'string' ? opt : opt.text }}
+              <div v-if="q.options && q.options.length > 0 && q.type === 'multiple_choice'" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div v-for="(opt, oIdx) in q.options" :key="oIdx" class="p-2 rounded-lg border text-[11px] flex flex-col gap-1" :class="(Array.isArray(q.correctAnswer) && q.correctAnswer.includes(oIdx)) || q.correctAnswer === oIdx ? 'bg-emerald-50 border-emerald-300 font-bold text-emerald-900' : 'bg-white text-slate-700'">
+                  <div>
+                    <span class="font-bold mr-1">{{ String.fromCharCode(65 + oIdx) }}.</span> {{ typeof opt === 'string' ? opt : opt.text }}
+                  </div>
+                  <img v-if="opt.imageUrl" :src="opt.imageUrl" class="h-16 w-16 object-cover rounded border" />
+                </div>
+              </div>
+
+              <!-- Matching Type Pairs -->
+              <div v-if="q.type === 'matching' && q.matchingPairs" class="space-y-2 text-xs">
+                <div v-for="(pair, pIdx) in q.matchingPairs" :key="pIdx" class="p-2.5 rounded-lg border bg-white flex items-center justify-between text-[11px]">
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-slate-500">{{ pIdx + 1 }}.</span>
+                    <span>{{ pair.leftText }}</span>
+                    <img v-if="pair.leftImageUrl" :src="pair.leftImageUrl" class="h-10 w-10 object-cover rounded border" />
+                  </div>
+                  <span class="font-bold text-slate-400">⟶</span>
+                  <div class="flex items-center gap-2">
+                    <span>{{ pair.rightText }}</span>
+                    <img v-if="pair.rightImageUrl" :src="pair.rightImageUrl" class="h-10 w-10 object-cover rounded border" />
+                  </div>
                 </div>
               </div>
 
@@ -242,150 +262,258 @@
       </div>
     </div>
 
-    <!-- TAB 2: AUTHORING FORM -->
-    <div v-show="activeTab === 'create'" class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-6">
-      <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider border-b pb-2">1. Program & Curriculum Mapping</h2>
+    <!-- TAB 2: AUTHORING FORM (ExamView Layout Matched) -->
+    <div v-show="activeTab === 'create'" class="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-2xs space-y-6 max-w-5xl mx-auto">
       
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-        <div>
-          <label class="font-bold text-slate-700 block mb-1">Target Academic Program</label>
-          <select v-model="form.program" @change="onProgramChange" class="w-full p-2.5 border rounded-lg bg-slate-50 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
-            <option value="Both">Both (BSMT & BSMarE)</option>
-            <option value="BSMT">BSMT (Marine Transportation)</option>
-            <option value="BSMarE">BSMarE (Marine Engineering)</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="font-bold text-slate-700 block mb-1">Examination Term</label>
-          <select v-model="form.term" class="w-full p-2.5 border rounded-lg bg-slate-50 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
-            <option value="Midterm">Midterm Examination</option>
-            <option value="Final">Final Examination</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="font-bold text-slate-700 block mb-1">Course / Subject Code *</label>
-          <select v-model="form.courseId" @change="onCourseChange" class="w-full p-2.5 border rounded-lg bg-slate-50 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
-            <option value="" disabled>Select Subject...</option>
-            <option v-for="c in filteredCourses" :key="c.id" :value="c.id || c.code">
-              {{ c.code }} — {{ c.title }}
-            </option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Outcomes & Classification -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-xs">
-        <div>
-          <label class="font-bold text-slate-700 block mb-1">Course Outcome (CO)</label>
-          <select v-model="form.courseOutcomeId" @change="onCOChange" class="w-full p-2 border rounded-lg bg-white outline-none">
-            <option value="">Select Course Outcome...</option>
-            <option v-for="co in availableCourseOutcomes" :key="co.id || co.code" :value="co.id || co.code">
-              {{ co.code }}: {{ co.description || co.title }}
-            </option>
-          </select>
-        </div>
-
-        <div>
-          <label class="font-bold text-slate-700 block mb-1">Learning Outcome (LO)</label>
-          <select v-model="form.learningOutcomeId" class="w-full p-2 border rounded-lg bg-white outline-none">
-            <option value="">Select Learning Outcome...</option>
-            <option v-for="lo in availableLearningOutcomes" :key="lo.id || lo.code" :value="lo.id || lo.code">
-              {{ lo.code }}: {{ lo.description || lo.title }}
-            </option>
-          </select>
-        </div>
-
-        <div>
-          <label class="font-bold text-slate-700 block mb-1">Bloom's Taxonomy Level</label>
-          <select v-model="form.bloomLevel" class="w-full p-2 border rounded-lg bg-white outline-none">
-            <option value="Remembering">Remembering (Knowledge Recall)</option>
-            <option value="Understanding">Understanding (Comprehension)</option>
-            <option value="Application">Application (Practical Calculation/Execution)</option>
-            <option value="Analysis">Analysis (Analytical Comparison)</option>
-            <option value="Evaluation">Evaluation (Assessment)</option>
-          </select>
-        </div>
-      </div>
-
-      <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider border-b pb-2 pt-2">2. Item Statement & Type</h2>
-
+      <!-- 1. PROGRAM & CURRICULUM MAPPING -->
       <div>
-        <label class="font-bold text-xs text-slate-700 block mb-1">Question Type</label>
-        <div class="flex items-center gap-6 text-xs">
-          <label class="inline-flex items-center gap-2 cursor-pointer">
-            <input type="radio" v-model="form.type" value="multiple_choice" class="text-emerald-600" />
-            <span>Multiple Choice</span>
-          </label>
-          <label class="inline-flex items-center gap-2 cursor-pointer">
-            <input type="radio" v-model="form.type" value="true_false" class="text-emerald-600" />
-            <span>True / False</span>
-          </label>
-          <label class="inline-flex items-center gap-2 cursor-pointer">
-            <input type="radio" v-model="form.type" value="short_answer" class="text-emerald-600" />
-            <span>Short Answer</span>
-          </label>
+        <h2 class="text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200 pb-2 mb-4">
+          1. PROGRAM & CURRICULUM MAPPING
+        </h2>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs">
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Program</label>
+            <select v-model="form.program" @change="onProgramChange" class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="Both">Both (BSMT & BSMarE)</option>
+              <option value="BSMT">BSMT</option>
+              <option value="BSMarE">BSMarE</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Academic Term</label>
+            <select v-model="form.term" class="w-full p-2.5 border border-slate-300 rounded-xl bg-emerald-50/60 font-medium text-emerald-900 focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="Midterm">Midterm</option>
+              <option value="Final">Final</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Course / Subject</label>
+            <select v-model="form.courseId" @change="onCourseChange" class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="" disabled>Select Subject...</option>
+              <option v-for="c in filteredCourses" :key="c.id" :value="c.id || c.code">
+                {{ c.code }} — {{ c.title }}
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Course Outcome (CO)</label>
+            <select v-model="form.courseOutcomeId" @change="onCOChange" class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="">Select CO...</option>
+              <option v-for="co in availableCourseOutcomes" :key="co.id || co.code" :value="co.id || co.code">
+                {{ co.code }}: {{ co.description || co.title }}
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Learning Outcome (LO)</label>
+            <select v-model="form.learningOutcomeId" class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="">Select LO...</option>
+              <option v-for="lo in availableLearningOutcomes" :key="lo.id || lo.code" :value="lo.id || lo.code">
+                {{ lo.code }}: {{ lo.description || lo.title }}
+              </option>
+            </select>
+          </div>
         </div>
       </div>
 
-      <!-- Stem textarea -->
-      <div class="space-y-3">
-        <label class="font-bold text-xs text-slate-700 block">Question Stem / Statement *</label>
-        <textarea v-model="form.text" rows="3" placeholder="Enter question statement..." class="w-full p-3 border rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none"></textarea>
+      <!-- 2. ITEM CLASSIFICATION -->
+      <div>
+        <h2 class="text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200 pb-2 mb-4">
+          2. ITEM CLASSIFICATION
+        </h2>
 
-        <div class="bg-slate-50 p-3 rounded-xl border border-dashed flex items-center justify-between">
-          <div>
-            <span class="text-[11px] font-bold text-slate-700 block">Question Diagram / Image (Optional)</span>
-            <input type="file" accept="image/*" @change="e => handleFileUpload(e, form, 'imageUrl')" class="text-xs mt-1" />
+        <div class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Bloom's Taxonomy</label>
+              <select v-model="form.bloomLevel" class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
+                <option value="Remembering">Remembering</option>
+                <option value="Understanding">Understanding</option>
+                <option value="Application">Application</option>
+                <option value="Analysis">Analysis</option>
+                <option value="Evaluation">Evaluation</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Question Type</label>
+              <select v-model="form.type" class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
+                <option value="multiple_choice">Multiple Choice</option>
+                <option value="matching">Matching Type</option>
+                <option value="true_false">True / False</option>
+                <option value="short_answer">Short Answer</option>
+              </select>
+            </div>
           </div>
-          <div v-if="form.imageUrl" class="relative">
-            <img :src="form.imageUrl" class="h-14 w-14 object-cover rounded-lg border shadow-2xs" />
-            <button @click="removeImage(form, 'imageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600">
-              <X :size="10" />
+
+          <!-- Question Stem Input -->
+          <div>
+            <label class="font-bold text-xs text-slate-700 block mb-1">Question Stem</label>
+            <textarea 
+              v-model="form.text" 
+              rows="3" 
+              placeholder="Enter question statement..." 
+              class="w-full p-3 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none"
+            ></textarea>
+          </div>
+
+          <!-- Question Image Picker Box -->
+          <div class="border border-dashed border-slate-300 rounded-xl p-3 text-xs bg-slate-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <span class="font-bold text-slate-700 block">Question Image (Optional)</span>
+              <input type="file" accept="image/*" @change="e => handleFileUpload(e, form, 'imageUrl')" class="text-xs mt-1 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300" />
+            </div>
+            <div v-if="form.imageUrl" class="relative shrink-0">
+              <img :src="form.imageUrl" class="h-16 w-16 object-cover rounded-lg border shadow-2xs" />
+              <button @click="removeImage(form, 'imageUrl')" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-2xs">
+                <X :size="10" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. OPTIONS & CORRECT ANSWERS -->
+      <div>
+        <h2 class="text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200 pb-2 mb-4">
+          3. OPTIONS & CORRECT ANSWERS
+        </h2>
+
+        <!-- MULTIPLE CHOICE OPTIONS -->
+        <div v-if="form.type === 'multiple_choice'" class="space-y-3 border border-slate-200 p-4 rounded-xl bg-slate-50/30">
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-xs font-bold text-slate-700">Options & Correct Answer(s) (Check all that apply)</span>
+            <button @click="addOption" type="button" class="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1">
+              <Plus :size="14" /> Add Option
             </button>
           </div>
+
+          <div v-for="(opt, idx) in form.options" :key="idx" class="flex flex-col sm:flex-row sm:items-center gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+            <div class="flex items-center gap-3 flex-1">
+              <input type="checkbox" v-model="opt.isCorrect" title="Mark as correct answer" class="h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 shrink-0" />
+              <input v-model="opt.text" :placeholder="`Option ${idx + 1} text...`" class="flex-1 p-2 border border-slate-300 rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500" />
+            </div>
+
+            <div class="flex items-center gap-2 self-end sm:self-auto">
+              <!-- Option Image Upload Button -->
+              <label class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300/80 cursor-pointer flex items-center gap-1.5 transition">
+                <Image :size="14" class="text-slate-500" />
+                <span>Image</span>
+                <input type="file" accept="image/*" @change="e => handleFileUpload(e, opt, 'imageUrl')" class="hidden" />
+              </label>
+
+              <!-- Image Preview -->
+              <div v-if="opt.imageUrl" class="relative">
+                <img :src="opt.imageUrl" class="h-8 w-8 object-cover rounded border" />
+                <button @click="removeImage(opt, 'imageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600">
+                  <X :size="8" />
+                </button>
+              </div>
+
+              <!-- Delete Option Button -->
+              <button v-if="form.options.length > 2" @click="removeOption(idx)" title="Remove option" class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition">
+                <Trash2 :size="16" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- MATCHING TYPE PAIRS -->
+        <div v-if="form.type === 'matching'" class="space-y-3 border border-slate-200 p-4 rounded-xl bg-slate-50/30">
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-xs font-bold text-slate-700">Matching Pairs (Item ⟶ Correct Match)</span>
+            <button @click="addMatchingPair" type="button" class="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1">
+              <Plus :size="14" /> Add Matching Pair
+            </button>
+          </div>
+
+          <div v-for="(pair, idx) in form.matchingPairs" :key="idx" class="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-xs text-slate-600">Pair #{{ idx + 1 }}</span>
+              <button v-if="form.matchingPairs.length > 2" @click="removeMatchingPair(idx)" title="Remove Pair" class="text-red-500 hover:bg-red-50 p-1 rounded">
+                <Trash2 :size="14" />
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <!-- Left Side Item -->
+              <div class="space-y-2 border p-2.5 rounded-lg bg-slate-50/50">
+                <span class="font-bold text-[11px] text-slate-500">Premise Item / Question</span>
+                <input v-model="pair.leftText" placeholder="Left item text..." class="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none bg-white" />
+                
+                <div class="flex items-center justify-between">
+                  <label class="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-semibold rounded border cursor-pointer flex items-center gap-1">
+                    <Image :size="12" /> Image
+                    <input type="file" accept="image/*" @change="e => handleFileUpload(e, pair, 'leftImageUrl')" class="hidden" />
+                  </label>
+                  <div v-if="pair.leftImageUrl" class="relative">
+                    <img :src="pair.leftImageUrl" class="h-8 w-8 object-cover rounded border" />
+                    <button @click="removeImage(pair, 'leftImageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5">
+                      <X :size="8" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right Side Match -->
+              <div class="space-y-2 border p-2.5 rounded-lg bg-slate-50/50">
+                <span class="font-bold text-[11px] text-slate-500">Matching Target / Answer</span>
+                <input v-model="pair.rightText" placeholder="Right matching text..." class="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none bg-white" />
+                
+                <div class="flex items-center justify-between">
+                  <label class="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-semibold rounded border cursor-pointer flex items-center gap-1">
+                    <Image :size="12" /> Image
+                    <input type="file" accept="image/*" @change="e => handleFileUpload(e, pair, 'rightImageUrl')" class="hidden" />
+                  </label>
+                  <div v-if="pair.rightImageUrl" class="relative">
+                    <img :src="pair.rightImageUrl" class="h-8 w-8 object-cover rounded border" />
+                    <button @click="removeImage(pair, 'rightImageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5">
+                      <X :size="8" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TRUE / FALSE -->
+        <div v-if="form.type === 'true_false'" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <label class="font-bold text-xs text-slate-700 block">Select Correct Answer</label>
+          <div class="flex gap-6 text-xs font-bold text-slate-800">
+            <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2.5 rounded-xl border border-slate-300 hover:border-emerald-500">
+              <input type="radio" value="true" v-model="form.tfCorrect" name="tf_answer" class="text-emerald-600" /> True
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2.5 rounded-xl border border-slate-300 hover:border-emerald-500">
+              <input type="radio" value="false" v-model="form.tfCorrect" name="tf_answer" class="text-emerald-600" /> False
+            </label>
+          </div>
+        </div>
+
+        <!-- SHORT ANSWER -->
+        <div v-if="form.type === 'short_answer'" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <label class="font-bold text-xs text-slate-700 block">Expected Answer Keywords (Comma Separated)</label>
+          <input v-model="form.shortAnswerKeywords" placeholder="e.g. ECDIS, navigation, chart" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs bg-white outline-none focus:ring-1 focus:ring-emerald-500" />
         </div>
       </div>
 
-      <!-- Dynamic Answer Options -->
-      <div v-if="form.type === 'multiple_choice'" class="space-y-3 bg-slate-50 p-4 rounded-xl border">
-        <div class="flex justify-between items-center">
-          <span class="text-xs font-bold text-slate-700">Options & Correct Choice</span>
-          <button @click="addOption" type="button" class="text-xs text-emerald-600 font-bold flex items-center gap-1 hover:underline">
-            <Plus :size="14" /> Add Option
-          </button>
-        </div>
-
-        <div v-for="(opt, idx) in form.options" :key="idx" class="flex items-center gap-3 bg-white p-3 rounded-xl border shadow-2xs">
-          <input type="checkbox" v-model="opt.isCorrect" title="Mark as correct answer" class="h-4 w-4 text-emerald-600 rounded border-slate-300" />
-          <span class="font-bold text-slate-500 text-xs w-4">{{ String.fromCharCode(65 + idx) }}.</span>
-          <input v-model="opt.text" :placeholder="`Option ${String.fromCharCode(65 + idx)} text...`" class="flex-1 p-2 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500" />
-
-          <button v-if="form.options.length > 2" @click="removeOption(idx)" class="text-slate-400 hover:text-red-500 p-1">
-            <Trash2 :size="16" />
-          </button>
-        </div>
-      </div>
-
-      <div v-if="form.type === 'true_false'" class="space-y-3 bg-slate-50 p-4 rounded-xl border">
-        <label class="font-bold text-xs text-slate-700 block">Select Correct Answer</label>
-        <div class="flex gap-6 text-xs font-bold text-slate-800">
-          <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-xl border hover:border-emerald-500">
-            <input type="radio" value="true" v-model="form.tfCorrect" name="tf_answer" class="text-emerald-600" /> True
-          </label>
-          <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-xl border hover:border-emerald-500">
-            <input type="radio" value="false" v-model="form.tfCorrect" name="tf_answer" class="text-emerald-600" /> False
-          </label>
-        </div>
-      </div>
-
-      <div class="flex justify-end gap-3 border-t pt-4">
-        <button @click="resetForm" class="px-4 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50">Reset</button>
-        <button @click="saveQuestion" :disabled="isSubmitting" class="px-5 py-2 bg-[#00c068] hover:bg-[#00a358] text-white font-bold text-xs rounded-xl shadow-2xs transition flex items-center gap-2">
-          <Save :size="16" /> {{ isSubmitting ? 'Saving...' : 'Save Question Item' }}
+      <!-- Save Button Block -->
+      <div class="pt-4">
+        <button 
+          @click="saveQuestion" 
+          :disabled="isSubmitting" 
+          class="w-full py-3.5 bg-[#00c068] hover:bg-[#00a358] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <Save :size="16" /> 
+          <span>{{ isSubmitting ? 'Saving...' : 'Save Question Item' }}</span>
         </button>
       </div>
+
     </div>
 
     <!-- TAB 3: COURSE REPORTS & AUDITS -->
@@ -464,19 +592,13 @@
       </div>
     </div>
 
-    <!-- Floating Action Widget -->
-    <div class="fixed bottom-6 right-6 z-50">
-      <button class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 text-white font-black text-sm flex items-center justify-center shadow-lg hover:opacity-90 transition">
-        M
-      </button>
-    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { 
-  Plus, Trash2, X, Upload, Download, 
+  Plus, Trash2, X, Upload, Download, Image,
   CheckCircle, XCircle, Sparkles, ChevronDown, ChevronRight, Check,
   Database, PlusCircle, BarChart2, Save, FileText, RotateCcw
 } from 'lucide-vue-next'
@@ -514,6 +636,10 @@ const form = reactive({
     { text: '', imageUrl: '', isCorrect: false },
     { text: '', imageUrl: '', isCorrect: false }
   ],
+  matchingPairs: [
+    { leftText: '', leftImageUrl: '', rightText: '', rightImageUrl: '' },
+    { leftText: '', leftImageUrl: '', rightText: '', rightImageUrl: '' }
+  ],
   tfCorrect: 'true',
   shortAnswerKeywords: ''
 })
@@ -526,6 +652,10 @@ function resetForm() {
     { text: '', imageUrl: '', isCorrect: false },
     { text: '', imageUrl: '', isCorrect: false },
     { text: '', imageUrl: '', isCorrect: false }
+  ]
+  form.matchingPairs = [
+    { leftText: '', leftImageUrl: '', rightText: '', rightImageUrl: '' },
+    { leftText: '', leftImageUrl: '', rightText: '', rightImageUrl: '' }
   ]
   form.tfCorrect = 'true'
   form.shortAnswerKeywords = ''
@@ -667,6 +797,14 @@ function addOption() {
 
 function removeOption(index) {
   if (form.options.length > 2) form.options.splice(index, 1)
+}
+
+function addMatchingPair() {
+  form.matchingPairs.push({ leftText: '', leftImageUrl: '', rightText: '', rightImageUrl: '' })
+}
+
+function removeMatchingPair(index) {
+  if (form.matchingPairs.length > 2) form.matchingPairs.splice(index, 1)
 }
 
 function handleFileUpload(event, targetObj, propertyName) {
@@ -838,7 +976,7 @@ async function saveQuestion() {
     alert('Question item saved locally!')
     resetForm()
     activeTab.value = 'repository'
-  } finally {
+  } font-mediumally {
     isSubmitting.value = false
   }
 }
