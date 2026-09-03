@@ -1,59 +1,54 @@
 <template>
   <div class="flex min-h-screen bg-[#f4f6f9] font-sans text-slate-800">
     <!-- Left Sidebar -->
-    <aside class="w-64 bg-white border-r border-slate-200/80 flex flex-col justify-between shrink-0 p-5">
+    <aside 
+      :class="[
+        'bg-white border-r border-slate-200/80 flex flex-col justify-between shrink-0 p-4 transition-all duration-300 relative',
+        isSidebarCollapsed ? 'w-20' : 'w-64'
+      ]"
+    >
       <div class="space-y-6">
         <!-- System Logo & Title -->
-        <div class="flex items-center gap-3">
-          <div class="w-9 h-9 bg-black text-white rounded-lg flex items-center justify-center font-bold text-lg">
-            B
+        <div class="flex items-center justify-between gap-3 px-1">
+          <div class="flex items-center gap-3 overflow-hidden">
+            <div class="w-9 h-9 bg-black text-white rounded-lg flex items-center justify-center font-bold text-lg shrink-0">
+              B
+            </div>
+            <div v-show="!isSidebarCollapsed" class="truncate transition-opacity duration-200">
+              <h1 class="font-bold text-slate-900 text-sm leading-tight truncate">BMA Pilot System</h1>
+              <p class="text-[11px] text-slate-400 font-medium truncate">STCW Exam Engine v2.4</p>
+            </div>
           </div>
-          <div>
-            <h1 class="font-bold text-slate-900 text-sm leading-tight">BMA Pilot System</h1>
-            <p class="text-[11px] text-slate-400 font-medium">STCW Exam Engine v2.4</p>
-          </div>
+
+          <!-- Collapse Toggle Button -->
+          <button 
+            @click="isSidebarCollapsed = !isSidebarCollapsed" 
+            class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition shrink-0"
+            :title="isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'"
+          >
+            <ChevronLeft v-if="!isSidebarCollapsed" :size="18" />
+            <ChevronRight v-else :size="18" />
+          </button>
         </div>
 
         <!-- Navigation Menu -->
         <nav class="space-y-1">
-          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition">
-            <LayoutDashboard :size="16" />
-            <span>Dashboard</span>
-          </a>
-
-          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold bg-[#e8f7f0] text-[#00a358] transition">
-            <HelpCircle :size="16" />
-            <span>Question Bank</span>
-          </a>
-
-          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition">
-            <BookOpen :size="16" />
-            <span>Courses</span>
-          </a>
-
-          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition">
-            <Wrench :size="16" />
-            <span>Test Builder</span>
-          </a>
-
-          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition">
-            <Sliders :size="16" />
-            <span>Pilot Administration</span>
-          </a>
-
-          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition">
-            <BarChart2 :size="16" />
-            <span>Reports & Analysis</span>
-          </a>
-
-          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition">
-            <Users :size="16" />
-            <span>User Management</span>
-          </a>
-
-          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition">
-            <GraduationCap :size="16" />
-            <span>Student Exam Portal</span>
+          <a
+            v-for="item in navItems"
+            :key="item.name"
+            href="#"
+            @click.prevent="activeNav = item.name"
+            :class="[
+              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs transition-all duration-150',
+              activeNav === item.name
+                ? 'bg-[#e8f7f0] text-[#00a358] font-bold shadow-2xs'
+                : 'text-slate-500 font-semibold hover:bg-slate-50 hover:text-slate-900',
+              isSidebarCollapsed ? 'justify-center px-0' : ''
+            ]"
+            :title="isSidebarCollapsed ? item.name : ''"
+          >
+            <component :is="item.icon" :size="18" class="shrink-0" />
+            <span v-show="!isSidebarCollapsed" class="truncate">{{ item.name }}</span>
           </a>
         </nav>
       </div>
@@ -63,7 +58,7 @@
         <div class="w-8 h-8 rounded-full bg-[#00a358] text-white flex items-center justify-center font-bold text-xs shrink-0">
           BMA
         </div>
-        <div class="truncate">
+        <div v-show="!isSidebarCollapsed" class="truncate">
           <p class="text-xs font-bold text-slate-900 truncate">Assessment Officer</p>
           <p class="text-[10px] text-slate-400 truncate">admin@bma.edu.ph</p>
         </div>
@@ -104,7 +99,7 @@
         </div>
       </div>
 
-      <!-- Navigation Tabs (Pill style matching Question Bank_4.jpg) -->
+      <!-- Navigation Tabs -->
       <div class="flex items-center gap-3">
         <button 
           @click="activeTab = 'repository'"
@@ -538,7 +533,7 @@
 
     </main>
 
-    <!-- Floating Action Widget (Bottom-right purple/blue icon) -->
+    <!-- Floating Action Widget -->
     <div class="fixed bottom-6 right-6 z-50">
       <button class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 text-white font-black text-sm flex items-center justify-center shadow-lg hover:opacity-90 transition">
         M
@@ -551,7 +546,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { 
   HelpCircle, Plus, Trash2, X, Upload, Download, 
-  CheckCircle, XCircle, Sparkles, ChevronDown, ChevronRight, Check,
+  CheckCircle, XCircle, Sparkles, ChevronDown, ChevronRight, ChevronLeft, Check,
   Database, PlusCircle, BarChart2, Save, FileText, LayoutDashboard,
   BookOpen, Wrench, Sliders, Users, GraduationCap, RotateCcw
 } from 'lucide-vue-next'
@@ -561,6 +556,20 @@ const courses = ref([])
 const isSubmitting = ref(false)
 const isUploadingBulk = ref(false)
 const bulkFileInput = ref(null)
+
+const isSidebarCollapsed = ref(false)
+const activeNav = ref('Question Bank')
+
+const navItems = [
+  { name: 'Dashboard', icon: LayoutDashboard },
+  { name: 'Question Bank', icon: HelpCircle },
+  { name: 'Courses', icon: BookOpen },
+  { name: 'Test Builder', icon: Wrench },
+  { name: 'Pilot Administration', icon: Sliders },
+  { name: 'Reports & Analysis', icon: BarChart2 },
+  { name: 'User Management', icon: Users },
+  { name: 'Student Exam Portal', icon: GraduationCap }
+]
 
 const activeTab = ref('repository')
 const collapsedCourses = ref({})
