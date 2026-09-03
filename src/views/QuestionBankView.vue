@@ -3,7 +3,8 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { 
   HelpCircle, Save, Plus, Trash2, Image, X, Upload, Download, 
   CheckCircle, XCircle, Sparkles, Filter, AlertTriangle, RefreshCw,
-  Database, PlusCircle, ChevronDown, ChevronRight, Check, RotateCcw
+  Database, PlusCircle, ChevronDown, ChevronRight, Check, RotateCcw,
+  FileText, BarChart2
 } from 'lucide-vue-next'
 
 const questions = ref([])
@@ -12,7 +13,7 @@ const isSubmitting = ref(false)
 const isUploadingBulk = ref(false)
 const bulkFileInput = ref(null)
 
-// Tab Navigation State: 'repository' | 'create'
+// Tab Navigation State: 'repository' | 'create' | 'report'
 const activeTab = ref('repository')
 
 // Collapsible course groups state
@@ -124,8 +125,84 @@ const groupedQuestions = computed(() => {
   return Object.values(groups)
 })
 
+// Computed Course Reports for Assessor Audit
+const courseReports = computed(() => {
+  const map = {}
+  
+  courses.value.forEach(course => {
+    map[course.id || course.code] = {
+      code: course.code || course.id,
+      title: course.title || `Course ${course.code}`,
+      program: course.program || 'Both',
+      total: 0,
+      approved: 0,
+      disapproved: 0,
+      pending: 0,
+      retainedAi: 0
+    }
+  })
+
+  questions.value.forEach(q => {
+    const key = q.courseId || 'Unassigned'
+    if (!map[key]) {
+      map[key] = {
+        code: key,
+        title: 'Unassigned Course Items',
+        program: 'N/A',
+        total: 0,
+        approved: 0,
+        disapproved: 0,
+        pending: 0,
+        retainedAi: 0
+      }
+    }
+    
+    map[key].total++
+    const status = q.status || 'Pending'
+    if (status === 'Approved') map[key].approved++
+    else if (status === 'Disapproved') map[key].disapproved++
+    else map[key].pending++
+
+    if (q.retainedAi) map[key].retainedAi++
+  })
+
+  return Object.values(map)
+})
+
+const overallReportSummary = computed(() => {
+  const total = questions.value.length
+  const approved = questions.value.filter(q => q.status === 'Approved').length
+  const disapproved = questions.value.filter(q => q.status === 'Disapproved').length
+  const pending = questions.value.filter(q => (q.status || 'Pending') === 'Pending').length
+  const retainedAi = questions.value.filter(q => q.retainedAi).length
+  return { total, approved, disapproved, pending, retainedAi }
+})
+
 function toggleCourseCollapse(courseKey) {
   collapsedCourses.value[courseKey] = !collapsedCourses.value[courseKey]
+}
+
+function exportCourseReportCSV() {
+  const headers = ['Course Code', 'Course Title', 'Program', 'Total Questions', 'Approved', 'Disapproved', 'Pending Approval', 'AI Overrides Retained']
+  const rows = courseReports.value.map(r => [
+    r.code,
+    r.title,
+    r.program,
+    r.total,
+    r.approved,
+    r.disapproved,
+    r.pending,
+    r.retainedAi
+  ])
+
+  const csvContent = [headers.join(','), ...rows.map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))].join('\n')
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.setAttribute('download', `course_question_report_${new Date().toISOString().slice(0, 10)}.csv`)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
 }
 
 function onProgramChange() {
@@ -601,6 +678,18 @@ onMounted(() => {
       >
         <PlusCircle :size="15" /> Author New Question
       </button>
+
+      <button 
+        @click="activeTab = 'report'"
+        :class="[
+          'px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all',
+          activeTab === 'report' 
+            ? 'bg-slate-900 text-white shadow-sm' 
+            : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+        ]"
+      >
+        <FileText :size="15" /> Course Reports & Audits
+      </button>
     </div>
 
     <!-- TAB 1: AUTHORING FORM -->
@@ -988,6 +1077,87 @@ onMounted(() => {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: COURSE REPORTS & AUDITS -->
+    <div v-show="activeTab === 'report'" class="bg-white border rounded-2xl p-6 shadow-sm space-y-6">
+      <div class="flex flex-col md:flex-row justify-between md:items-center border-b pb-4 gap-4">
+        <div>
+          <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <BarChart2 class="text-emerald-600" :size="20" /> Course Question Changes & Audit Report
+          </h2>
+          <p class="text-xs text-slate-500">View question counts, approval status, and AI overrides grouped per course.</p>
+        </div>
+
+        <button @click="exportCourseReportCSV" type="button" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-2 transition shadow-sm self-start md:self-auto">
+          <Download :size="14" /> Export Report CSV
+        </button>
+      </div>
+
+      <!-- Summary Stat Cards -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="bg-slate-50 border p-4 rounded-xl">
+          <span class="text-[11px] font-bold text-slate-500 block uppercase">Total Questions</span>
+          <span class="text-xl font-extrabold text-slate-900">{{ overallReportSummary.total }}</span>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-100 p-4 rounded-xl">
+          <span class="text-[11px] font-bold text-emerald-700 block uppercase">Approved</span>
+          <span class="text-xl font-extrabold text-emerald-800">{{ overallReportSummary.approved }}</span>
+        </div>
+        <div class="bg-amber-50 border border-amber-100 p-4 rounded-xl">
+          <span class="text-[11px] font-bold text-amber-700 block uppercase">Pending Review</span>
+          <span class="text-xl font-extrabold text-amber-800">{{ overallReportSummary.pending }}</span>
+        </div>
+        <div class="bg-red-50 border border-red-100 p-4 rounded-xl">
+          <span class="text-[11px] font-bold text-red-700 block uppercase">Disapproved</span>
+          <span class="text-xl font-extrabold text-red-800">{{ overallReportSummary.disapproved }}</span>
+        </div>
+        <div class="bg-blue-50 border border-blue-100 p-4 rounded-xl">
+          <span class="text-[11px] font-bold text-blue-700 block uppercase">AI Retained</span>
+          <span class="text-xl font-extrabold text-blue-800">{{ overallReportSummary.retainedAi }}</span>
+        </div>
+      </div>
+
+      <!-- Course Breakdown Table -->
+      <div class="overflow-x-auto border rounded-xl">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b">
+            <tr>
+              <th class="p-3">Course Code</th>
+              <th class="p-3">Course Title</th>
+              <th class="p-3">Program</th>
+              <th class="p-3 text-center">Total Items</th>
+              <th class="p-3 text-center">Approved</th>
+              <th class="p-3 text-center">Pending</th>
+              <th class="p-3 text-center">Disapproved</th>
+              <th class="p-3 text-center">AI Overrides</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 font-medium text-slate-800">
+            <tr v-for="report in courseReports" :key="report.code" class="hover:bg-slate-50/80">
+              <td class="p-3 font-mono font-bold text-slate-900">{{ report.code }}</td>
+              <td class="p-3 font-bold">{{ report.title }}</td>
+              <td class="p-3"><span class="bg-slate-100 px-2 py-0.5 rounded text-[11px] font-semibold">{{ report.program }}</span></td>
+              <td class="p-3 text-center font-bold">{{ report.total }}</td>
+              <td class="p-3 text-center">
+                <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.approved }}</span>
+              </td>
+              <td class="p-3 text-center">
+                <span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.pending }}</span>
+              </td>
+              <td class="p-3 text-center">
+                <span class="bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.disapproved }}</span>
+              </td>
+              <td class="p-3 text-center">
+                <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.retainedAi }}</span>
+              </td>
+            </tr>
+            <tr v-if="courseReports.length === 0">
+              <td colspan="8" class="p-6 text-center text-slate-400">No course data available.</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
