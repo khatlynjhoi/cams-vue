@@ -1440,23 +1440,26 @@ function retainOriginalSettings(q) {
 }
 
 async function deleteQuestion(id) {
-  if (!confirm('Are you sure you want to remove this question item?')) return
+  if (!confirm('Are you sure you want to remove this question item?')) {
+    return
+  }
 
   try {
     const response = await fetch(
-      'http://localhost:3001/api/questions/' + id,
+      `${API_BASE_URL}/questions/${id}`,
       {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders()
       }
     )
 
-    const result = await response.json()
-
-    if (!response.ok || !result.success) {
-      throw new Error(result.message || 'Failed to delete question.')
+    if (!response.ok) {
+      throw await getApiError(response)
     }
 
-    questions.value = questions.value.filter(q => q.id !== id)
+    questions.value = questions.value.filter(
+      q => q.id !== id
+    )
 
     selectedQuestionIds.value =
       selectedQuestionIds.value.filter(
@@ -1465,11 +1468,14 @@ async function deleteQuestion(id) {
 
     syncQuestionsStorage()
 
-    alert('Question item deleted successfully.')
-
+    alert('Question item deleted successfully from CAMS.')
   } catch (err) {
-    console.error('Delete question failed:', err)
-    alert('Unable to delete the question item. Please try again.')
+    console.error('Failed to delete question:', err)
+
+    alert(
+      err.message ||
+      'Unable to delete the question.'
+    )
   }
 }
 
