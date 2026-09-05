@@ -128,12 +128,11 @@
               <option value="short_answer">Short Answer</option>
             </select>
 
-            <!-- Sorting Dropdown -->
             <select v-model="sortBy" class="px-2.5 py-1.5 border border-slate-300/80 rounded-lg bg-slate-100 text-xs text-slate-800 font-bold outline-none cursor-pointer shadow-2xs border-slate-400">
               <option value="default">Sort: Default</option>
-              <option value="type">Sort by Question Type</option>
-              <option value="co">Sort by Course Outcome (CO)</option>
-              <option value="lo">Sort by Learning Outcome (LO)</option>
+              <option value="code">Sort by Course Code</option>
+              <option value="newest">Sort by Newest</option>
+              <option value="oldest">Sort by Oldest</option>
             </select>
           </div>
         </div>
@@ -237,7 +236,6 @@
                     {{ q.status || 'Pending' }}
                   </span>
 
-                  <!-- Approval/Disapproval & Edit Buttons (Hidden if Already Approved) -->
                   <template v-if="q.status !== 'Approved'">
                     <button @click="updateQuestionStatus(q.id, 'Approved')" title="Approve Question" class="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg border border-emerald-200 transition cursor-pointer">
                       <CheckCircle :size="15"></CheckCircle>
@@ -247,7 +245,6 @@
                       <XCircle :size="15"></XCircle>
                     </button>
 
-                    <!-- Edit Button -->
                     <button @click="editQuestion(q)" title="Edit / Revise Item" class="p-1.5 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white rounded-lg border border-blue-200 transition cursor-pointer">
                       <Edit :size="15"></Edit>
                     </button>
@@ -328,7 +325,6 @@
                   </div>
                 </div>
 
-                <!-- Latest AI Decision: choose refined version or retain original -->
                 <div
                   v-if="generateAiSuggestion(q).type === 'warning' && q.status !== 'Approved'"
                   class="flex items-center gap-2 mt-3 ml-6"
@@ -885,7 +881,6 @@ import {
   Sparkles,
   ChevronDown,
   ChevronRight,
-  Check,
   Database,
   PlusCircle,
   BarChart2,
@@ -895,27 +890,17 @@ import {
   Edit
 } from 'lucide-vue-next'
 
-
-// ============================================================
-// API / STORAGE
-// ============================================================
-
+// API / STORAGE CONSTANTS
 const API_BASE_URL = 'http://127.0.0.1:8000/api'
-
 const STORAGE_COURSES_KEY = 'cams_courses_data'
 const STORAGE_QUESTIONS_KEY = 'cams_questions_data'
 
-
-// ============================================================
-// REACTIVE DATA
-// ============================================================
-
+// REACTIVE STATE
 const questions = ref([])
 const courses = ref([])
 
 const isSubmitting = ref(false)
 const isUploadingBulk = ref(false)
-
 const bulkFileInput = ref(null)
 
 const activeTab = ref('repository')
@@ -930,218 +915,105 @@ const searchQuery = ref('')
 const selectedQuestionIds = ref([])
 const editingQuestion = ref(null)
 
-
-// ============================================================
 // QUESTION FORM
-// ============================================================
-
 const form = reactive({
   program: 'Both',
   term: 'Midterm',
-
   courseId: '',
   courseOutcomeId: '',
   learningOutcomeId: '',
-
   bloomLevel: 'Understanding',
-
   type: 'multiple_choice',
-
   text: '',
   imageUrl: '',
-
   options: [
-    {
-      text: '',
-      imageUrl: '',
-      isCorrect: false
-    },
-    {
-      text: '',
-      imageUrl: '',
-      isCorrect: false
-    },
-    {
-      text: '',
-      imageUrl: '',
-      isCorrect: false
-    },
-    {
-      text: '',
-      imageUrl: '',
-      isCorrect: false
-    }
+    { text: '', imageUrl: '', isCorrect: false },
+    { text: '', imageUrl: '', isCorrect: false },
+    { text: '', imageUrl: '', isCorrect: false },
+    { text: '', imageUrl: '', isCorrect: false }
   ],
-
   matchingPairs: [
-    {
-      leftText: '',
-      leftImageUrl: '',
-      rightText: '',
-      rightImageUrl: ''
-    },
-    {
-      leftText: '',
-      leftImageUrl: '',
-      rightText: '',
-      rightImageUrl: ''
-    }
+    { leftText: '', leftImageUrl: '', rightText: '', rightImageUrl: '' },
+    { leftText: '', leftImageUrl: '', rightText: '', rightImageUrl: '' }
   ],
-
   tfCorrect: 'true',
-
   shortAnswerKeywords: ''
 })
 
-
-// ============================================================
 // API HELPERS
-// ============================================================
-
 async function getApiError(response) {
   let data = {}
-
   try {
     data = await response.json()
   } catch (_) {}
 
   if (response.status === 401) {
-    return new Error(
-      'Your session has expired. Please log in again.'
-    )
+    return new Error('Your session has expired. Please log in again.')
   }
 
   if (response.status === 422 && data.duplicate) {
-    const error = new Error(
-      data.message || 'Duplicate question detected.'
-    )
-
+    const error = new Error(data.message || 'Duplicate question detected.')
     error.status = 422
     error.duplicate = true
-    error.existingQuestion =
-      data.existing_question || null
-
+    error.existingQuestion = data.existing_question || null
     return error
   }
 
   if (response.status === 422 && data.errors) {
-    const firstError =
-      Object.values(data.errors).flat()[0]
-
-    return new Error(
-      firstError ||
-      data.message ||
-      'Please check the submitted information.'
-    )
+    const firstError = Object.values(data.errors).flat()[0]
+    return new Error(firstError || data.message || 'Please check the submitted information.')
   }
 
-  return new Error(
-    data.message ||
-    `Request failed. HTTP ${response.status}`
-  )
+  return new Error(data.message || `Request failed. HTTP ${response.status}`)
 }
-
 
 function getAuthHeaders(includeJson = false) {
   const token = localStorage.getItem('token')
-
   if (!token) {
-    throw new Error(
-      'No authentication token found. Please log in again.'
-    )
+    throw new Error('No authentication token found. Please log in again.')
   }
-
   return {
     Accept: 'application/json',
     Authorization: `Bearer ${token}`,
-
-    ...(includeJson
-      ? {
-          'Content-Type': 'application/json'
-        }
-      : {})
+    ...(includeJson ? { 'Content-Type': 'application/json' } : {})
   }
 }
 
-
-// ============================================================
 // FORM RESET
-// ============================================================
-
 function resetForm() {
   form.program = 'Both'
   form.term = 'Midterm'
-
   form.courseId = ''
   form.courseOutcomeId = ''
   form.learningOutcomeId = ''
-
   form.bloomLevel = 'Understanding'
   form.type = 'multiple_choice'
-
   form.text = ''
   form.imageUrl = ''
-
   form.options = [
-    {
-      text: '',
-      imageUrl: '',
-      isCorrect: false
-    },
-    {
-      text: '',
-      imageUrl: '',
-      isCorrect: false
-    },
-    {
-      text: '',
-      imageUrl: '',
-      isCorrect: false
-    },
-    {
-      text: '',
-      imageUrl: '',
-      isCorrect: false
-    }
+    { text: '', imageUrl: '', isCorrect: false },
+    { text: '', imageUrl: '', isCorrect: false },
+    { text: '', imageUrl: '', isCorrect: false },
+    { text: '', imageUrl: '', isCorrect: false }
   ]
-
   form.matchingPairs = [
-    {
-      leftText: '',
-      leftImageUrl: '',
-      rightText: '',
-      rightImageUrl: ''
-    },
-    {
-      leftText: '',
-      leftImageUrl: '',
-      rightText: '',
-      rightImageUrl: ''
-    }
+    { leftText: '', leftImageUrl: '', rightText: '', rightImageUrl: '' },
+    { leftText: '', leftImageUrl: '', rightText: '', rightImageUrl: '' }
   ]
-
   form.tfCorrect = 'true'
   form.shortAnswerKeywords = ''
 }
 
-
-// ============================================================
 // COURSE COMPUTED PROPERTIES
-// ============================================================
-
 const filteredCourses = computed(() => {
   let result = [...courses.value]
-
   if (filterProgram.value !== 'All') {
-    result = result.filter(course =>
-      course.program === filterProgram.value ||
-      course.program === 'Both'
+    result = result.filter(
+      course => course.program === filterProgram.value || course.program === 'Both'
     )
   }
-
   return result
 })
-
 
 const availableCourseOutcomes = computed(() => {
   const selectedCourse = courses.value.find(
@@ -1149,56 +1021,35 @@ const availableCourseOutcomes = computed(() => {
       String(course.id) === String(form.courseId) ||
       String(course.code) === String(form.courseId)
   )
-
   return selectedCourse?.courseOutcomes || []
 })
 
-
 const availableLearningOutcomes = computed(() => {
-  const selectedCO =
-    availableCourseOutcomes.value.find(
-      co =>
-        String(co.id || co.code) ===
-        String(form.courseOutcomeId)
-    )
-
+  const selectedCO = availableCourseOutcomes.value.find(
+    co => String(co.id || co.code) === String(form.courseOutcomeId)
+  )
   return selectedCO?.learningOutcomes || []
 })
 
-
-// ============================================================
 // QUESTION FILTERING
-// ============================================================
-
 const filteredQuestions = computed(() => {
   let result = [...questions.value]
 
   if (filterStatus.value !== 'All') {
-    result = result.filter(
-      question =>
-        question.status === filterStatus.value
-    )
+    result = result.filter(question => question.status === filterStatus.value)
   }
 
   if (filterProgram.value !== 'All') {
     result = result.filter(
-      question =>
-        question.program === filterProgram.value ||
-        question.program === 'Both'
+      question => question.program === filterProgram.value || question.program === 'Both'
     )
   }
 
   if (filterType.value !== 'All') {
-    result = result.filter(
-      question =>
-        question.type === filterType.value
-    )
+    result = result.filter(question => question.type === filterType.value)
   }
 
-  const search = searchQuery.value
-    .trim()
-    .toLowerCase()
-
+  const search = searchQuery.value.trim().toLowerCase()
   if (search) {
     result = result.filter(question => {
       const searchable = [
@@ -1218,94 +1069,710 @@ const filteredQuestions = computed(() => {
   }
 
   if (sortBy.value === 'code') {
-    result.sort((a, b) =>
-      String(a.code || '').localeCompare(
-        String(b.code || '')
-      )
-    )
-  }
-
-  if (sortBy.value === 'newest') {
-    result.sort((a, b) =>
-      new Date(b.created_at || 0) -
-      new Date(a.created_at || 0)
-    )
-  }
-
-  if (sortBy.value === 'oldest') {
-    result.sort((a, b) =>
-      new Date(a.created_at || 0) -
-      new Date(b.created_at || 0)
-    )
+    result.sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')))
+  } else if (sortBy.value === 'newest') {
+    result.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+  } else if (sortBy.value === 'oldest') {
+    result.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
   }
 
   return result
 })
 
-
-// ============================================================
 // SELECTION
-// ============================================================
-
 const isAllSelected = computed(() => {
-  if (!filteredQuestions.value.length) {
-    return false
-  }
-
-  return filteredQuestions.value.every(
-    question =>
-      selectedQuestionIds.value.includes(
-        question.id
-      )
-  )
+  if (!filteredQuestions.value.length) return false
+  return filteredQuestions.value.every(question => selectedQuestionIds.value.includes(question.id))
 })
 
-
 function toggleQuestionSelection(id) {
-function toggleSelectQuestion(id) {
-  toggleQuestionSelection(id)
+  if (selectedQuestionIds.value.includes(id)) {
+    selectedQuestionIds.value = selectedQuestionIds.value.filter(selectedId => selectedId !== id)
+  } else {
+    selectedQuestionIds.value.push(id)
+  }
 }
 
-function onProgramChange() {
-  handleProgramChange()
+function toggleSelectAll() {
+  if (isAllSelected.value) {
+    selectedQuestionIds.value = []
+    return
+  }
+  selectedQuestionIds.value = filteredQuestions.value.map(question => question.id)
 }
 
-function onCourseChange() {
-  handleCourseChange()
+// LOCAL STORAGE
+function syncQuestionsStorage() {
+  localStorage.setItem(STORAGE_QUESTIONS_KEY, JSON.stringify(questions.value))
 }
 
-function onCOChange() {
-  handleCourseOutcomeChange()
+function syncCoursesStorage() {
+  localStorage.setItem(STORAGE_COURSES_KEY, JSON.stringify(courses.value))
 }
 
-function handleFileUpload(event, targetObj, propertyName) {
-  handleImageUpload(event, targetObj, propertyName)
+// NORMALIZATION
+function parseCorrectAnswer(value) {
+  if (Array.isArray(value)) return value
+  if (value === null || value === undefined || value === '') return null
+  try {
+    return JSON.parse(value)
+  } catch (e) {
+    return value
+  }
 }
 
-function openEditModal(question) {
-  editQuestion(question)
+function normalizeCourse(course) {
+  return {
+    ...course,
+    courseOutcomes: course.course_outcomes || []
+  }
 }
+
+function normalizeQuestion(question) {
+  const course = courses.value.find(
+    course => String(course.id) === String(question.course_id)
+  )
+
+  let matchingPairs = question.matching_pairs
+  if (typeof matchingPairs === 'string') {
+    matchingPairs = parseCorrectAnswer(matchingPairs)
+  }
+  if (!Array.isArray(matchingPairs)) matchingPairs = []
+
+  let options = question.options
+  if (typeof options === 'string') {
+    options = parseCorrectAnswer(options)
+  }
+  if (!Array.isArray(options)) options = []
+
+  return {
+    ...question,
+    id: question.id,
+    courseId: course?.code || question.course_id || '',
+    courseDbId: question.course_id || null,
+    courseOutcomeId: question.course_outcome_id || '',
+    learningOutcomeId: question.learning_outcome_id || '',
+    imageUrl: question.image_url || '',
+    options,
+    correctAnswer: parseCorrectAnswer(question.correct_answer),
+    matchingPairs,
+    bloomLevel: question.bloom_level || 'Understanding',
+    stcwStandard: question.stcw_standard || '',
+    aiAccepted: Boolean(question.ai_accepted),
+    retainedAi: Boolean(question.retained_ai),
+    status: question.status || 'Pending'
+  }
+}
+
+// RESOLUTION HELPERS
+function resolveCourseId(courseValue) {
+  const course = courses.value.find(
+    c => String(c.id) === String(courseValue) || String(c.code) === String(courseValue)
+  )
+  return course?.id || null
+}
+
+function handleProgramChange() {
+  form.courseId = ''
+  form.courseOutcomeId = ''
+  form.learningOutcomeId = ''
+}
+
+function handleCourseChange() {
+  form.courseOutcomeId = ''
+  form.learningOutcomeId = ''
+}
+
+function handleCourseOutcomeChange() {
+  form.learningOutcomeId = ''
+}
+
+// OPTIONS & PAIRS MANAGEMENT
+function addOption() {
+  form.options.push({ text: '', imageUrl: '', isCorrect: false })
+}
+
+function removeOption(index) {
+  if (form.options.length <= 2) {
+    alert('A multiple-choice question must have at least two choices.')
+    return
+  }
+  form.options.splice(index, 1)
+}
+
+function addMatchingPair() {
+  form.matchingPairs.push({ leftText: '', leftImageUrl: '', rightText: '', rightImageUrl: '' })
+}
+
+function removeMatchingPair(index) {
+  if (form.matchingPairs.length <= 2) {
+    alert('A matching question must have at least two pairs.')
+    return
+  }
+  form.matchingPairs.splice(index, 1)
+}
+
+// IMAGE HANDLING
+function handleImageUpload(event, targetObj, propertyName) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    alert('Please select a valid image file.')
+    event.target.value = ''
+    return
+  }
+  const reader = new FileReader()
+  reader.onload = () => {
+    targetObj[propertyName] = reader.result
+  }
+  reader.readAsDataURL(file)
+  event.target.value = ''
+}
+
+function removeImage(targetObj, propertyName) {
+  if (confirm('Are you sure you want to remove this image?')) {
+    targetObj[propertyName] = ''
+  }
+}
+
+function generateQuestionCode() {
+  return `Q-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`
+}
+
+// AI VALIDATION & AUDIT LOGIC
+function generateAiSuggestion(q) {
+  const issues = []
+  let bloomAudit = `Bloom Level (${q.bloomLevel || 'Understanding'}): Aligned with question cognitive demand.`
+  
+  if (q.bloomLevel === 'Remembering' && q.text && q.text.toLowerCase().includes('why')) {
+    issues.push('Question uses "why" which demands analytical reasoning rather than simple remembering.')
+    bloomAudit = `Bloom Level (${q.bloomLevel}): Potential cognitive depth mismatch.`
+  }
+
+  const loAudit = q.learningOutcomeId 
+    ? `Learning Outcome (${q.learningOutcomeId}): Properly mapped.`
+    : `Learning Outcome: Unassigned. Mapping recommended.`
+
+  const coAudit = q.courseOutcomeId
+    ? `Course Outcome (${q.courseOutcomeId}): Mapped.`
+    : `Course Outcome: Unassigned.`
+
+  let constructionAudit = 'Item Construction: Standard question structure.'
+  if (q.type === 'multiple_choice' && (!q.options || q.options.length < 4)) {
+    issues.push('Multiple-choice items should ideally provide 4 distractor options.')
+    constructionAudit = 'Item Construction: Insufficient distractor count.'
+  }
+
+  let answerAudit = 'Answer Key: Valid key assigned.'
+  if (q.correctAnswer === null || q.correctAnswer === undefined || (Array.isArray(q.correctAnswer) && q.correctAnswer.length === 0)) {
+    issues.push('Missing correct answer designation.')
+    answerAudit = 'Answer Key: Missing answer key.'
+  }
+
+  const type = issues.length > 0 ? 'warning' : 'success'
+
+  return {
+    type,
+    bloom: bloomAudit,
+    loAlignment: loAudit,
+    coAlignment: coAudit,
+    construction: constructionAudit,
+    answer: answerAudit,
+    suggestions: issues
+  }
+}
+
+function useAiRefinement(q) {
+  if (!confirm('Apply AI recommended refinements to this question?')) return
+  const target = questions.value.find(item => item.id === q.id)
+  if (!target) return
+
+  target.aiAccepted = true
+  target.retainedAi = false
+
+  if (target.bloomLevel === 'Remembering' && target.text.toLowerCase().includes('why')) {
+    target.bloomLevel = 'Understanding'
+  }
+
+  syncQuestionsStorage()
+  alert('AI refinements applied successfully.')
+}
+
+function retainOriginalSettings(q) {
+  if (!confirm('Retain original settings and dismiss AI suggestion?')) return
+  const target = questions.value.find(item => item.id === q.id)
+  if (!target) return
+
+  target.aiAccepted = false
+  target.retainedAi = true
+
+  syncQuestionsStorage()
+  alert('Original question settings retained.')
+}
+
+// SAVE NEW QUESTION
+async function saveQuestion() {
+  if (!form.courseId || !form.text.trim()) {
+    alert('Please select a Course / Subject and enter Question Stem.')
+    return
+  }
+
+  if (!confirm('Are you sure you want to save this new assessment question?')) return
+
+  const numericCourseId = resolveCourseId(form.courseId)
+  if (!numericCourseId) {
+    alert('The selected course could not be matched to the course record.')
+    return
+  }
+
+  let formattedOptions = null
+  let formattedCorrectAnswer = null
+  let formattedMatchingPairs = null
+
+  if (form.type === 'multiple_choice') {
+    formattedOptions = form.options.map(option => ({
+      text: option.text,
+      imageUrl: option.imageUrl || null
+    }))
+    formattedCorrectAnswer = form.options
+      .map((option, index) => (option.isCorrect ? index : null))
+      .filter(value => value !== null)
+
+    if (formattedCorrectAnswer.length === 0) {
+      alert('Please check at least one correct option.')
+      return
+    }
+  } else if (form.type === 'true_false') {
+    formattedOptions = ['True', 'False']
+    formattedCorrectAnswer = form.tfCorrect === 'true' ? [0] : [1]
+  } else if (form.type === 'short_answer') {
+    formattedCorrectAnswer = form.shortAnswerKeywords
+      .split(',')
+      .map(k => k.trim())
+      .filter(Boolean)
+
+    if (formattedCorrectAnswer.length === 0) {
+      alert('Please enter at least one expected answer keyword.')
+      return
+    }
+  } else if (form.type === 'matching') {
+    formattedMatchingPairs = form.matchingPairs
+    formattedCorrectAnswer = null
+  }
+
+  const payload = {
+    program: form.program || null,
+    term: form.term || null,
+    course_id: numericCourseId,
+    course_outcome_id: form.courseOutcomeId || null,
+    learning_outcome_id: form.learningOutcomeId || null,
+    code: generateQuestionCode(),
+    type: form.type,
+    text: form.text.trim(),
+    image_url: form.imageUrl || null,
+    options: formattedOptions,
+    correct_answer: formattedCorrectAnswer ? JSON.stringify(formattedCorrectAnswer) : null,
+    matching_pairs: formattedMatchingPairs,
+    stcw_standard: null,
+    bloom_level: form.bloomLevel,
+    status: 'Pending',
+    ai_accepted: false,
+    retained_ai: false
+  }
+
+  isSubmitting.value = true
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/questions`, {
+      method: 'POST',
+      headers: getAuthHeaders(true),
+      body: JSON.stringify(payload)
+    })
+
+    if (!response.ok) throw await getApiError(response)
+
+    const data = await response.json()
+    const savedQuestion = normalizeQuestion(data)
+
+    questions.value.unshift(savedQuestion)
+    syncQuestionsStorage()
+
+    alert('Question saved successfully.')
+    resetForm()
+    activeTab.value = 'repository'
+  } catch (err) {
+    console.error('Failed to save question:', err)
+    if (err?.status === 422 && err?.duplicate) {
+      const duplicate = err.existingQuestion
+      alert(
+        `Duplicate Question Detected!\n\nQuestion Code: ${duplicate?.code || 'N/A'}\nExisting Text:\n${duplicate?.text || 'N/A'}\n\nPlease revise standard stem text.`
+      )
+      return
+    }
+    alert(err.message || 'Unable to save the question.')
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+// EDIT QUESTION MODAL
+function editQuestion(question) {
+  editingQuestion.value = {
+    ...question,
+    options: Array.isArray(question.options) ? question.options.map(opt => ({ ...opt })) : [],
+    matchingPairs: Array.isArray(question.matchingPairs) ? question.matchingPairs.map(p => ({ ...p })) : [],
+    correctAnswer: Array.isArray(question.correctAnswer) ? [...question.correctAnswer] : question.correctAnswer
+  }
+}
+
+function closeEditModal() {
+  editingQuestion.value = null
+}
+
+function toggleEditCorrectOption(index) {
+  if (!editingQuestion.value) return
+  const current = Array.isArray(editingQuestion.value.correctAnswer)
+    ? [...editingQuestion.value.correctAnswer]
+    : []
+
+  const pos = current.indexOf(index)
+  if (pos >= 0) {
+    current.splice(pos, 1)
+  } else {
+    current.push(index)
+  }
+
+  editingQuestion.value.correctAnswer = current.sort((a, b) => a - b)
+}
+
+async function saveEditedQuestion() {
+  if (!editingQuestion.value) return
+  if (!editingQuestion.value.courseId || !editingQuestion.value.text?.trim()) {
+    alert('Please select a Course / Subject and enter Question Stem.')
+    return
+  }
+
+  if (!confirm('Are you sure you want to save the changes to this question?')) return
+
+  const numericCourseId = resolveCourseId(editingQuestion.value.courseId)
+  if (!numericCourseId) {
+    alert('The selected course could not be matched to the course record.')
+    return
+  }
+
+  let formattedOptions = null
+  let formattedCorrectAnswer = null
+  let formattedMatchingPairs = null
+
+  if (editingQuestion.value.type === 'multiple_choice') {
+    formattedOptions = (editingQuestion.value.options || []).map(opt => ({
+      text: opt.text,
+      imageUrl: opt.imageUrl || null
+    }))
+    formattedCorrectAnswer = formattedOptions
+      .map((_, index) => (editingQuestion.value.correctAnswer?.includes(index) ? index : null))
+      .filter(value => value !== null)
+
+    if (formattedCorrectAnswer.length === 0) {
+      alert('Please check at least one correct option.')
+      return
+    }
+  } else if (editingQuestion.value.type === 'true_false') {
+    formattedOptions = ['True', 'False']
+    formattedCorrectAnswer = editingQuestion.value.correctAnswer?.[0] === 1 ? [1] : [0]
+  } else if (editingQuestion.value.type === 'short_answer') {
+    formattedCorrectAnswer = Array.isArray(editingQuestion.value.correctAnswer)
+      ? editingQuestion.value.correctAnswer
+      : String(editingQuestion.value.correctAnswer || '').split(',').map(k => k.trim()).filter(Boolean)
+
+    if (formattedCorrectAnswer.length === 0) {
+      alert('Please enter at least one expected answer keyword.')
+      return
+    }
+  } else if (editingQuestion.value.type === 'matching') {
+    formattedMatchingPairs = editingQuestion.value.matchingPairs || []
+    formattedCorrectAnswer = null
+  }
+
+  const payload = {
+    program: editingQuestion.value.program || null,
+    term: editingQuestion.value.term || null,
+    course_id: numericCourseId,
+    course_outcome_id: editingQuestion.value.courseOutcomeId || null,
+    learning_outcome_id: editingQuestion.value.learningOutcomeId || null,
+    code: editingQuestion.value.code,
+    type: editingQuestion.value.type,
+    text: editingQuestion.value.text.trim(),
+    image_url: editingQuestion.value.imageUrl || null,
+    options: formattedOptions,
+    correct_answer: formattedCorrectAnswer ? JSON.stringify(formattedCorrectAnswer) : null,
+    matching_pairs: formattedMatchingPairs,
+    stcw_standard: editingQuestion.value.stcwStandard || null,
+    bloom_level: editingQuestion.value.bloomLevel || 'Understanding',
+    status: editingQuestion.value.status || 'Pending',
+    ai_accepted: Boolean(editingQuestion.value.aiAccepted),
+    retained_ai: Boolean(editingQuestion.value.retainedAi)
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/questions/${editingQuestion.value.id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(true),
+      body: JSON.stringify(payload)
+    })
+
+    if (!response.ok) throw await getApiError(response)
+
+    const updatedQuestion = normalizeQuestion(await response.json())
+    const index = questions.value.findIndex(q => q.id === editingQuestion.value.id)
+
+    if (index !== -1) questions.value[index] = updatedQuestion
+
+    syncQuestionsStorage()
+    closeEditModal()
+    alert('Question updated successfully.')
+  } catch (err) {
+    console.error('Failed to update question:', err)
+    alert(err.message || 'Unable to update the question.')
+  }
+}
+
+// STATUS UPDATES & DELETION
+async function updateQuestionStatus(id, status) {
+  if (!id || !status) return
+  if (!confirm(`Are you sure you want to mark this question as ${status}?`)) return
+
+  const question = questions.value.find(item => item.id === id)
+  if (!question) {
+    alert('Question not found.')
+    return
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/questions/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(true),
+      body: JSON.stringify({
+        program: question.program || null,
+        term: question.term || null,
+        course_id: question.courseDbId || resolveCourseId(question.courseId),
+        course_outcome_id: question.courseOutcomeId || null,
+        learning_outcome_id: question.learningOutcomeId || null,
+        code: question.code,
+        type: question.type,
+        text: question.text,
+        image_url: question.imageUrl || null,
+        options: question.options || null,
+        correct_answer: question.correctAnswer !== null && question.correctAnswer !== undefined ? JSON.stringify(question.correctAnswer) : null,
+        matching_pairs: question.matchingPairs || null,
+        stcw_standard: question.stcwStandard || null,
+        bloom_level: question.bloomLevel || 'Understanding',
+        status,
+        ai_accepted: Boolean(question.aiAccepted),
+        retained_ai: Boolean(question.retainedAi)
+      })
+    })
+
+    if (!response.ok) throw await getApiError(response)
+
+    const updated = normalizeQuestion(await response.json())
+    const index = questions.value.findIndex(item => item.id === id)
+    if (index !== -1) questions.value[index] = updated
+
+    syncQuestionsStorage()
+  } catch (err) {
+    console.error('Failed to update question status:', err)
+    alert(err.message || 'Unable to update question status.')
+  }
+}
+
+async function deleteQuestion(id) {
+  if (!confirm('Are you sure you want to remove this question item?')) return
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/questions/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    })
+
+    if (!response.ok) throw await getApiError(response)
+
+    questions.value = questions.value.filter(question => question.id !== id)
+    selectedQuestionIds.value = selectedQuestionIds.value.filter(selectedId => selectedId !== id)
+
+    syncQuestionsStorage()
+    alert('Question deleted successfully.')
+  } catch (err) {
+    console.error('Failed to delete question:', err)
+    alert(err.message || 'Unable to delete the question.')
+  }
+}
+
+async function bulkUpdateStatus(status) {
+  if (!selectedQuestionIds.value.length) {
+    alert('Please select at least one question.')
+    return
+  }
+
+  if (!confirm(`Mark ${selectedQuestionIds.value.length} question(s) as ${status}?`)) return
+
+  try {
+    for (const id of selectedQuestionIds.value) {
+      const question = questions.value.find(item => item.id === id)
+      if (!question) continue
+
+      const response = await fetch(`${API_BASE_URL}/questions/${id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(true),
+        body: JSON.stringify({
+          program: question.program || null,
+          term: question.term || null,
+          course_id: question.courseDbId || resolveCourseId(question.courseId),
+          course_outcome_id: question.courseOutcomeId || null,
+          learning_outcome_id: question.learningOutcomeId || null,
+          code: question.code,
+          type: question.type,
+          text: question.text,
+          image_url: question.imageUrl || null,
+          options: question.options || null,
+          correct_answer: question.correctAnswer ? JSON.stringify(question.correctAnswer) : null,
+          matching_pairs: question.matchingPairs || null,
+          stcw_standard: question.stcwStandard || null,
+          bloom_level: question.bloomLevel || 'Understanding',
+          status,
+          ai_accepted: Boolean(question.aiAccepted),
+          retained_ai: Boolean(question.retainedAi)
+        })
+      })
+
+      if (!response.ok) throw await getApiError(response)
+
+      const updated = normalizeQuestion(await response.json())
+      const index = questions.value.findIndex(item => item.id === id)
+      if (index !== -1) questions.value[index] = updated
+    }
+
+    selectedQuestionIds.value = []
+    syncQuestionsStorage()
+    alert(`Selected question(s) marked as ${status}.`)
+  } catch (err) {
+    console.error('Bulk status update failed:', err)
+    alert(err.message || 'Unable to update selected questions.')
+  }
+}
+
+async function bulkDeleteQuestions() {
+  if (!selectedQuestionIds.value.length) {
+    alert('Please select at least one question.')
+    return
+  }
+
+  if (!confirm(`Delete ${selectedQuestionIds.value.length} selected question(s)?`)) return
+
+  try {
+    for (const id of selectedQuestionIds.value) {
+      const response = await fetch(`${API_BASE_URL}/questions/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      })
+      if (!response.ok) throw await getApiError(response)
+    }
+
+    questions.value = questions.value.filter(question => !selectedQuestionIds.value.includes(question.id))
+    selectedQuestionIds.value = []
+    syncQuestionsStorage()
+
+    alert('Selected questions deleted successfully.')
+  } catch (err) {
+    console.error('Bulk delete failed:', err)
+    alert(err.message || 'Unable to delete selected questions.')
+  }
+}
+
+// GROUPING & COLLAPSE
+const groupedQuestions = computed(() => {
+  const groups = {}
+
+  filteredQuestions.value.forEach(question => {
+    const courseKey = question.courseId || 'Unassigned'
+
+    if (!groups[courseKey]) {
+      const courseObj = courses.value.find(
+        c => String(c.id) === String(question.courseDbId || question.course_id) || String(c.code) === String(question.courseId)
+      )
+
+      groups[courseKey] = {
+        courseKey,
+        code: courseObj?.code || question.courseId || 'UNASSIGNED',
+        title: courseObj?.title || 'General / Unassigned Course Items',
+        questions: []
+      }
+    }
+
+    groups[courseKey].questions.push(question)
+  })
+
+  return Object.values(groups)
+})
+
+function toggleCourseCollapse(courseKey) {
+  collapsedCourses.value[courseKey] = !collapsedCourses.value[courseKey]
+}
+
+// REPORTS
+const courseReports = computed(() => {
+  const map = {}
+
+  courses.value.forEach(course => {
+    const key = course.code || course.id
+    map[key] = {
+      code: course.code || course.id,
+      title: course.title || `Course ${course.code}`,
+      program: course.program || 'Both',
+      total: 0,
+      approved: 0,
+      disapproved: 0,
+      pending: 0,
+      retainedAi: 0,
+      acceptedAi: 0
+    }
+  })
+
+  questions.value.forEach(question => {
+    const key = question.courseId || question.courseDbId
+    if (!map[key]) return
+
+    map[key].total++
+    if (question.status === 'Approved') map[key].approved++
+    else if (question.status === 'Disapproved') map[key].disapproved++
+    else map[key].pending++
+
+    if (question.retainedAi) map[key].retainedAi++
+    if (question.aiAccepted) map[key].acceptedAi++
+  })
+
+  return Object.values(map)
+})
+
+const overallReportSummary = computed(() => {
+  return {
+    total: questions.value.length,
+    approved: questions.value.filter(q => q.status === 'Approved').length,
+    disapproved: questions.value.filter(q => q.status === 'Disapproved').length,
+    pending: questions.value.filter(q => q.status !== 'Approved' && q.status !== 'Disapproved').length,
+    acceptedAi: questions.value.filter(q => q.aiAccepted).length,
+    retainedAi: questions.value.filter(q => q.retainedAi).length
+  }
+})
 
 function exportCourseReportCSV() {
-  const firstReport = courseReports.value[0]
-
-  if (!firstReport) {
+  if (!courseReports.value.length) {
     alert('There are no course reports to export.')
     return
   }
 
   const rows = [
-    [
-      'Course Code',
-      'Course Title',
-      'Program',
-      'Total Items',
-      'Approved',
-      'Pending',
-      'Disapproved',
-      'AI Accepted',
-      'AI Overrides'
-    ]
+    ['Course Code', 'Course Title', 'Program', 'Total Items', 'Approved', 'Pending', 'Disapproved', 'AI Accepted', 'AI Overrides']
   ]
 
   courseReports.value.forEach(report => {
@@ -1322,21 +1789,8 @@ function exportCourseReportCSV() {
     ])
   })
 
-  const csv = rows
-    .map(row =>
-      row
-        .map(value =>
-          `"${String(value).replace(/"/g, '""')}"`
-        )
-        .join(',')
-    )
-    .join('\n')
-
-  const blob = new Blob(
-    [csv],
-    { type: 'text/csv;charset=utf-8;' }
-  )
-
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)
   link.download = 'CAMS_Course_Question_Report.csv'
@@ -1344,1753 +1798,46 @@ function exportCourseReportCSV() {
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
-
   URL.revokeObjectURL(link.href)
 }
 
-function toggleEditCorrectOption(index) {
-  if (!editingQuestion.value) {
-    return
-  }
-
-  const current =
-    Array.isArray(editingQuestion.value.correctAnswer)
-      ? [...editingQuestion.value.correctAnswer]
-      : []
-
-  const position =
-    current.indexOf(index)
-
-  if (position >= 0) {
-    current.splice(position, 1)
-  } else {
-    current.push(index)
-  }
-
-  editingQuestion.value.correctAnswer = current.sort(
-    (a, b) => a - b
-  )
-}
-
-  if (
-    selectedQuestionIds.value.includes(id)
-  ) {
-    selectedQuestionIds.value =
-      selectedQuestionIds.value.filter(
-        selectedId => selectedId !== id
-      )
-  } else {
-    selectedQuestionIds.value.push(id)
-  }
-}
-
-
-function toggleSelectAll() {
-  if (isAllSelected.value) {
-    selectedQuestionIds.value = []
-    return
-  }
-
-  selectedQuestionIds.value =
-    filteredQuestions.value.map(
-      question => question.id
-    )
-}
-
-
-// ============================================================
-// LOCAL STORAGE
-// ============================================================
-
-function syncQuestionsStorage() {
-  localStorage.setItem(
-    STORAGE_QUESTIONS_KEY,
-    JSON.stringify(questions.value)
-  )
-}
-
-
-function syncCoursesStorage() {
-  localStorage.setItem(
-    STORAGE_COURSES_KEY,
-    JSON.stringify(courses.value)
-  )
-}
-
-
-// ============================================================
-// NORMALIZATION
-// ============================================================
-
-function parseCorrectAnswer(value) {
-  if (Array.isArray(value)) {
-    return value
-  }
-
-  if (
-    value === null ||
-    value === undefined ||
-    value === ''
-  ) {
-    return null
-  }
-
-  try {
-    return JSON.parse(value)
-  } catch (e) {
-    return value
-  }
-}
-
-
-function normalizeCourse(course) {
-  return {
-    ...course,
-    courseOutcomes:
-      course.course_outcomes || []
-  }
-}
-
-function normalizeQuestion(question) {
-  const course = courses.value.find(
-    course =>
-      String(course.id) ===
-      String(question.course_id)
-  )
-
-  let matchingPairs =
-    question.matching_pairs
-
-  if (
-    typeof matchingPairs === 'string'
-  ) {
-    matchingPairs =
-      parseCorrectAnswer(
-        matchingPairs
-      )
-  }
-
-  if (!Array.isArray(matchingPairs)) {
-    matchingPairs = []
-  }
-
-  let options = question.options
-
-  if (typeof options === 'string') {
-    options = parseCorrectAnswer(options)
-  }
-
-  if (!Array.isArray(options)) {
-    options = []
-  }
-
-  return {
-    ...question,
-
-    id:
-      question.id,
-
-    courseId:
-      course?.code ||
-      question.course_id ||
-      '',
-
-    courseDbId:
-      question.course_id || null,
-
-    courseOutcomeId:
-      question.course_outcome_id || '',
-
-    learningOutcomeId:
-      question.learning_outcome_id || '',
-
-    imageUrl:
-      question.image_url || '',
-
-    options,
-
-    correctAnswer:
-      parseCorrectAnswer(
-        question.correct_answer
-      ),
-
-    matchingPairs,
-
-    bloomLevel:
-      question.bloom_level ||
-      'Understanding',
-
-    stcwStandard:
-      question.stcw_standard || '',
-
-    aiAccepted:
-      Boolean(question.ai_accepted),
-
-    retainedAi:
-      Boolean(question.retained_ai),
-
-    status:
-      question.status || 'Pending'
-  }
-}
-
-// ============================================================
-// COURSE RESOLUTION
-// ============================================================
-
-function resolveCourseId(courseValue) {
-  const course = courses.value.find(
-    course =>
-      String(course.id) ===
-        String(courseValue) ||
-      String(course.code) ===
-        String(courseValue)
-  )
-
-  return course?.id || null
-}
-
-
-function getQuestionCourse(q) {
-  return courses.value.find(course =>
-    String(course.id) ===
-      String(q.courseDbId || q.course_id) ||
-    String(course.code) ===
-      String(q.courseId)
-  )
-}
-
-
-function getQuestionCO(q) {
-  const course = getQuestionCourse(q)
-
-  if (!course) {
-    return null
-  }
-
-  const outcomes =
-    course.courseOutcomes ||
-    course.course_outcomes ||
-    []
-
-  return outcomes.find(co =>
-    String(co.id || co.code) ===
-    String(
-      q.courseOutcomeId ||
-      q.course_outcome_id
-    )
-  ) || null
-}
-
-
-function getQuestionLO(q) {
-  const co = getQuestionCO(q)
-
-  if (!co) {
-    return null
-  }
-
-  const learningOutcomes =
-    co.learningOutcomes ||
-    co.learning_outcomes ||
-    []
-
-  return learningOutcomes.find(lo =>
-    String(lo.id || lo.code) ===
-    String(
-      q.learningOutcomeId ||
-      q.learning_outcome_id
-    )
-  ) || null
-}
-
-
-// ============================================================
-// COURSE / FORM HANDLERS
-// ============================================================
-
-function handleProgramChange() {
-  form.courseId = ''
-  form.courseOutcomeId = ''
-  form.learningOutcomeId = ''
-}
-
-
-function handleCourseChange() {
-  form.courseOutcomeId = ''
-  form.learningOutcomeId = ''
-}
-
-
-function handleCourseOutcomeChange() {
-  form.learningOutcomeId = ''
-}
-
-
-// ============================================================
-// OPTIONS
-// ============================================================
-
-function addOption() {
-  form.options.push({
-    text: '',
-    imageUrl: '',
-    isCorrect: false
-  })
-}
-
-
-function removeOption(index) {
-  if (form.options.length <= 2) {
-    alert(
-      'A multiple-choice question must have at least two choices.'
-    )
-    return
-  }
-
-  form.options.splice(index, 1)
-}
-
-
-// ============================================================
-// MATCHING PAIRS
-// ============================================================
-
-function addMatchingPair() {
-  form.matchingPairs.push({
-    leftText: '',
-    leftImageUrl: '',
-    rightText: '',
-    rightImageUrl: ''
-  })
-}
-
-
-function removeMatchingPair(index) {
-  if (form.matchingPairs.length <= 2) {
-    alert(
-      'A matching question must have at least two pairs.'
-    )
-    return
-  }
-
-  form.matchingPairs.splice(index, 1)
-}
-
-
-// ============================================================
-// IMAGE HANDLING
-// ============================================================
-
-function handleImageUpload(event, targetObj, propertyName) {
-  const file = event.target.files?.[0]
-
-  if (!file) {
-    return
-  }
-
-  if (!file.type.startsWith('image/')) {
-    alert('Please select a valid image file.')
-    event.target.value = ''
-    return
-  }
-
-  const reader = new FileReader()
-
-  reader.onload = () => {
-    targetObj[propertyName] =
-      reader.result
-  }
-
-  reader.readAsDataURL(file)
-
-  event.target.value = ''
-}
-
-
-function removeImage(targetObj, propertyName) {
-  if (
-    confirm(
-      'Are you sure you want to remove this image?'
-    )
-  ) {
-    targetObj[propertyName] = ''
-  }
-}
-
-
-// ============================================================
-// QUESTION CODE
-// ============================================================
-
-function generateQuestionCode() {
-  return `Q-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 7)
-    .toUpperCase()}`
-}
-
-
-// ============================================================
-// SAVE NEW QUESTION
-// ============================================================
-
-async function saveQuestion() {
-  if (
-    !form.courseId ||
-    !form.text.trim()
-  ) {
-    alert(
-      'Please select a Course / Subject and enter Question Stem.'
-    )
-    return
-  }
-
-  if (
-    !confirm(
-      'Are you sure you want to save this new assessment question?'
-    )
-  ) {
-    return
-  }
-
-  const numericCourseId =
-    resolveCourseId(form.courseId)
-
-  if (!numericCourseId) {
-    alert(
-      'The selected course could not be matched to the Laravel course record.'
-    )
-    return
-  }
-
-  let formattedOptions = null
-  let formattedCorrectAnswer = null
-  let formattedMatchingPairs = null
-
-  // ----------------------------------------------------------
-  // MULTIPLE CHOICE
-  // ----------------------------------------------------------
-
-  if (form.type === 'multiple_choice') {
-    formattedOptions =
-      form.options.map(option => ({
-        text: option.text,
-        imageUrl:
-          option.imageUrl || null
-      }))
-
-    formattedCorrectAnswer =
-      form.options
-        .map((option, index) =>
-          option.isCorrect
-            ? index
-            : null
-        )
-        .filter(
-          value => value !== null
-        )
-
-    if (
-      formattedCorrectAnswer.length === 0
-    ) {
-      alert(
-        'Please check at least one correct option.'
-      )
-      return
-    }
-  }
-
-  // ----------------------------------------------------------
-  // TRUE / FALSE
-  // ----------------------------------------------------------
-
-  else if (
-    form.type === 'true_false'
-  ) {
-    formattedOptions = [
-      'True',
-      'False'
-    ]
-
-    formattedCorrectAnswer =
-      form.tfCorrect === 'true'
-        ? [0]
-        : [1]
-  }
-
-  // ----------------------------------------------------------
-  // SHORT ANSWER
-  // ----------------------------------------------------------
-
-  else if (
-    form.type === 'short_answer'
-  ) {
-    formattedCorrectAnswer =
-      form.shortAnswerKeywords
-        .split(',')
-        .map(keyword =>
-          keyword.trim()
-        )
-        .filter(Boolean)
-
-    if (
-      formattedCorrectAnswer.length === 0
-    ) {
-      alert(
-        'Please enter at least one expected answer keyword.'
-      )
-      return
-    }
-  }
-
-  // ----------------------------------------------------------
-  // MATCHING
-  // ----------------------------------------------------------
-
-  else if (
-    form.type === 'matching'
-  ) {
-    formattedMatchingPairs =
-      form.matchingPairs
-
-    formattedCorrectAnswer = null
-  }
-
-  const payload = {
-    program:
-      form.program || null,
-
-    term:
-      form.term || null,
-
-    course_id:
-      numericCourseId,
-
-    course_outcome_id:
-      form.courseOutcomeId || null,
-
-    learning_outcome_id:
-      form.learningOutcomeId || null,
-
-    code:
-      generateQuestionCode(),
-
-    type:
-      form.type,
-
-    text:
-      form.text.trim(),
-
-    image_url:
-      form.imageUrl || null,
-
-    options:
-      formattedOptions,
-
-    correct_answer:
-      formattedCorrectAnswer
-        ? JSON.stringify(
-            formattedCorrectAnswer
-          )
-        : null,
-
-    matching_pairs:
-      formattedMatchingPairs,
-
-    stcw_standard:
-      null,
-
-    bloom_level:
-      form.bloomLevel,
-
-    status:
-      'Pending',
-
-    ai_accepted:
-      false,
-
-    retained_ai:
-      false
-  }
-
-  isSubmitting.value = true
-
-  try {
-    const response =
-      await fetch(
-        `${API_BASE_URL}/questions`,
-        {
-          method: 'POST',
-          headers:
-            getAuthHeaders(true),
-          body:
-            JSON.stringify(payload)
-        }
-      )
-
-    if (!response.ok) {
-      throw await getApiError(
-        response
-      )
-    }
-
-    const data =
-      await response.json()
-
-    const savedQuestion =
-      normalizeQuestion(data)
-
-    questions.value.unshift(
-      savedQuestion
-    )
-
-    syncQuestionsStorage()
-
-    alert(
-      'Question saved successfully to CAMS.'
-    )
-
-    resetForm()
-
-    activeTab.value =
-      'repository'
-
-  } catch (err) {
-    console.error(
-      'Failed to save question:',
-      err
-    )
-
-    if (
-      err?.status === 422 &&
-      err?.duplicate
-    ) {
-      const duplicate =
-        err.existingQuestion
-
-      alert(
-        `Duplicate Question Detected!\n\n` +
-        `This question already exists in the Question Bank.\n\n` +
-        `Question Code: ${
-          duplicate?.code || 'N/A'
-        }\n\n` +
-        `Existing Question:\n${
-          duplicate?.text || 'N/A'
-        }\n\n` +
-        `Please revise the question before saving.`
-      )
-
-      return
-    }
-
-    alert(
-      err.message ||
-      'Unable to save the question.'
-    )
-
-  } finally {
-    isSubmitting.value = false
-  }
-}
-
-
-// ============================================================
-// EDIT QUESTION
-// ============================================================
-
-function editQuestion(question) {
-  editingQuestion.value = {
-    ...question,
-
-    options:
-      Array.isArray(question.options)
-        ? question.options.map(
-            option => ({
-              ...option
-            })
-          )
-        : [],
-
-    matchingPairs:
-      Array.isArray(
-        question.matchingPairs
-      )
-        ? question.matchingPairs.map(
-            pair => ({
-              ...pair
-            })
-          )
-        : [],
-
-    correctAnswer:
-      Array.isArray(
-        question.correctAnswer
-      )
-        ? [
-            ...question.correctAnswer
-          ]
-        : question.correctAnswer
-  }
-}
-
-
-function closeEditModal() {
-  editingQuestion.value = null
-}
-
-
-// ============================================================
-// SAVE EDITED QUESTION
-// ============================================================
-
-async function saveEditedQuestion() {
-  if (!editingQuestion.value) {
-    return
-  }
-
-  if (
-    !editingQuestion.value.courseId ||
-    !editingQuestion.value.text?.trim()
-  ) {
-    alert(
-      'Please select a Course / Subject and enter Question Stem.'
-    )
-    return
-  }
-
-  if (
-    !confirm(
-      'Are you sure you want to save the changes to this question?'
-    )
-  ) {
-    return
-  }
-
-  const numericCourseId =
-    resolveCourseId(
-      editingQuestion.value.courseId
-    )
-
-  if (!numericCourseId) {
-    alert(
-      'The selected course could not be matched to the Laravel course record.'
-    )
-    return
-  }
-
-  let formattedOptions = null
-  let formattedCorrectAnswer = null
-  let formattedMatchingPairs = null
-
-  if (
-    editingQuestion.value.type ===
-    'multiple_choice'
-  ) {
-    formattedOptions =
-      (
-        editingQuestion.value.options ||
-        []
-      ).map(option => ({
-        text:
-          option.text,
-        imageUrl:
-          option.imageUrl ||
-          null
-      }))
-
-    formattedCorrectAnswer =
-      formattedOptions
-        .map((_, index) =>
-          editingQuestion.value
-            .correctAnswer
-            ?.includes(index)
-            ? index
-            : null
-        )
-        .filter(
-          value => value !== null
-        )
-
-    if (
-      formattedCorrectAnswer.length ===
-      0
-    ) {
-      alert(
-        'Please check at least one correct option.'
-      )
-      return
-    }
-  }
-
-  else if (
-    editingQuestion.value.type ===
-    'true_false'
-  ) {
-    formattedOptions = [
-      'True',
-      'False'
-    ]
-
-    formattedCorrectAnswer =
-      editingQuestion.value
-        .correctAnswer?.[0] === 1
-        ? [1]
-        : [0]
-  }
-
-  else if (
-    editingQuestion.value.type ===
-    'short_answer'
-  ) {
-    if (
-      Array.isArray(
-        editingQuestion.value
-          .correctAnswer
-      )
-    ) {
-      formattedCorrectAnswer =
-        editingQuestion.value
-          .correctAnswer
-    } else {
-      formattedCorrectAnswer =
-        String(
-          editingQuestion.value
-            .correctAnswer || ''
-        )
-          .split(',')
-          .map(keyword =>
-            keyword.trim()
-          )
-          .filter(Boolean)
-    }
-
-    if (
-      formattedCorrectAnswer.length ===
-      0
-    ) {
-      alert(
-        'Please enter at least one expected answer keyword.'
-      )
-      return
-    }
-  }
-
-  else if (
-    editingQuestion.value.type ===
-    'matching'
-  ) {
-    formattedMatchingPairs =
-      editingQuestion.value
-        .matchingPairs || []
-
-    formattedCorrectAnswer = null
-  }
-
-  const payload = {
-    program:
-      editingQuestion.value
-        .program || null,
-
-    term:
-      editingQuestion.value
-        .term || null,
-
-    course_id:
-      numericCourseId,
-
-    course_outcome_id:
-      editingQuestion.value
-        .courseOutcomeId || null,
-
-    learning_outcome_id:
-      editingQuestion.value
-        .learningOutcomeId || null,
-
-    code:
-      editingQuestion.value.code,
-
-    type:
-      editingQuestion.value.type,
-
-    text:
-      editingQuestion.value
-        .text.trim(),
-
-    image_url:
-      editingQuestion.value
-        .imageUrl || null,
-
-    options:
-      formattedOptions,
-
-    correct_answer:
-      formattedCorrectAnswer
-        ? JSON.stringify(
-            formattedCorrectAnswer
-          )
-        : null,
-
-    matching_pairs:
-      formattedMatchingPairs,
-
-    stcw_standard:
-      editingQuestion.value
-        .stcwStandard || null,
-
-    bloom_level:
-      editingQuestion.value
-        .bloomLevel ||
-      'Understanding',
-
-    status:
-      editingQuestion.value
-        .status || 'Pending',
-
-    ai_accepted:
-      Boolean(
-        editingQuestion.value
-          .aiAccepted
-      ),
-
-    retained_ai:
-      Boolean(
-        editingQuestion.value
-          .retainedAi
-      )
-  }
-
-  try {
-    const response =
-      await fetch(
-        `${API_BASE_URL}/questions/${editingQuestion.value.id}`,
-        {
-          method: 'PUT',
-          headers:
-            getAuthHeaders(true),
-          body:
-            JSON.stringify(payload)
-        }
-      )
-
-    if (!response.ok) {
-      throw await getApiError(
-        response
-      )
-    }
-
-    const data =
-      await response.json()
-
-    const updatedQuestion =
-      normalizeQuestion(data)
-
-    const index =
-      questions.value.findIndex(
-        question =>
-          question.id ===
-          editingQuestion.value.id
-      )
-
-    if (index !== -1) {
-      questions.value[index] =
-        updatedQuestion
-    }
-
-    syncQuestionsStorage()
-
-    closeEditModal()
-
-    alert(
-      'Question updated successfully in CAMS.'
-    )
-
-  } catch (err) {
-    console.error(
-      'Failed to update question:',
-      err
-    )
-
-    alert(
-      err.message ||
-      'Unable to update the question.'
-    )
-  }
-}
-
-
-// ============================================================
-// SINGLE QUESTION STATUS UPDATE
-// ============================================================
-
-async function updateQuestionStatus(id, status) {
-  if (!id || !status) return
-
-  if (!confirm(`Are you sure you want to mark this question as ${status}?`)) {
-    return
-  }
-
-  const question = questions.value.find(item => item.id === id)
-
-  if (!question) {
-    alert('Question not found.')
-    return
-  }
-
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/questions/${id}`,
-      {
-        method: 'PUT',
-        headers: getAuthHeaders(true),
-        body: JSON.stringify({
-          program: question.program || null,
-          term: question.term || null,
-          course_id: question.courseDbId || resolveCourseId(question.courseId),
-          course_outcome_id: question.courseOutcomeId || null,
-          learning_outcome_id: question.learningOutcomeId || null,
-          code: question.code,
-          type: question.type,
-          text: question.text,
-          image_url: question.imageUrl || null,
-          options: question.options || null,
-          correct_answer:
-            question.correctAnswer !== null && question.correctAnswer !== undefined
-              ? JSON.stringify(question.correctAnswer)
-              : null,
-          matching_pairs: question.matchingPairs || null,
-          stcw_standard: question.stcwStandard || null,
-          bloom_level: question.bloomLevel || 'Understanding',
-          status,
-          ai_accepted: Boolean(question.aiAccepted),
-          retained_ai: Boolean(question.retainedAi)
-        })
-      }
-    )
-
-    if (!response.ok) {
-      throw await getApiError(response)
-    }
-
-    const updated = normalizeQuestion(await response.json())
-    const index = questions.value.findIndex(item => item.id === id)
-
-    if (index !== -1) {
-      questions.value[index] = updated
-    }
-
-    syncQuestionsStorage()
-  } catch (err) {
-    console.error('Failed to update question status:', err)
-    alert(err.message || 'Unable to update the question status.')
-  }
-}
-
-
-// ============================================================
-// DELETE QUESTION
-// ============================================================
-
-async function deleteQuestion(id) {
-  if (
-    !confirm(
-      'Are you sure you want to remove this question item?'
-    )
-  ) {
-    return
-  }
-
-  try {
-    const response =
-      await fetch(
-        `${API_BASE_URL}/questions/${id}`,
-        {
-          method: 'DELETE',
-          headers:
-            getAuthHeaders()
-        }
-      )
-
-    if (!response.ok) {
-      throw await getApiError(
-        response
-      )
-    }
-
-    questions.value =
-      questions.value.filter(
-        question =>
-          question.id !== id
-      )
-
-    selectedQuestionIds.value =
-      selectedQuestionIds.value.filter(
-        selectedId =>
-          selectedId !== id
-      )
-
-    syncQuestionsStorage()
-
-    alert(
-      'Question item deleted successfully from CAMS.'
-    )
-
-  } catch (err) {
-    console.error(
-      'Failed to delete question:',
-      err
-    )
-
-    alert(
-      err.message ||
-      'Unable to delete the question.'
-    )
-  }
-}
-
-
-// ============================================================
-// BULK STATUS UPDATE
-// ============================================================
-
-async function bulkUpdateStatus(status) {
-  if (
-    !selectedQuestionIds.value.length
-  ) {
-    alert(
-      'Please select at least one question.'
-    )
-    return
-  }
-
-  if (
-    !confirm(
-      `Are you sure you want to mark ${selectedQuestionIds.value.length} question(s) as ${status}?`
-    )
-  ) {
-    return
-  }
-
-  try {
-    for (
-      const id of
-      selectedQuestionIds.value
-    ) {
-      const question =
-        questions.value.find(
-          item => item.id === id
-        )
-
-      if (!question) {
-        continue
-      }
-
-      const response =
-        await fetch(
-          `${API_BASE_URL}/questions/${id}`,
-          {
-            method: 'PUT',
-            headers:
-              getAuthHeaders(true),
-            body: JSON.stringify({
-              program:
-                question.program ||
-                null,
-
-              term:
-                question.term ||
-                null,
-
-              course_id:
-                question.courseDbId ||
-                resolveCourseId(
-                  question.courseId
-                ),
-
-              course_outcome_id:
-                question.courseOutcomeId ||
-                null,
-
-              learning_outcome_id:
-                question.learningOutcomeId ||
-                null,
-
-              code:
-                question.code,
-
-              type:
-                question.type,
-
-              text:
-                question.text,
-
-              image_url:
-                question.imageUrl ||
-                null,
-
-              options:
-                question.options ||
-                null,
-
-              correct_answer:
-                question.correctAnswer
-                  ? JSON.stringify(
-                      question.correctAnswer
-                    )
-                  : null,
-
-              matching_pairs:
-                question.matchingPairs ||
-                null,
-
-              stcw_standard:
-                question.stcwStandard ||
-                null,
-
-              bloom_level:
-                question.bloomLevel ||
-                'Understanding',
-
-              status,
-
-              ai_accepted:
-                Boolean(
-                  question.aiAccepted
-                ),
-
-              retained_ai:
-                Boolean(
-                  question.retainedAi
-                )
-            })
-          }
-        )
-
-      if (!response.ok) {
-        throw await getApiError(
-          response
-        )
-      }
-
-      const updated =
-        normalizeQuestion(
-          await response.json()
-        )
-
-      const index =
-        questions.value.findIndex(
-          item => item.id === id
-        )
-
-      if (index !== -1) {
-        questions.value[index] =
-          updated
-      }
-    }
-
-    selectedQuestionIds.value = []
-
-    syncQuestionsStorage()
-
-    alert(
-      `Selected question(s) successfully marked as ${status}.`
-    )
-
-  } catch (err) {
-    console.error(
-      'Bulk status update failed:',
-      err
-    )
-
-    alert(
-      err.message ||
-      'Unable to update selected questions.'
-    )
-  }
-}
-
-
-// ============================================================
-// BULK DELETE
-// ============================================================
-
-async function bulkDeleteQuestions() {
-  if (
-    !selectedQuestionIds.value.length
-  ) {
-    alert(
-      'Please select at least one question.'
-    )
-    return
-  }
-
-  if (
-    !confirm(
-      `Are you sure you want to permanently delete ${selectedQuestionIds.value.length} selected question(s)?`
-    )
-  ) {
-    return
-  }
-
-  try {
-    for (
-      const id of
-      selectedQuestionIds.value
-    ) {
-      const response =
-        await fetch(
-          `${API_BASE_URL}/questions/${id}`,
-          {
-            method: 'DELETE',
-            headers:
-              getAuthHeaders()
-          }
-        )
-
-      if (!response.ok) {
-        throw await getApiError(
-          response
-        )
-      }
-    }
-
-    questions.value =
-      questions.value.filter(
-        question =>
-          !selectedQuestionIds.value.includes(
-            question.id
-          )
-      )
-
-    selectedQuestionIds.value = []
-
-    syncQuestionsStorage()
-
-    alert(
-      'Selected question(s) deleted successfully from CAMS.'
-    )
-
-  } catch (err) {
-    console.error(
-      'Bulk delete failed:',
-      err
-    )
-
-    alert(
-      err.message ||
-      'Unable to delete selected questions.'
-    )
-  }
-}
-
-
-// ============================================================
-// GROUP QUESTIONS BY COURSE
-// ============================================================
-
-const groupedQuestions = computed(() => {
-  const groups = {}
-
-  filteredQuestions.value.forEach(
-    question => {
-      const courseKey =
-        question.courseId ||
-        'Unassigned'
-
-      if (!groups[courseKey]) {
-        const courseObj =
-          courses.value.find(
-            course =>
-              String(course.id) ===
-                String(
-                  question.courseDbId ||
-                  question.course_id
-                ) ||
-              String(course.code) ===
-                String(question.courseId)
-          )
-
-        groups[courseKey] = {
-          courseKey,
-
-          code:
-            courseObj?.code ||
-            question.courseId ||
-            'UNASSIGNED',
-
-          title:
-            courseObj?.title ||
-            'General / Unassigned Course Items',
-
-          questions: []
-        }
-      }
-
-      groups[courseKey]
-        .questions
-        .push(question)
-    }
-  )
-
-  return Object.values(groups)
-})
-
-
-// ============================================================
-// COLLAPSE COURSE
-// ============================================================
-
-function toggleCourseCollapse(
-  courseKey
-) {
-  collapsedCourses.value[courseKey] =
-    !collapsedCourses.value[
-      courseKey
-    ]
-}
-
-
-// Support either naming convention.
-function collapseCourse(courseKey) {
-  toggleCourseCollapse(courseKey)
-}
-
-
-// ============================================================
-// COURSE REPORTS
-// ============================================================
-
-const courseReports = computed(() => {
-  const map = {}
-
-  courses.value.forEach(course => {
-    const key =
-      course.code ||
-      course.id
-
-    map[key] = {
-      code:
-        course.code ||
-        course.id,
-
-      title:
-        course.title ||
-        `Course ${course.code}`,
-
-      program:
-        course.program ||
-        'Both',
-
-      total: 0,
-      approved: 0,
-      disapproved: 0,
-      pending: 0,
-
-      retainedAi: 0,
-      acceptedAi: 0
-    }
-  })
-
-  questions.value.forEach(
-    question => {
-      const key =
-        question.courseId ||
-        question.courseDbId
-
-      if (!map[key]) {
-        return
-      }
-
-      map[key].total++
-
-      if (
-        question.status ===
-        'Approved'
-      ) {
-        map[key].approved++
-      }
-
-      else if (
-        question.status ===
-        'Disapproved'
-      ) {
-        map[key].disapproved++
-      }
-
-      else {
-        map[key].pending++
-      }
-
-      if (question.retainedAi) {
-        map[key].retainedAi++
-      }
-
-      if (question.aiAccepted) {
-        map[key].acceptedAi++
-      }
-    }
-  )
-
-  return Object.values(map)
-})
-
-
-const overallReportSummary = computed(() => {
-  return {
-    total:
-      questions.value.length,
-
-    approved:
-      questions.value.filter(
-        question =>
-          question.status ===
-          'Approved'
-      ).length,
-
-    disapproved:
-      questions.value.filter(
-        question =>
-          question.status ===
-          'Disapproved'
-      ).length,
-
-    pending:
-      questions.value.filter(
-        question =>
-          question.status !==
-            'Approved' &&
-          question.status !==
-            'Disapproved'
-      ).length,
-
-    acceptedAi:
-      questions.value.filter(
-        question =>
-          question.aiAccepted
-      ).length,
-
-    retainedAi:
-      questions.value.filter(
-        question =>
-          question.retainedAi
-      ).length
-  }
-})
-
-
-// ============================================================
-// EXPORT COURSE REPORT
-// ============================================================
-
-function exportCourseReport(report) {
-  const courseQuestions =
-    questions.value.filter(
-      question =>
-        String(
-          question.courseId
-        ) === String(report.code)
-    )
-
-  const rows = [
-    [
-      'Question Code',
-      'Question Type',
-      'Question',
-      'CO',
-      'LO',
-      'Bloom Level',
-      'Status',
-      'AI Accepted',
-      'Retained Original'
-    ]
-  ]
-
-  courseQuestions.forEach(
-    question => {
-      rows.push([
-        question.code || '',
-        question.type || '',
-        question.text || '',
-        question.courseOutcomeId || '',
-        question.learningOutcomeId || '',
-        question.bloomLevel || '',
-        question.status || '',
-        question.aiAccepted
-          ? 'Yes'
-          : 'No',
-        question.retainedAi
-          ? 'Yes'
-          : 'No'
-      ])
-    }
-  )
-
-  const csv = rows
-    .map(row =>
-      row
-        .map(value =>
-          `"${String(value)
-            .replace(/"/g, '""')}"`
-        )
-        .join(',')
-    )
-    .join('\n')
-
-  const blob =
-    new Blob(
-      [csv],
-      {
-        type:
-          'text/csv;charset=utf-8;'
-      }
-    )
-
-  const link =
-    document.createElement('a')
-
-  link.href =
-    URL.createObjectURL(blob)
-
-  link.download =
-    `${report.code || 'course'}_question_report.csv`
-
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-}
-
-
-// ============================================================
-// CSV TEMPLATE
-// ============================================================
-
 function downloadCSVTemplate() {
-  if (
-    !confirm(
-      'Are you sure you want to download the CSV template?'
-    )
-  ) {
-    return
-  }
+  if (!confirm('Download question bank CSV import template?')) return
 
   const headers = [
-    'Program',
-    'Term',
-    'CourseId',
-    'CourseOutcomeId',
-    'LearningOutcomeId',
-    'BloomLevel',
-    'QuestionType',
-    'QuestionText',
-    'OptionA',
-    'OptionB',
-    'OptionC',
-    'OptionD',
-    'CorrectAnswer'
+    'Program', 'Term', 'CourseId', 'CourseOutcomeId', 'LearningOutcomeId', 
+    'BloomLevel', 'QuestionType', 'QuestionText', 'OptionA', 'OptionB', 
+    'OptionC', 'OptionD', 'CorrectAnswer'
   ]
 
   const sampleRows = [
-    [
-      'BSMT',
-      'Midterm',
-      'ICT',
-      'CO1',
-      'LO1.1',
-      'Understanding',
-      'multiple_choice',
-      'What is the primary function of an ECDIS?',
-      'Electronic Chart Display',
-      'Radar Display',
-      'Sonar System',
-      'GMDSS Radio',
-      'A'
-    ],
-
-    [
-      'BSMarE',
-      'Final',
-      'ICT',
-      'CO2',
-      'LO2.1',
-      'Remember',
-      'true_false',
-      'Is a diesel engine an internal combustion engine?',
-      'True',
-      'False',
-      '',
-      '',
-      'A'
-    ]
+    ['BSMT', 'Midterm', 'NAV-101', 'CO1', 'LO1.1', 'Understanding', 'multiple_choice', 'What is the primary function of ECDIS?', 'Electronic Chart Display', 'Radar Display', 'Sonar System', 'Radio', 'A'],
+    ['BSMarE', 'Final', 'ENG-101', 'CO2', 'LO2.1', 'Remembering', 'true_false', 'Is a diesel engine an internal combustion engine?', 'True', 'False', '', '', 'A']
   ]
 
-  const csvContent =
-    [
-      headers.join(','),
-
-      ...sampleRows.map(row =>
-        row
-          .map(field =>
-            `"${String(field)
-              .replace(/"/g, '""')}"`
-          )
-          .join(',')
-      )
-    ].join('\n')
-
-  const blob =
-    new Blob(
-      [csvContent],
-      {
-        type:
-          'text/csv;charset=utf-8;'
-      }
-    )
-
-  const link =
-    document.createElement('a')
-
-  link.href =
-    URL.createObjectURL(blob)
-
-  link.download =
-    'question_bank_template.csv'
+  const csvContent = [headers.join(','), ...sampleRows.map(r => r.map(f => `"${String(f).replace(/"/g, '""')}"`).join(','))].join('\n')
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = 'question_bank_template.csv'
 
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
 }
 
-
-// ============================================================
-// BULK CSV UPLOAD
-// ============================================================
-
+// BULK CSV UPLOAD PARSER
 async function handleBulkCSVUpload(event) {
-  const file =
-    event.target.files?.[0]
+  const file = event.target.files?.[0]
+  if (!file) return
 
-  if (!file) {
-    return
-  }
-
-  if (
-    !file.name
-      .toLowerCase()
-      .endsWith('.csv')
-  ) {
-    alert(
-      'Please select a CSV file.'
-    )
-
+  if (!file.name.toLowerCase().endsWith('.csv')) {
+    alert('Please select a CSV file.')
     event.target.value = ''
     return
   }
 
-  if (
-    !confirm(
-      'Are you sure you want to upload these assessment questions to CAMS?'
-    )
-  ) {
+  if (!confirm('Upload these assessment questions to CAMS?')) {
     event.target.value = ''
     return
   }
@@ -3098,820 +1845,227 @@ async function handleBulkCSVUpload(event) {
   isUploadingBulk.value = true
 
   try {
-    const csvText =
-      await file.text()
-
-    // --------------------------------------------------------
-    // CSV PARSER
-    // Supports:
-    // - commas inside quoted fields
-    // - quoted text
-    // - line breaks inside quoted fields
-    // --------------------------------------------------------
+    const csvText = await file.text()
 
     function parseCSV(text) {
       const rows = []
-
       let currentRow = []
       let currentValue = ''
       let insideQuotes = false
 
-      for (
-        let i = 0;
-        i < text.length;
-        i++
-      ) {
+      for (let i = 0; i < text.length; i++) {
         const char = text[i]
-
         if (char === '"') {
-          if (
-            insideQuotes &&
-            text[i + 1] === '"'
-          ) {
+          if (insideQuotes && text[i + 1] === '"') {
             currentValue += '"'
             i++
           } else {
-            insideQuotes =
-              !insideQuotes
+            insideQuotes = !insideQuotes
           }
-
           continue
         }
-
-        if (
-          char === ',' &&
-          !insideQuotes
-        ) {
-          currentRow.push(
-            currentValue.trim()
-          )
-
+        if (char === ',' && !insideQuotes) {
+          currentRow.push(currentValue.trim())
           currentValue = ''
-
           continue
         }
-
-        if (
-          (
-            char === '\n' ||
-            char === '\r'
-          ) &&
-          !insideQuotes
-        ) {
-          if (
-            char === '\r' &&
-            text[i + 1] === '\n'
-          ) {
-            i++
-          }
-
-          currentRow.push(
-            currentValue.trim()
-          )
-
+        if ((char === '\n' || char === '\r') && !insideQuotes) {
+          if (char === '\r' && text[i + 1] === '\n') i++
+          currentRow.push(currentValue.trim())
           currentValue = ''
-
-          if (
-            currentRow.some(
-              value =>
-                value !== ''
-            )
-          ) {
-            rows.push(
-              currentRow
-            )
-          }
-
+          if (currentRow.some(v => v !== '')) rows.push(currentRow)
           currentRow = []
-
           continue
         }
-
         currentValue += char
       }
-
-      if (
-        currentValue !== '' ||
-        currentRow.length > 0
-      ) {
-        currentRow.push(
-          currentValue.trim()
-        )
-
-        if (
-          currentRow.some(
-            value =>
-              value !== ''
-          )
-        ) {
-          rows.push(
-            currentRow
-          )
-        }
+      if (currentValue !== '' || currentRow.length > 0) {
+        currentRow.push(currentValue.trim())
+        if (currentRow.some(v => v !== '')) rows.push(currentRow)
       }
-
       return rows
     }
 
-    const rows =
-      parseCSV(csvText)
-
+    const rows = parseCSV(csvText)
     if (rows.length < 2) {
-      alert(
-        'The CSV file does not contain any question records.'
-      )
+      alert('The CSV file does not contain any question records.')
       return
     }
-
-    // --------------------------------------------------------
-    // EXPECTED HEADER
-    // --------------------------------------------------------
 
     const expectedHeaders = [
-      'Program',
-      'Term',
-      'CourseId',
-      'CourseOutcomeId',
-      'LearningOutcomeId',
-      'BloomLevel',
-      'QuestionType',
-      'QuestionText',
-      'OptionA',
-      'OptionB',
-      'OptionC',
-      'OptionD',
-      'CorrectAnswer'
+      'Program', 'Term', 'CourseId', 'CourseOutcomeId', 'LearningOutcomeId', 
+      'BloomLevel', 'QuestionType', 'QuestionText', 'OptionA', 'OptionB', 
+      'OptionC', 'OptionD', 'CorrectAnswer'
     ]
 
-    const headers =
-      rows[0].map(header =>
-        header
-          .replace(/^\uFEFF/, '')
-          .trim()
-      )
-
-    const headersAreValid =
-      expectedHeaders.length ===
-        headers.length &&
-      expectedHeaders.every(
-        (header, index) =>
-          header ===
-          headers[index]
-      )
+    const headers = rows[0].map(h => h.replace(/^\uFEFF/, '').trim())
+    const headersAreValid = expectedHeaders.length === headers.length && expectedHeaders.every((h, i) => h === headers[i])
 
     if (!headersAreValid) {
-      alert(
-        `Invalid CSV header.\n\nExpected:\n${expectedHeaders.join(',')}`
-      )
+      alert(`Invalid CSV header.\n\nExpected:\n${expectedHeaders.join(',')}`)
       return
     }
 
-    // --------------------------------------------------------
-    // HELPERS
-    // --------------------------------------------------------
+    function clean(v) { return String(v ?? '').trim() }
+    function generateBulkQuestionCode(rIdx) { return `Q-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}-${rIdx}` }
 
-    function clean(value) {
-      return String(
-        value ?? ''
-      ).trim()
-    }
-
-    function generateBulkQuestionCode(
-      rowIndex
-    ) {
-      return `Q-${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2, 7)
-        .toUpperCase()}-${rowIndex}`
-    }
-
-    function normalizeQuestionType(
-      type
-    ) {
-      const value =
-        clean(type).toLowerCase()
-
-      if (
-        value ===
-          'multiple_choice' ||
-        value ===
-          'multiple choice' ||
-        value === 'mcq'
-      ) {
-        return 'multiple_choice'
-      }
-
-      if (
-        value ===
-          'true_false' ||
-        value ===
-          'true/false' ||
-        value ===
-          'true or false'
-      ) {
-        return 'true_false'
-      }
-
-      if (
-        value ===
-          'short_answer' ||
-        value ===
-          'short answer'
-      ) {
-        return 'short_answer'
-      }
-
-      if (
-        value ===
-        'matching'
-      ) {
-        return 'matching'
-      }
-
+    function normalizeQuestionType(t) {
+      const value = clean(t).toLowerCase()
+      if (value === 'multiple_choice' || value === 'multiple choice' || value === 'mcq') return 'multiple_choice'
+      if (value === 'true_false' || value === 'true/false' || value === 'true or false') return 'true_false'
+      if (value === 'short_answer' || value === 'short answer') return 'short_answer'
+      if (value === 'matching') return 'matching'
       return value
     }
 
-    // --------------------------------------------------------
-    // DUPLICATE CHECKING
-    // --------------------------------------------------------
-
-    const existingQuestionTexts =
-      new Set(
-        questions.value
-          .map(q =>
-            clean(q.text)
-              .toLowerCase()
-          )
-          .filter(Boolean)
-      )
-
-    const uploadedQuestionTexts =
-      new Set()
+    const existingQuestionTexts = new Set(questions.value.map(q => clean(q.text).toLowerCase()).filter(Boolean))
+    const uploadedQuestionTexts = new Set()
 
     let successCount = 0
     let skippedCount = 0
     let failedCount = 0
-
     const failedRows = []
 
-    // --------------------------------------------------------
-    // PROCESS EACH ROW
-    // --------------------------------------------------------
-
-    for (
-      let rowIndex = 1;
-      rowIndex < rows.length;
-      rowIndex++
-    ) {
-      const row =
-        rows[rowIndex]
-
-      if (
-        !row ||
-        row.every(
-          value =>
-            clean(value) === ''
-        )
-      ) {
-        continue
-      }
+    for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
+      const row = rows[rowIndex]
+      if (!row || row.every(v => clean(v) === '')) continue
 
       try {
-        if (
-          row.length !==
-          expectedHeaders.length
-        ) {
-          throw new Error(
-            `Expected ${expectedHeaders.length} columns but found ${row.length}.`
-          )
+        if (row.length !== expectedHeaders.length) {
+          throw new Error(`Expected ${expectedHeaders.length} columns but found ${row.length}.`)
         }
 
-        const [
-          program,
-          term,
-          courseId,
-          courseOutcomeId,
-          learningOutcomeId,
-          bloomLevel,
-          questionTypeRaw,
-          questionText,
-          optionA,
-          optionB,
-          optionC,
-          optionD,
-          correctAnswerRaw
-        ] = row
+        const [program, term, courseId, courseOutcomeId, learningOutcomeId, bloomLevel, questionTypeRaw, questionText, optionA, optionB, optionC, optionD, correctAnswerRaw] = row
+        const type = normalizeQuestionType(questionTypeRaw)
 
-        const type =
-          normalizeQuestionType(
-            questionTypeRaw
-          )
+        if (!clean(questionText)) throw new Error('QuestionText is empty.')
+        if (!clean(courseId)) throw new Error('CourseId is empty.')
 
-        if (
-          !clean(questionText)
-        ) {
-          throw new Error(
-            'QuestionText is empty.'
-          )
-        }
+        const course = courses.value.find(
+          c => String(c.id) === clean(courseId) || String(c.code).toLowerCase() === clean(courseId).toLowerCase()
+        )
 
-        if (
-          !clean(courseId)
-        ) {
-          throw new Error(
-            'CourseId is empty.'
-          )
-        }
+        if (!course) throw new Error(`CourseId "${courseId}" could not be matched to a course.`)
+        const numericCourseId = course.id
 
-        // ----------------------------------------------------
-        // FIND COURSE
-        // ----------------------------------------------------
-
-        const course =
-          courses.value.find(
-            course =>
-              String(course.id) ===
-                String(
-                  courseId
-                ).trim() ||
-              String(
-                course.code
-              ).toLowerCase() ===
-                String(
-                  courseId
-                )
-                  .trim()
-                  .toLowerCase()
-          )
-
-        if (!course) {
-          throw new Error(
-            `CourseId "${courseId}" could not be matched to a CAMS course.`
-          )
-        }
-
-        const numericCourseId =
-          course.id
-
-        // ----------------------------------------------------
-        // DUPLICATE CHECK
-        // ----------------------------------------------------
-
-        const normalizedText =
-          clean(
-            questionText
-          ).toLowerCase()
-
-        if (
-          existingQuestionTexts.has(
-            normalizedText
-          ) ||
-          uploadedQuestionTexts.has(
-            normalizedText
-          )
-        ) {
+        const normalizedText = clean(questionText).toLowerCase()
+        if (existingQuestionTexts.has(normalizedText) || uploadedQuestionTexts.has(normalizedText)) {
           skippedCount++
           continue
         }
-
-        uploadedQuestionTexts.add(
-          normalizedText
-        )
-
-        // ----------------------------------------------------
-        // PREPARE DATA
-        // ----------------------------------------------------
+        uploadedQuestionTexts.add(normalizedText)
 
         let formattedOptions = null
         let formattedCorrectAnswer = null
         let formattedMatchingPairs = null
 
-        // ----------------------------------------------------
-        // MULTIPLE CHOICE
-        // ----------------------------------------------------
-
-        if (
-          type ===
-          'multiple_choice'
-        ) {
+        if (type === 'multiple_choice') {
           formattedOptions = [
-            {
-              text: clean(optionA),
-              imageUrl: null
-            },
-            {
-              text: clean(optionB),
-              imageUrl: null
-            },
-            {
-              text: clean(optionC),
-              imageUrl: null
-            },
-            {
-              text: clean(optionD),
-              imageUrl: null
-            }
+            { text: clean(optionA), imageUrl: null },
+            { text: clean(optionB), imageUrl: null },
+            { text: clean(optionC), imageUrl: null },
+            { text: clean(optionD), imageUrl: null }
           ]
 
-          const answerLetters =
-            clean(
-              correctAnswerRaw
-            )
-              .split('|')
-              .map(answer =>
-                answer
-                  .trim()
-                  .toUpperCase()
-              )
-              .filter(Boolean)
-
-          if (
-            answerLetters.length ===
-            0
-          ) {
-            throw new Error(
-              'CorrectAnswer is empty.'
-            )
-          }
+          const answerLetters = clean(correctAnswerRaw).split('|').map(a => a.trim().toUpperCase()).filter(Boolean)
+          if (!answerLetters.length) throw new Error('CorrectAnswer is empty.')
 
           const answerIndexes = []
-
-          for (
-            const letter of
-            answerLetters
-          ) {
-            const index =
-              [
-                'A',
-                'B',
-                'C',
-                'D'
-              ].indexOf(
-                letter
-              )
-
-            if (index === -1) {
-              throw new Error(
-                `Invalid multiple-choice answer "${letter}". Use A, B, C, or D.`
-              )
-            }
-
-            if (
-              !answerIndexes.includes(
-                index
-              )
-            ) {
-              answerIndexes.push(
-                index
-              )
-            }
+          for (const letter of answerLetters) {
+            const idx = ['A', 'B', 'C', 'D'].indexOf(letter)
+            if (idx === -1) throw new Error(`Invalid MCQ answer "${letter}". Use A, B, C, or D.`)
+            if (!answerIndexes.includes(idx)) answerIndexes.push(idx)
           }
-
-          formattedCorrectAnswer =
-            answerIndexes
+          formattedCorrectAnswer = answerIndexes
+        } else if (type === 'true_false') {
+          formattedOptions = ['True', 'False']
+          const answer = clean(correctAnswerRaw).toUpperCase()
+          if (answer === 'A' || answer === 'TRUE') formattedCorrectAnswer = [0]
+          else if (answer === 'B' || answer === 'FALSE') formattedCorrectAnswer = [1]
+          else throw new Error('True/False CorrectAnswer must be A/True or B/False.')
+        } else if (type === 'short_answer') {
+          const possibleAnswers = clean(correctAnswerRaw).split('|').map(a => a.trim()).filter(Boolean)
+          if (!possibleAnswers.length) throw new Error('CorrectAnswer is empty for short-answer.')
+          formattedCorrectAnswer = possibleAnswers
+        } else if (type === 'matching') {
+          formattedMatchingPairs = null
+          formattedCorrectAnswer = null
+        } else {
+          throw new Error(`Unsupported QuestionType "${questionTypeRaw}".`)
         }
-
-        // ----------------------------------------------------
-        // TRUE / FALSE
-        // ----------------------------------------------------
-
-        else if (
-          type ===
-          'true_false'
-        ) {
-          formattedOptions = [
-            'True',
-            'False'
-          ]
-
-          const answer =
-            clean(
-              correctAnswerRaw
-            ).toUpperCase()
-
-          if (
-            answer === 'A' ||
-            answer === 'TRUE'
-          ) {
-            formattedCorrectAnswer =
-              [0]
-          }
-
-          else if (
-            answer === 'B' ||
-            answer === 'FALSE'
-          ) {
-            formattedCorrectAnswer =
-              [1]
-          }
-
-          else {
-            throw new Error(
-              'True/False CorrectAnswer must be A/True or B/False.'
-            )
-          }
-        }
-
-        // ----------------------------------------------------
-        // SHORT ANSWER
-        // ----------------------------------------------------
-
-        else if (
-          type ===
-          'short_answer'
-        ) {
-          const possibleAnswers =
-            clean(
-              correctAnswerRaw
-            )
-              .split('|')
-              .map(answer =>
-                answer.trim()
-              )
-              .filter(Boolean)
-
-          if (
-            possibleAnswers.length ===
-            0
-          ) {
-            throw new Error(
-              'CorrectAnswer is empty for the short-answer question.'
-            )
-          }
-
-          formattedCorrectAnswer =
-            possibleAnswers
-        }
-
-        // ----------------------------------------------------
-        // MATCHING
-        // ----------------------------------------------------
-
-        else if (
-          type ===
-          'matching'
-        ) {
-          formattedMatchingPairs =
-            null
-
-          formattedCorrectAnswer =
-            null
-        }
-
-        else {
-          throw new Error(
-            `Unsupported QuestionType "${questionTypeRaw}".`
-          )
-        }
-
-        // ----------------------------------------------------
-        // LARAVEL PAYLOAD
-        // ----------------------------------------------------
 
         const payload = {
-          program:
-            clean(program) ||
-            null,
-
-          term:
-            clean(term) ||
-            null,
-
-          course_id:
-            numericCourseId,
-
-          course_outcome_id:
-            clean(
-              courseOutcomeId
-            ) || null,
-
-          learning_outcome_id:
-            clean(
-              learningOutcomeId
-            ) || null,
-
-          code:
-            generateBulkQuestionCode(
-              rowIndex
-            ),
-
+          program: clean(program) || null,
+          term: clean(term) || null,
+          course_id: numericCourseId,
+          course_outcome_id: clean(courseOutcomeId) || null,
+          learning_outcome_id: clean(learningOutcomeId) || null,
+          code: generateBulkQuestionCode(rowIndex),
           type,
-
-          text:
-            clean(questionText),
-
-          image_url:
-            null,
-
-          options:
-            formattedOptions,
-
-          correct_answer:
-            formattedCorrectAnswer !==
-            null
-              ? JSON.stringify(
-                  formattedCorrectAnswer
-                )
-              : null,
-
-          matching_pairs:
-            formattedMatchingPairs,
-
-          stcw_standard:
-            null,
-
-          bloom_level:
-            clean(bloomLevel) ||
-            'Understanding',
-
-          status:
-            'Pending',
-
-          ai_accepted:
-            false,
-
-          retained_ai:
-            false
+          text: clean(questionText),
+          image_url: null,
+          options: formattedOptions,
+          correct_answer: formattedCorrectAnswer !== null ? JSON.stringify(formattedCorrectAnswer) : null,
+          matching_pairs: formattedMatchingPairs,
+          stcw_standard: null,
+          bloom_level: clean(bloomLevel) || 'Understanding',
+          status: 'Pending',
+          ai_accepted: false,
+          retained_ai: false
         }
 
-        // ----------------------------------------------------
-        // SAVE TO LARAVEL
-        // ----------------------------------------------------
-
-        const response =
-          await fetch(
-            `${API_BASE_URL}/questions`,
-            {
-              method: 'POST',
-              headers:
-                getAuthHeaders(
-                  true
-                ),
-              body:
-                JSON.stringify(
-                  payload
-                )
-            }
-          )
+        const response = await fetch(`${API_BASE_URL}/questions`, {
+          method: 'POST',
+          headers: getAuthHeaders(true),
+          body: JSON.stringify(payload)
+        })
 
         if (!response.ok) {
           let errorData = {}
-
-          try {
-            errorData =
-              await response.json()
-          } catch (_) {}
-
-          // Laravel duplicate
-          if (
-            response.status ===
-              422 &&
-            errorData.duplicate ===
-              true
-          ) {
+          try { errorData = await response.json() } catch (_) {}
+          if (response.status === 422 && errorData.duplicate === true) {
             skippedCount++
-
-            uploadedQuestionTexts.delete(
-              normalizedText
-            )
-
+            uploadedQuestionTexts.delete(normalizedText)
             continue
           }
-
-          if (
-            response.status ===
-            401
-          ) {
-            throw new Error(
-              'Your session has expired. Please log in again.'
-            )
-          }
-
-          if (
-            response.status ===
-              422 &&
-            errorData.errors
-          ) {
-            const firstError =
-              Object.values(
-                errorData.errors
-              ).flat()[0]
-
-            throw new Error(
-              firstError ||
-              errorData.message ||
-              'Please check the submitted information.'
-            )
-          }
-
-          throw new Error(
-            errorData.message ||
-            `Request failed. HTTP ${response.status}`
-          )
+          if (response.status === 401) throw new Error('Your session has expired. Please log in again.')
+          throw new Error(errorData.message || `Request failed. HTTP ${response.status}`)
         }
 
-        const savedQuestion =
-          await response.json()
-
-        questions.value.unshift(
-          normalizeQuestion(
-            savedQuestion
-          )
-        )
-
+        const savedQuestion = await response.json()
+        questions.value.unshift(normalizeQuestion(savedQuestion))
         successCount++
 
-        // Prevent excessive requests
-        await new Promise(
-          resolve =>
-            setTimeout(
-              resolve,
-              50
-            )
-        )
-
+        await new Promise(resolve => setTimeout(resolve, 30))
       } catch (rowError) {
         failedCount++
-
-        failedRows.push(
-          `Row ${rowIndex + 1}: ${rowError.message}`
-        )
+        failedRows.push(`Row ${rowIndex + 1}: ${rowError.message}`)
       }
     }
-
-    // --------------------------------------------------------
-    // SAVE LOCAL CACHE
-    // --------------------------------------------------------
 
     syncQuestionsStorage()
 
-    // --------------------------------------------------------
-    // SUMMARY
-    // --------------------------------------------------------
-
-    let message =
-      `Bulk upload completed.\n\n` +
-      `Successfully saved: ${successCount}\n` +
-      `Skipped duplicates: ${skippedCount}\n` +
-      `Failed: ${failedCount}`
-
-    if (
-      failedRows.length > 0
-    ) {
-      message +=
-        `\n\nFailed rows:\n` +
-        failedRows
-          .slice(0, 10)
-          .join('\n')
-
-      if (
-        failedRows.length > 10
-      ) {
-        message +=
-          `\n...and ${
-            failedRows.length - 10
-          } more.`
-      }
+    let message = `Bulk upload completed.\n\nSaved: ${successCount}\nSkipped: ${skippedCount}\nFailed: ${failedCount}`
+    if (failedRows.length > 0) {
+      message += `\n\nErrors:\n` + failedRows.slice(0, 5).join('\n')
     }
-
     alert(message)
-
   } catch (err) {
-    console.error(
-      'Bulk CSV upload failed:',
-      err
-    )
-
-    alert(
-      err.message ||
-      'Unable to process the CSV file.'
-    )
-
+    console.error('Bulk CSV upload failed:', err)
+    alert(err.message || 'Unable to process the CSV file.')
   } finally {
-    isUploadingBulk.value =
-      false
-
+    isUploadingBulk.value = false
     event.target.value = ''
   }
 }
 
-
-// ============================================================
-// LOAD COURSES
-// ============================================================
-
+// DATA INITIALIZATION & CACHE LOAD
 async function loadCachedCourses() {
   const savedCourses = localStorage.getItem(STORAGE_COURSES_KEY)
-
   if (!savedCourses) return false
-
   try {
     const parsed = JSON.parse(savedCourses)
-
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      return false
-    }
-
+    if (!Array.isArray(parsed) || parsed.length === 0) return false
     courses.value = parsed.map(normalizeCourse)
     return true
   } catch (err) {
@@ -3920,19 +2074,12 @@ async function loadCachedCourses() {
   }
 }
 
-
 async function loadCachedQuestions() {
   const savedQuestions = localStorage.getItem(STORAGE_QUESTIONS_KEY)
-
   if (!savedQuestions) return false
-
   try {
     const parsed = JSON.parse(savedQuestions)
-
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      return false
-    }
-
+    if (!Array.isArray(parsed) || parsed.length === 0) return false
     questions.value = parsed
     return true
   } catch (err) {
@@ -3941,1528 +2088,51 @@ async function loadCachedQuestions() {
   }
 }
 
-
-// ============================================================
-// LOAD COURSES
-// ============================================================
-//
-// Local cache is loaded first so existing data never disappears
-// while the Laravel API is empty or temporarily unavailable.
-// Laravel data replaces the cache only when Laravel actually
-// returns one or more course records.
-// ============================================================
-
 async function fetchCourses() {
   await loadCachedCourses()
-
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/courses`,
-      {
-        method: 'GET',
-        headers: getAuthHeaders()
-      }
-    )
+    const response = await fetch(`${API_BASE_URL}/courses`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    })
 
-    if (response.status === 401) {
-      throw new Error(
-        'Your session has expired. Please log in again.'
-      )
-    }
-
-    if (!response.ok) {
-      throw new Error(
-        `Failed to load courses. HTTP ${response.status}`
-      )
-    }
+    if (response.status === 401) throw new Error('Your session has expired. Please log in again.')
+    if (!response.ok) throw new Error(`Failed to load courses. HTTP ${response.status}`)
 
     const data = await response.json()
-
-    if (!Array.isArray(data)) {
-      throw new Error(
-        'Invalid course data received from Laravel.'
-      )
-    }
+    if (!Array.isArray(data)) throw new Error('Invalid course data received.')
 
     if (data.length > 0) {
       courses.value = data.map(normalizeCourse)
       syncCoursesStorage()
-      console.log(
-        `CAMS: Loaded ${courses.value.length} courses from Laravel.`
-      )
-    } else {
-      console.warn(
-        'CAMS: Laravel returned no courses. Existing local courses were preserved.'
-      )
     }
-
   } catch (err) {
-    console.error(
-      'Failed to load courses from Laravel:',
-      err
-    )
-
-    if (!courses.value.length) {
-      console.warn(
-        'CAMS: No courses are currently available.'
-      )
-    }
+    console.warn('CAMS: Fallback to cached courses due to error:', err.message)
   }
 }
-
-
-// ============================================================
-// LOAD QUESTIONS
-// ============================================================
-//
-// Local cache is loaded first so existing data never disappears
-// while the Laravel API is empty or temporarily unavailable.
-// Laravel data replaces the cache only when Laravel actually
-// returns one or more question records.
-// ============================================================
 
 async function fetchQuestions() {
-  const saved = localStorage.getItem(
-    STORAGE_QUESTIONS_KEY
-  )
-
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved)
-
-      if (Array.isArray(parsed)) {
-        questions.value = parsed
-      }
-    } catch (error) {
-      console.warn(
-        'CAMS: Unable to read cached questions.',
-        error
-      )
-    }
-  }
-
+  await loadCachedQuestions()
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/questions`,
-      {
-        method: 'GET',
-        headers: getAuthHeaders()
-      }
-    )
+    const response = await fetch(`${API_BASE_URL}/questions`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    })
 
-    if (response.status === 401) {
-      throw new Error(
-        'Your session has expired. Please log in again.'
-      )
-    }
-
-    if (!response.ok) {
-      throw new Error(
-        `Failed to load questions. HTTP ${response.status}`
-      )
-    }
+    if (response.status === 401) throw new Error('Your session has expired. Please log in again.')
+    if (!response.ok) throw new Error(`Failed to load questions. HTTP ${response.status}`)
 
     const data = await response.json()
+    if (!Array.isArray(data)) throw new Error('Invalid question data received.')
 
-    console.log('CAMS API /questions response:', data)
-
-    const questionData =
-      Array.isArray(data)
-        ? data
-        : Array.isArray(data.data)
-          ? data.data
-          : null
-
-    if (!questionData) {
-      throw new Error(
-        'Invalid question data received from Laravel.'
-      )
+    if (data.length > 0) {
+      questions.value = data.map(normalizeQuestion)
+      syncQuestionsStorage()
     }
-
-    questions.value = questionData.map(
-      normalizeQuestion
-    )
-
-    syncQuestionsStorage()
-
-    console.log(
-      `CAMS: Loaded ${questions.value.length} questions from Laravel.`
-    )
-
-  } catch (error) {
-    console.error(
-      'Failed to load questions from Laravel:',
-      error
-    )
-
-    // Do not destroy already loaded questions.
-    if (!questions.value.length && saved) {
-      try {
-        const parsed = JSON.parse(saved)
-
-        if (Array.isArray(parsed)) {
-          questions.value = parsed
-        }
-      } catch (cacheError) {
-        console.warn(
-          'CAMS: Cached questions could not be restored.',
-          cacheError
-        )
-      }
-    }
-  }
-}
-
-// ============================================================
-// AI VALIDATION ENGINE
-// ============================================================
-//
-// CAMS Question Quality Assistant
-//
-// Rule-based validation checks:
-//
-// 1. Bloom's Level
-// 2. LO Alignment
-// 3. CO Alignment
-// 4. Question Construction
-// 5. Answer & Distractor Quality
-// 6. AI Suggestions
-//
-// No numerical score.
-// No external AI API yet.
-// ============================================================
-
-
-// ============================================================
-// BASIC TEXT HELPERS
-// ============================================================
-
-function normalizeAuditText(value) {
-  return String(value || '')
-    .toLowerCase()
-    .replace(
-      /[^a-z0-9\s.-]/gi,
-      ' '
-    )
-    .replace(
-      /\s+/g,
-      ' '
-    )
-    .trim()
-}
-
-
-function getWords(value) {
-  return normalizeAuditText(value)
-    .split(/\s+/)
-    .filter(
-      word =>
-        word.length >= 4
-    )
-}
-
-
-function removeCommonWords(words) {
-  const stopWords =
-    new Set([
-      'about',
-      'after',
-      'again',
-      'against',
-      'among',
-      'also',
-      'based',
-      'being',
-      'between',
-      'could',
-      'different',
-      'during',
-      'explain',
-      'following',
-      'from',
-      'have',
-      'into',
-      'more',
-      'most',
-      'other',
-      'purpose',
-      'should',
-      'such',
-      'than',
-      'that',
-      'their',
-      'these',
-      'this',
-      'those',
-      'through',
-      'used',
-      'using',
-      'what',
-      'when',
-      'which',
-      'with'
-    ])
-
-  return words.filter(
-    word =>
-      !stopWords.has(word)
-  )
-}
-
-
-function calculateWordOverlap(
-  questionText,
-  targetText
-) {
-  const questionWords =
-    new Set(
-      removeCommonWords(
-        getWords(questionText)
-      )
-    )
-
-  const targetWords =
-    new Set(
-      removeCommonWords(
-        getWords(targetText)
-      )
-    )
-
-  if (
-    !questionWords.size ||
-    !targetWords.size
-  ) {
-    return 0
-  }
-
-  let matches = 0
-
-  questionWords.forEach(
-    word => {
-      if (
-        targetWords.has(word)
-      ) {
-        matches++
-      }
-    }
-  )
-
-  return (
-    matches /
-    Math.max(
-      targetWords.size,
-      1
-    )
-  )
-}
-
-
-// ============================================================
-// BLOOM'S TAXONOMY
-// ============================================================
-
-const BLOOM_VERBS = {
-  Remember: [
-    'define',
-    'identify',
-    'list',
-    'name',
-    'recall',
-    'recognize',
-    'state',
-    'label',
-    'select'
-  ],
-
-  Understanding: [
-    'describe',
-    'discuss',
-    'explain',
-    'classify',
-    'summarize',
-    'interpret',
-    'compare',
-    'identify',
-    'outline'
-  ],
-
-  Applying: [
-    'apply',
-    'demonstrate',
-    'use',
-    'operate',
-    'implement',
-    'execute',
-    'solve',
-    'perform',
-    'calculate'
-  ],
-
-  Analyzing: [
-    'analyze',
-    'differentiate',
-    'examine',
-    'compare',
-    'contrast',
-    'investigate',
-    'categorize',
-    'distinguish'
-  ],
-
-  Evaluating: [
-    'evaluate',
-    'assess',
-    'judge',
-    'justify',
-    'critique',
-    'defend',
-    'recommend',
-    'verify'
-  ],
-
-  Creating: [
-    'create',
-    'design',
-    'develop',
-    'construct',
-    'formulate',
-    'plan',
-    'produce'
-  ]
-}
-
-
-const BLOOM_ORDER = [
-  'Remember',
-  'Understanding',
-  'Applying',
-  'Analyzing',
-  'Evaluating',
-  'Creating'
-]
-
-
-function detectQuestionAction(text) {
-  const normalized =
-    normalizeAuditText(text)
-
-  for (
-    const [level, verbs] of
-    Object.entries(
-      BLOOM_VERBS
-    )
-  ) {
-    for (
-      const verb of verbs
-    ) {
-      const pattern =
-        new RegExp(
-          `\\b${verb}\\b`,
-          'i'
-        )
-
-      if (
-        pattern.test(
-          normalized
-        )
-      ) {
-        return {
-          verb,
-          level
-        }
-      }
-    }
-  }
-
-  if (
-    /^(what|who|when|where|which|name|identify)\b/i.test(
-      normalized
-    )
-  ) {
-    return {
-      verb: null,
-      level: 'Remember'
-    }
-  }
-
-  return {
-    verb: null,
-    level: null
-  }
-}
-
-
-// ============================================================
-// BLOOM VALIDATION
-// ============================================================
-
-function evaluateBloomSimple(q) {
-  const selectedLevel =
-    q.bloomLevel ||
-    q.bloom_level ||
-    'Understanding'
-
-  const questionText =
-    q.text || ''
-
-  const detected =
-    detectQuestionAction(
-      questionText
-    )
-
-  const selectedIndex =
-    BLOOM_ORDER.indexOf(
-      selectedLevel
-    )
-
-  if (
-    !questionText.trim()
-  ) {
-    return {
-      status: 'Review',
-      label: '⚠️ Review',
-      reason:
-        'The question stem is empty.',
-      suggestion:
-        'Complete the question stem before validating its Bloom level.'
-    }
-  }
-
-  if (
-    !detected.level
-  ) {
-    return {
-      status: 'Review',
-      label: '⚠️ Review',
-      reason:
-        `The cognitive action for "${selectedLevel}" could not be clearly detected.`,
-      suggestion:
-        `Use a clear ${selectedLevel.toLowerCase()}-level action in the question.`
-    }
-  }
-
-  const detectedIndex =
-    BLOOM_ORDER.indexOf(
-      detected.level
-    )
-
-  if (
-    detectedIndex ===
-    selectedIndex
-  ) {
-    return {
-      status: 'Appropriate',
-      label: '✅ Appropriate',
-      reason:
-        `The question appears consistent with the selected Bloom level "${selectedLevel}".`,
-      suggestion: null
-    }
-  }
-
-  if (
-    Math.abs(
-      detectedIndex -
-      selectedIndex
-    ) === 1
-  ) {
-    return {
-      status: 'Review',
-      label: '⚠️ Review',
-      reason:
-        `The question appears to assess "${detected.level}" while "${selectedLevel}" is selected.`,
-      suggestion:
-        `Review the question verb and cognitive demand so it better matches ${selectedLevel}.`
-    }
-  }
-
-  return {
-    status: 'Review',
-    label: '⚠️ Review',
-    reason:
-      `The question appears to assess "${detected.level}", which differs significantly from the selected Bloom level "${selectedLevel}".`,
-    suggestion:
-      `Revise the question so its required thinking process matches ${selectedLevel}.`
-  }
-}
-
-
-// ============================================================
-// LO ALIGNMENT
-// ============================================================
-
-function evaluateLOAlignmentSimple(q) {
-  const lo =
-    getQuestionLO(q)
-
-  if (!lo) {
-    return {
-      status: 'Not Aligned',
-      label: '❌ Not Aligned',
-      reason:
-        'The selected Learning Outcome could not be found.',
-      suggestion:
-        'Select a valid Learning Outcome before approving this question.'
-    }
-  }
-
-  const loText =
-    lo.description ||
-    lo.title ||
-    ''
-
-  const questionText =
-    q.text || ''
-
-  const overlap =
-    calculateWordOverlap(
-      questionText,
-      loText
-    )
-
-  const action =
-    detectQuestionAction(
-      questionText
-    )
-
-  const loAction =
-    detectQuestionAction(
-      loText
-    )
-
-  if (
-    overlap >= 0.30
-  ) {
-    if (
-      !loAction.level ||
-      !action.level ||
-      Math.abs(
-        BLOOM_ORDER.indexOf(
-          action.level
-        ) -
-        BLOOM_ORDER.indexOf(
-          loAction.level
-        )
-      ) <= 1
-    ) {
-      return {
-        status: 'Aligned',
-        label: '✅ Aligned',
-        reason:
-          `The question directly addresses the selected LO: ${lo.id || ''}.`,
-        suggestion: null
-      }
-    }
-
-    return {
-      status: 'Partially Aligned',
-      label: '⚠️ Partially Aligned',
-      reason:
-        'The question addresses the LO topic, but its cognitive action may not fully match the LO.',
-      suggestion:
-        `Revise the question so students perform the action required by ${lo.id || 'the selected LO'}.`
-    }
-  }
-
-  if (
-    overlap >= 0.15
-  ) {
-    return {
-      status: 'Partially Aligned',
-      label: '⚠️ Partially Aligned',
-      reason:
-        'The question has some connection to the selected LO, but the alignment is not sufficiently direct.',
-      suggestion:
-        `Make the question more directly assess the knowledge or skill stated in ${lo.id || 'the selected LO'}.`
-    }
-  }
-
-  return {
-    status: 'Not Aligned',
-    label: '❌ Not Aligned',
-    reason:
-      `The question does not clearly assess the selected Learning Outcome ${lo.id || ''}.`,
-    suggestion:
-      `Revise the question so it directly measures the knowledge or skill described in ${lo.id || 'the selected LO'}.`
-  }
-}
-
-
-// ============================================================
-// CO ALIGNMENT
-// ============================================================
-
-function evaluateCOAlignmentSimple(q) {
-  const co =
-    getQuestionCO(q)
-
-  const lo =
-    getQuestionLO(q)
-
-  if (!co) {
-    return {
-      status: 'Not Aligned',
-      label: '❌ Not Aligned',
-      reason:
-        'The selected Course Outcome could not be found.',
-      suggestion:
-        'Select a valid Course Outcome and Learning Outcome.'
-    }
-  }
-
-  const coText =
-    co.title ||
-    co.description ||
-    ''
-
-  const questionText =
-    q.text || ''
-
-  const selectedLOBelongsToCO =
-    Boolean(lo)
-
-  const overlap =
-    calculateWordOverlap(
-      questionText,
-      coText
-    )
-
-  if (
-    selectedLOBelongsToCO &&
-    overlap >= 0.10
-  ) {
-    return {
-      status: 'Aligned',
-      label: '✅ Aligned',
-      reason:
-        `The question supports ${co.id || 'the selected CO'} through the selected Learning Outcome.`,
-      suggestion: null
-    }
-  }
-
-  if (
-    selectedLOBelongsToCO
-  ) {
-    return {
-      status: 'Aligned',
-      label: '✅ Aligned',
-      reason:
-        `The question is mapped to a valid Learning Outcome under ${co.id || 'the selected CO'}.`,
-      suggestion: null
-    }
-  }
-
-  if (
-    overlap >= 0.15
-  ) {
-    return {
-      status: 'Partially Aligned',
-      label: '⚠️ Partially Aligned',
-      reason:
-        'The question has some relationship to the selected Course Outcome, but the mapping should be reviewed.',
-      suggestion:
-        'Confirm that the selected Learning Outcome belongs to this Course Outcome.'
-    }
-  }
-
-  return {
-    status: 'Not Aligned',
-    label: '❌ Not Aligned',
-    reason:
-      'The question does not clearly contribute to the selected Course Outcome.',
-    suggestion:
-      `Revise the question so it contributes directly to ${co.id || 'the selected Course Outcome'}.`
-  }
-}
-
-
-// ============================================================
-// QUESTION CONSTRUCTION
-// ============================================================
-
-function evaluateQuestionConstruction(q) {
-  const text =
-    String(q.text || '').trim()
-
-  if (!text) {
-    return {
-      status: 'Review',
-      label: '⚠️ Review',
-      reason:
-        'The question has no stem.',
-      suggestion:
-        'Write a complete and specific question stem.'
-    }
-  }
-
-  const suggestions = []
-
-  if (
-    text.length < 15
-  ) {
-    suggestions.push(
-      'The question may be too short or lack sufficient context.'
-    )
-  }
-
-  if (
-    text.length > 500
-  ) {
-    suggestions.push(
-      'The question stem is lengthy and may be simplified.'
-    )
-  }
-
-  if (
-    /[?]{2,}|!{2,}/.test(
-      text
-    )
-  ) {
-    suggestions.push(
-      'Remove unnecessary repeated punctuation.'
-    )
-  }
-
-  if (
-    /^(what is|what are|which of the following)\s*$/i.test(
-      text
-    )
-  ) {
-    suggestions.push(
-      'Make the question more specific.'
-    )
-  }
-
-  if (
-    q.type ===
-    'multiple_choice'
-  ) {
-    const options =
-      q.options || []
-
-    if (
-      options.length < 2
-    ) {
-      suggestions.push(
-        'Provide enough answer choices for a multiple-choice question.'
-      )
-    }
-  }
-
-  if (
-    suggestions.length
-  ) {
-    return {
-      status: 'Review',
-      label: '⚠️ Review',
-      reason:
-        suggestions[0],
-      suggestion:
-        suggestions[0]
-    }
-  }
-
-  return {
-    status: 'Good',
-    label: '✅ Good',
-    reason:
-      'The question stem is clear and sufficiently structured.',
-    suggestion: null
-  }
-}
-
-
-// ============================================================
-// ANSWER & DISTRACTOR QUALITY
-// ============================================================
-
-function evaluateAnswerAndDistractors(q) {
-  const type = q.type
-
-  // ----------------------------------------------------------
-  // MULTIPLE CHOICE
-  // ----------------------------------------------------------
-
-  if (
-    type ===
-    'multiple_choice'
-  ) {
-    const options =
-      Array.isArray(
-        q.options
-      )
-        ? q.options
-        : []
-
-    if (
-      options.length < 2
-    ) {
-      return {
-        status: 'Review',
-        label: '⚠️ Review',
-        reason:
-          'There are not enough answer choices.',
-        suggestion:
-          'Provide meaningful answer choices before approving the question.'
-      }
-    }
-
-    const texts =
-      options.map(option =>
-        String(
-          option?.text || ''
-        ).trim()
-      )
-
-    const normalizedTexts =
-      texts.map(text =>
-        normalizeAuditText(
-          text
-        )
-      )
-
-    if (
-      texts.some(
-        text => !text
-      )
-    ) {
-      return {
-        status: 'Review',
-        label: '⚠️ Review',
-        reason:
-          'One or more answer choices are empty.',
-        suggestion:
-          'Complete all answer choices with meaningful alternatives.'
-      }
-    }
-
-    const placeholderPattern =
-      /^(a|b|c|d|answer\s*[a-d]?|option\s*[a-d]?|choice\s*[a-d]?)$/i
-
-    if (
-      texts.some(text =>
-        placeholderPattern.test(
-          text
-        )
-      )
-    ) {
-      return {
-        status: 'Review',
-        label: '❌ Review',
-        reason:
-          'One or more choices appear to be placeholders rather than real answers.',
-        suggestion:
-          'Replace placeholder choices with meaningful and content-related alternatives.'
-      }
-    }
-
-    const uniqueChoices =
-      new Set(
-        normalizedTexts
-      )
-
-    if (
-      uniqueChoices.size !==
-      normalizedTexts.length
-    ) {
-      return {
-        status: 'Review',
-        label: '❌ Review',
-        reason:
-          'Two or more answer choices are identical or substantially duplicated.',
-        suggestion:
-          'Replace duplicated choices with distinct alternatives.'
-      }
-    }
-
-    const correctAnswers =
-      Array.isArray(
-        q.correctAnswer
-      )
-        ? q.correctAnswer
-        : []
-
-    if (
-      !correctAnswers.length
-    ) {
-      return {
-        status: 'Review',
-        label: '⚠️ Review',
-        reason:
-          'No correct answer is identified.',
-        suggestion:
-          'Mark the correct answer before approving the question.'
-      }
-    }
-
-    const veryShortChoices =
-      texts.filter(
-        text =>
-          text.length <= 1
-      )
-
-    if (
-      veryShortChoices.length >=
-      2
-    ) {
-      return {
-        status: 'Review',
-        label: '⚠️ Review',
-        reason:
-          'Several choices are extremely short and may not function as meaningful distractors.',
-        suggestion:
-          'Use realistic alternatives that require students to distinguish between concepts.'
-      }
-    }
-
-    return {
-      status: 'Good',
-      label: '✅ Good',
-      reason:
-        'The answer choices are populated, distinct, and a correct answer is identified.',
-      suggestion:
-        'Ensure distractors remain plausible and represent common misconceptions.'
-    }
-  }
-
-
-  // ----------------------------------------------------------
-  // TRUE / FALSE
-  // ----------------------------------------------------------
-
-  if (
-    type ===
-    'true_false'
-  ) {
-    const correctAnswers =
-      Array.isArray(
-        q.correctAnswer
-      )
-        ? q.correctAnswer
-        : []
-
-    if (
-      !correctAnswers.length
-    ) {
-      return {
-        status: 'Review',
-        label: '⚠️ Review',
-        reason:
-          'The correct True/False answer is not identified.',
-        suggestion:
-          'Identify whether the statement should be True or False.'
-      }
-    }
-
-    return {
-      status: 'Good',
-      label: '✅ Good',
-      reason:
-        'A correct True/False answer is identified.',
-      suggestion:
-        'Ensure the statement is clearly true or clearly false and avoids unnecessary clues.'
-    }
-  }
-
-
-  // ----------------------------------------------------------
-  // SHORT ANSWER
-  // ----------------------------------------------------------
-
-  if (
-    type ===
-    'short_answer'
-  ) {
-    const answers =
-      Array.isArray(
-        q.correctAnswer
-      )
-        ? q.correctAnswer
-        : []
-
-    if (
-      !answers.length
-    ) {
-      return {
-        status: 'Review',
-        label: '⚠️ Review',
-        reason:
-          'No expected answer has been identified.',
-        suggestion:
-          'Provide the expected answer or acceptable answer keywords.'
-      }
-    }
-
-    return {
-      status: 'Good',
-      label: '✅ Good',
-      reason:
-        'Expected answer information is available.',
-      suggestion:
-        'Include reasonable alternative answers or keywords when appropriate.'
-    }
-  }
-
-
-  // ----------------------------------------------------------
-  // MATCHING
-  // ----------------------------------------------------------
-
-  if (
-    type ===
-    'matching'
-  ) {
-    const pairs =
-      Array.isArray(
-        q.matchingPairs
-      )
-        ? q.matchingPairs
-        : []
-
-    if (
-      pairs.length < 2
-    ) {
-      return {
-        status: 'Review',
-        label: '⚠️ Review',
-        reason:
-          'The matching question contains too few valid pairs.',
-        suggestion:
-          'Provide at least two complete and meaningful matching pairs.'
-      }
-    }
-
-    const incompletePair =
-      pairs.some(pair =>
-        !String(
-          pair?.leftText || ''
-        ).trim() ||
-        !String(
-          pair?.rightText || ''
-        ).trim()
-      )
-
-    if (
-      incompletePair
-    ) {
-      return {
-        status: 'Review',
-        label: '⚠️ Review',
-        reason:
-          'One or more matching pairs are incomplete.',
-        suggestion:
-          'Complete both sides of every matching pair.'
-      }
-    }
-
-    return {
-      status: 'Good',
-      label: '✅ Good',
-      reason:
-        'The matching question contains complete pairs.',
-      suggestion:
-        'Ensure the pairs are conceptually distinct and not obvious from wording alone.'
-    }
-  }
-
-
-  return {
-    status: 'Good',
-    label: '✅ Good',
-    reason:
-      'No major answer-format issue was detected.',
-    suggestion: null
-  }
-}
-
-
-// ============================================================
-// COMPLETE AI AUDIT
-// ============================================================
-
-function buildAiAudit(q) {
-  const bloom =
-    evaluateBloomSimple(q)
-
-  const lo =
-    evaluateLOAlignmentSimple(q)
-
-  const co =
-    evaluateCOAlignmentSimple(q)
-
-  const construction =
-    evaluateQuestionConstruction(q)
-
-  const answer =
-    evaluateAnswerAndDistractors(q)
-
-  const suggestions = [
-    bloom.suggestion,
-    lo.suggestion,
-    co.suggestion,
-    construction.suggestion,
-    answer.suggestion
-  ].filter(Boolean)
-
-  let overallType =
-    'success'
-
-  if (
-    bloom.status === 'Review' ||
-    lo.status ===
-      'Partially Aligned' ||
-    co.status ===
-      'Partially Aligned' ||
-    construction.status ===
-      'Review' ||
-    answer.status ===
-      'Review'
-  ) {
-    overallType =
-      'warning'
-  }
-
-  if (
-    lo.status ===
-      'Not Aligned' ||
-    co.status ===
-      'Not Aligned'
-  ) {
-    overallType =
-      'warning'
-  }
-
-  return {
-    type:
-      overallType,
-
-    bloom,
-
-    loAlignment:
-      lo,
-
-    coAlignment:
-      co,
-
-    construction,
-
-    answer,
-
-    suggestions,
-
-    // No numerical scoring.
-    score: null,
-
-    rating:
-      overallType ===
-      'success'
-        ? 'Ready'
-        : 'Needs Review'
-  }
-}
-
-
-// ============================================================
-// AI DISPLAY MESSAGE
-// ============================================================
-
-function getCanonicalBloom(level) {
-  const value = String(level || 'Understanding').trim()
-  const map = {
-    Remembering: 'Remember',
-    Remember: 'Remember',
-    Understanding: 'Understanding',
-    Application: 'Applying',
-    Applying: 'Applying',
-    Analysis: 'Analyzing',
-    Analyzing: 'Analyzing',
-    Evaluation: 'Evaluating',
-    Evaluating: 'Evaluating',
-    Creating: 'Creating'
-  }
-  return map[value] || 'Understanding'
-}
-
-function getDisplayBloom(level) {
-  const map = {
-    Remember: 'Remembering',
-    Understanding: 'Understanding',
-    Applying: 'Application',
-    Analyzing: 'Analysis',
-    Evaluating: 'Evaluation',
-    Creating: 'Creating'
-  }
-  return map[level] || level || 'Understanding'
-}
-
-function cleanQuestionText(text) {
-  return String(text || '')
-    .replace(/\s+/g, ' ')
-    .replace(/([!?])\1+/g, '$1')
-    .trim()
-}
-
-function getRefinementTargetBloom(q) {
-  const selected = getCanonicalBloom(q.bloomLevel || 'Understanding')
-  const detected = detectQuestionAction(q.text || '')
-
-  if (detected.level && detected.level !== selected) {
-    return detected.level
-  }
-
-  return selected
-}
-
-function refineQuestionStem(text, targetBloom) {
-  const original = cleanQuestionText(text)
-  if (!original) return ''
-
-  const noQuestionMark = original.replace(/[?]+$/, '').trim()
-  const content = noQuestionMark
-    .replace(
-      /^(what is|what are|who is|who are|when|where|which|identify|define|name|list|state|explain|describe|discuss|analyze|analyse|evaluate|assess)\s+/i,
-      ''
-    )
-    .trim()
-
-  if (targetBloom === 'Remember') {
-    if (/^(what is|what are|who is|who are|when|where|which|identify|define|name|list|state)\b/i.test(original)) {
-      return original.endsWith('?') ? original : `${original}?`
-    }
-    return `Identify ${content}.`
-  }
-
-  if (targetBloom === 'Understanding') {
-    if (/^(explain|describe|discuss)\b/i.test(original)) {
-      return /[.!?]$/.test(original) ? original : `${original}.`
-    }
-    return `Explain ${content}.`
-  }
-
-  // Safe prototype: do not invent technical facts or answers for higher Bloom levels.
-  return original
-}
-
-function buildAiRefinement(q) {
-  const targetBloom = getRefinementTargetBloom(q)
-  const originalText = cleanQuestionText(q.text)
-  const refinedText = refineQuestionStem(originalText, targetBloom)
-
-  const options = Array.isArray(q.options)
-    ? q.options.map(option => ({ ...option }))
-    : []
-
-  const correctAnswer = cloneCorrectAnswer(parseCorrectAnswer(q.correctAnswer))
-  const matchingPairs = Array.isArray(q.matchingPairs)
-    ? q.matchingPairs.map(pair => ({ ...pair }))
-    : []
-
-  const changes = []
-  const originalBloom = getCanonicalBloom(q.bloomLevel || 'Understanding')
-
-  if (originalBloom !== targetBloom) {
-    changes.push(
-      `Bloom level adjusted from ${getDisplayBloom(originalBloom)} to ${getDisplayBloom(targetBloom)}.`
-    )
-  }
-
-  if (refinedText !== originalText) {
-    changes.push(
-      'Question wording refined to better reflect the detected cognitive action.'
-    )
-  }
-
-  return {
-    available: Boolean(refinedText),
-    changed: Boolean(refinedText) && (
-      refinedText !== originalText ||
-      originalBloom !== targetBloom
-    ),
-    bloomLevel: getDisplayBloom(targetBloom),
-    text: refinedText,
-    options,
-    correctAnswer,
-    matchingPairs,
-    explanation: changes
-  }
-}
-
-function generateAiSuggestion(q) {
-  const audit = buildAiAudit(q)
-
-  return {
-    type: audit.type,
-
-    bloom: audit.bloom,
-    loAlignment: audit.loAlignment,
-    coAlignment: audit.coAlignment,
-    construction: audit.construction,
-    answer: audit.answer,
-
-    suggestions: audit.suggestions || [],
-
-    score: null,
-
-    rating:
-      audit.type === 'success'
-        ? 'Ready'
-        : 'Needs Review'
-  }
-}
-
-async function useAiRefinement(q) {
-  const suggestion = generateAiSuggestion(q)
-  const refinement = suggestion.refinement
-
-  if (!refinement?.available || !refinement.changed) {
-    alert(
-      'A safe AI refinement could not be prepared for this question. Please review the item manually.'
-    )
-    return
-  }
-
-  const changes = refinement.explanation.length
-    ? `\n\nPrepared changes:\n- ${refinement.explanation.join('\n- ')}`
-    : ''
-
-  if (!confirm(
-    `Use AI Refinement?\n\nThe refined version will replace the current working version.${changes}`
-  )) {
-    return
-  }
-
-  const courseId = q.courseDbId || resolveCourseId(q.courseId)
-
-  if (!courseId) {
-    alert('The question course could not be identified.')
-    return
-  }
-
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/questions/${q.id}`,
-      {
-        method: 'PUT',
-        headers: getAuthHeaders(true),
-        body: JSON.stringify({
-          program: q.program || null,
-          term: q.term || null,
-          course_id: courseId,
-          course_outcome_id: q.courseOutcomeId || null,
-          learning_outcome_id: q.learningOutcomeId || null,
-          code: q.code,
-          type: q.type,
-          text: refinement.text,
-          image_url: q.imageUrl || null,
-          options: refinement.options.length ? refinement.options : null,
-          correct_answer:
-            refinement.correctAnswer !== null && refinement.correctAnswer !== undefined
-              ? JSON.stringify(refinement.correctAnswer)
-              : null,
-          matching_pairs: refinement.matchingPairs.length ? refinement.matchingPairs : null,
-          stcw_standard: q.stcwStandard || null,
-          bloom_level: refinement.bloomLevel,
-          status: q.status || 'Pending',
-          ai_accepted: true,
-          retained_ai: false
-        })
-      }
-    )
-
-    if (!response.ok) {
-      throw await getApiError(response)
-    }
-
-    const updated = normalizeQuestion(await response.json())
-    const index = questions.value.findIndex(
-      question => question.id === q.id
-    )
-
-    if (index !== -1) {
-      questions.value[index] = updated
-    }
-
-    syncQuestionsStorage()
-
-    alert(
-      'AI Refinement applied successfully. The refined version is now the official working question.'
-    )
   } catch (err) {
-    console.error('Failed to use AI refinement:', err)
-    alert(err.message || 'Unable to apply the AI refinement.')
+    console.warn('CAMS: Fallback to cached questions due to error:', err.message)
   }
 }
-
-async function retainOriginalSettings(q) {
-  if (!confirm(
-    'Retain Original?\n\nThe instructor-created or uploaded question will remain unchanged and will be recorded as the retained original.'
-  )) {
-    return
-  }
-
-  const courseId = q.courseDbId || resolveCourseId(q.courseId)
-
-  if (!courseId) {
-    alert('The question course could not be identified.')
-    return
-  }
-
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/questions/${q.id}`,
-      {
-        method: 'PUT',
-        headers: getAuthHeaders(true),
-        body: JSON.stringify({
-          program: q.program || null,
-          term: q.term || null,
-          course_id: courseId,
-          course_outcome_id: q.courseOutcomeId || null,
-          learning_outcome_id: q.learningOutcomeId || null,
-          code: q.code,
-          type: q.type,
-          text: q.text,
-          image_url: q.imageUrl || null,
-          options: q.options || null,
-          correct_answer:
-            q.correctAnswer !== null && q.correctAnswer !== undefined
-              ? JSON.stringify(q.correctAnswer)
-              : null,
-          matching_pairs: q.matchingPairs || null,
-          stcw_standard: q.stcwStandard || null,
-          bloom_level: q.bloomLevel || 'Understanding',
-          status: q.status || 'Pending',
-          ai_accepted: false,
-          retained_ai: true
-        })
-      }
-    )
-
-    if (!response.ok) {
-      throw await getApiError(response)
-    }
-
-    const updated = normalizeQuestion(await response.json())
-    const index = questions.value.findIndex(
-      question => question.id === q.id
-    )
-
-    if (index !== -1) {
-      questions.value[index] = updated
-    }
-
-    syncQuestionsStorage()
-
-    alert('Original question retained successfully.')
-  } catch (err) {
-    console.error('Failed to retain original question:', err)
-    alert(err.message || 'Unable to retain the original question.')
-  }
-}
-
-
-// ============================================================
-// ON MOUNT
-// ============================================================
 
 onMounted(async () => {
   await fetchCourses()

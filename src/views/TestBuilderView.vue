@@ -33,7 +33,7 @@ const selectedItems = ref([
     id: 'Q-101',
     code: 'NAV-101-01',
     text: 'What is the primary objective of keeping a safe navigational watch under STCW?',
-    bloomsLevel: 'Understanding',
+    bloomLevel: 'Understanding',
     points: 1,
     aiScore: '98%'
   },
@@ -41,7 +41,7 @@ const selectedItems = ref([
     id: 'Q-103',
     code: 'NAV-101-03',
     text: 'According to COLREG Rule 15, which vessel is give-way in a crossing situation?',
-    bloomsLevel: 'Remembering',
+    bloomLevel: 'Remembering',
     points: 1,
     aiScore: '95%'
   },
@@ -49,7 +49,7 @@ const selectedItems = ref([
     id: 'Q-105',
     code: 'NAV-101-05',
     text: 'What action should be taken immediately upon observing a Man Overboard (MOB) incident?',
-    bloomsLevel: 'Application',
+    bloomLevel: 'Application',
     points: 2,
     aiScore: '99%'
   }
@@ -66,7 +66,7 @@ function autoAssembleTest() {
         id: `Q-AI-${Date.now()}-1`,
         code: 'NAV-101-08',
         text: 'Determine the true vector course to steer when compensating for a 3-knot leeway current.',
-        bloomsLevel: 'Analysis',
+        bloomLevel: 'Analysis',
         points: 2,
         aiScore: '97%'
       },
@@ -74,7 +74,7 @@ function autoAssembleTest() {
         id: `Q-AI-${Date.now()}-2`,
         code: 'NAV-101-12',
         text: 'Identify the required fog signals for a power-driven vessel underway but stopped and making no way.',
-        bloomsLevel: 'Understanding',
+        bloomLevel: 'Understanding',
         points: 1,
         aiScore: '96%'
       }
@@ -227,7 +227,7 @@ function publishToPilot() {
                     {{ item.code }}
                   </span>
                   <span class="text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full">
-                    {{ item.bloomsLevel }}
+                    {{ item.bloomLevel }}
                   </span>
                 </div>
                 <p class="text-sm font-semibold text-gray-900 pt-1">{{ item.text }}</p>

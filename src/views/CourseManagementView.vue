@@ -1045,7 +1045,7 @@ onMounted(() => {
         <p class="text-[11px] text-slate-500">Cadet responses matching any of these keywords will be marked as correct.</p>
       </div>
 
-      <!-- MATCHING TYPE -->
+      <!-- MATCHING TYPE SECTION -->
       <div v-if="form.type === 'matching'" class="space-y-3 bg-slate-50 p-4 rounded-xl border">
         <div class="flex justify-between items-center">
           <span class="text-xs font-bold text-slate-700">Matching Pairs (Prompts & Answers)</span>
@@ -1054,129 +1054,95 @@ onMounted(() => {
           </button>
         </div>
 
-        <div v-for="(pair, idx) in form.matchingPairs" :key="idx" class="grid grid-cols-1 md:grid-cols-2 gap-3 bg-white p-3 rounded-xl border relative">
-          <div class="space-y-2">
-            <span class="text-[11px] font-bold text-slate-500">Item {{ idx + 1 }} (Prompt)</span>
-            <input v-model="pair.prompt" placeholder="Prompt text..." class="w-full p-2 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500" />
+        <div v-for="(pair, idx) in form.matchingPairs" :key="idx" class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white p-3 rounded-xl border shadow-2xs relative">
+          <div>
+            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Prompt {{ idx + 1 }}</label>
+            <input v-model="pair.prompt" placeholder="Item / Prompt text..." class="w-full p-2 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500" />
+          </div>
+          <div>
+            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Matching Answer {{ idx + 1 }}</label>
             <div class="flex items-center gap-2">
-              <label class="cursor-pointer text-[11px] font-bold text-slate-600 flex items-center gap-1 border px-2 py-1 rounded bg-slate-50">
-                <Image :size="12" /> {{ pair.promptImage ? 'Change Image' : 'Add Image' }}
-                <input type="file" accept="image/*" class="hidden" @change="e => handleFileUpload(e, pair, 'promptImage')" />
-              </label>
-              <div v-if="pair.promptImage" class="relative">
-                <img :src="pair.promptImage" class="h-8 w-8 object-cover rounded border" />
-                <button @click="removeImage(pair, 'promptImage')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5">
-                  <X :size="10" />
-                </button>
-              </div>
+              <input v-model="pair.match" placeholder="Matching answer text..." class="w-full p-2 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500" />
+              <button v-if="form.matchingPairs.length > 2" @click="removeMatchingPair(idx)" class="text-red-500 hover:text-red-700 p-1">
+                <Trash2 :size="16" />
+              </button>
             </div>
           </div>
-
-          <div class="space-y-2 pr-6">
-            <span class="text-[11px] font-bold text-slate-500">Matching Answer</span>
-            <input v-model="pair.match" placeholder="Matching answer text..." class="w-full p-2 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500" />
-            <div class="flex items-center gap-2">
-              <label class="cursor-pointer text-[11px] font-bold text-slate-600 flex items-center gap-1 border px-2 py-1 rounded bg-slate-50">
-                <Image :size="12" /> {{ pair.matchImage ? 'Change Image' : 'Add Image' }}
-                <input type="file" accept="image/*" class="hidden" @change="e => handleFileUpload(e, pair, 'matchImage')" />
-              </label>
-              <div v-if="pair.matchImage" class="relative">
-                <img :src="pair.matchImage" class="h-8 w-8 object-cover rounded border" />
-                <button @click="removeImage(pair, 'matchImage')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5">
-                  <X :size="10" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <button v-if="form.matchingPairs.length > 2" @click="removeMatchingPair(idx)" class="absolute top-2 right-2 text-red-500 hover:text-red-700 p-1">
-            <Trash2 :size="14" />
-          </button>
         </div>
       </div>
 
-      <!-- Submit Action -->
-      <button @click="saveQuestion" :disabled="isSubmitting" class="w-full py-3 bg-[#00c068] hover:bg-[#00a358] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-2xs transition">
-        <Save :size="16" /> Save Question Item
-      </button>
+      <!-- Action Footer -->
+      <div class="flex justify-end gap-3 pt-4 border-t border-slate-200">
+        <button @click="resetForm" type="button" class="px-4 py-2 border border-slate-300 rounded-xl text-xs font-medium text-slate-700 hover:bg-slate-50">
+          Reset Form
+        </button>
+        <button @click="saveQuestion" :disabled="isSubmitting" type="button" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-2">
+          <Save :size="14" />
+          {{ isSubmitting ? 'Saving Item...' : 'Save Question Item' }}
+        </button>
+      </div>
 
     </div>
 
-    <!-- TAB 3: COURSE REPORTS & AUDITS -->
+    <!-- TAB 3: COURSE AUDIT REPORTS -->
     <div v-show="activeTab === 'report'" class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-6">
-      <div class="flex flex-col md:flex-row justify-between md:items-center border-b pb-4 gap-4">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
         <div>
-          <h2 class="text-base font-bold text-slate-900 flex items-center gap-2 tracking-tight">
-            <BarChart2 class="text-emerald-600" :size="20" /> Course Question Changes & Audit Report
-          </h2>
-          <p class="text-xs text-slate-500">View question counts, approval status, and AI overrides grouped per course.</p>
+          <h2 class="text-base font-bold text-slate-900">Course Question Audit & Alignment Report</h2>
+          <p class="text-xs text-slate-500">Summary of question items, approval statuses, and retained AI overrides per course.</p>
         </div>
-
-        <button @click="exportCourseReportCSV" type="button" class="px-4 py-2 bg-[#00c068] hover:bg-[#00a358] text-white text-xs font-bold rounded-xl flex items-center gap-2 transition shadow-2xs self-start md:self-auto">
+        <button @click="exportCourseReportCSV" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-2">
           <Download :size="14" /> Export Report CSV
         </button>
       </div>
 
-      <!-- Summary Stat Cards -->
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div class="bg-slate-50 border p-4 rounded-xl">
-          <span class="text-[11px] font-bold text-slate-500 block uppercase">Total Questions</span>
-          <span class="text-xl font-extrabold text-slate-900">{{ overallReportSummary.total }}</span>
+      <!-- Overview Cards -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
+        <div class="p-3 bg-slate-50 border rounded-xl">
+          <span class="text-[10px] text-slate-500 font-bold uppercase block">Total Items</span>
+          <span class="text-lg font-black text-slate-900">{{ overallReportSummary.total }}</span>
         </div>
-        <div class="bg-emerald-50 border border-emerald-100 p-4 rounded-xl">
-          <span class="text-[11px] font-bold text-emerald-700 block uppercase">Approved</span>
-          <span class="text-xl font-extrabold text-emerald-800">{{ overallReportSummary.approved }}</span>
+        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <span class="text-[10px] text-emerald-700 font-bold uppercase block">Approved</span>
+          <span class="text-lg font-black text-emerald-800">{{ overallReportSummary.approved }}</span>
         </div>
-        <div class="bg-amber-50 border border-amber-100 p-4 rounded-xl">
-          <span class="text-[11px] font-bold text-amber-700 block uppercase">Pending Review</span>
-          <span class="text-xl font-extrabold text-amber-800">{{ overallReportSummary.pending }}</span>
+        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <span class="text-[10px] text-amber-700 font-bold uppercase block">Pending</span>
+          <span class="text-lg font-black text-amber-800">{{ overallReportSummary.pending }}</span>
         </div>
-        <div class="bg-red-50 border border-red-100 p-4 rounded-xl">
-          <span class="text-[11px] font-bold text-red-700 block uppercase">Disapproved</span>
-          <span class="text-xl font-extrabold text-red-800">{{ overallReportSummary.disapproved }}</span>
+        <div class="p-3 bg-red-50 border border-red-200 rounded-xl">
+          <span class="text-[10px] text-red-700 font-bold uppercase block">Disapproved</span>
+          <span class="text-lg font-black text-red-800">{{ overallReportSummary.disapproved }}</span>
         </div>
-        <div class="bg-blue-50 border border-blue-100 p-4 rounded-xl">
-          <span class="text-[11px] font-bold text-blue-700 block uppercase">AI Retained</span>
-          <span class="text-xl font-extrabold text-blue-800">{{ overallReportSummary.retainedAi }}</span>
+        <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl">
+          <span class="text-[10px] text-purple-700 font-bold uppercase block">AI Retained</span>
+          <span class="text-lg font-black text-purple-800">{{ overallReportSummary.retainedAi }}</span>
         </div>
       </div>
 
-      <!-- Course Breakdown Table -->
+      <!-- Report Table -->
       <div class="overflow-x-auto border rounded-xl">
         <table class="w-full text-left text-xs">
-          <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b">
+          <thead class="bg-slate-50 border-b text-slate-700 font-bold">
             <tr>
               <th class="p-3">Course Code</th>
               <th class="p-3">Course Title</th>
               <th class="p-3">Program</th>
-              <th class="p-3 text-center">Total Items</th>
+              <th class="p-3 text-center">Total Questions</th>
               <th class="p-3 text-center">Approved</th>
               <th class="p-3 text-center">Pending</th>
               <th class="p-3 text-center">Disapproved</th>
-              <th class="p-3 text-center">AI Overrides</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100 font-medium text-slate-800">
-            <tr v-for="report in courseReports" :key="report.code" class="hover:bg-slate-50/80">
+          <tbody class="divide-y divide-slate-100">
+            <tr v-for="report in courseReports" :key="report.code" class="hover:bg-slate-50">
               <td class="p-3 font-mono font-bold text-slate-900">{{ report.code }}</td>
-              <td class="p-3 font-bold">{{ report.title }}</td>
-              <td class="p-3"><span class="bg-slate-100 px-2 py-0.5 rounded text-[11px] font-semibold">{{ report.program }}</span></td>
+              <td class="p-3 font-semibold text-slate-800">{{ report.title }}</td>
+              <td class="p-3"><span class="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold text-slate-700">{{ report.program }}</span></td>
               <td class="p-3 text-center font-bold">{{ report.total }}</td>
-              <td class="p-3 text-center">
-                <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.approved }}</span>
-              </td>
-              <td class="p-3 text-center">
-                <span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.pending }}</span>
-              </td>
-              <td class="p-3 text-center">
-                <span class="bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.disapproved }}</span>
-              </td>
-              <td class="p-3 text-center">
-                <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.retainedAi }}</span>
-              </td>
-            </tr>
-            <tr v-if="courseReports.length === 0">
-              <td colspan="8" class="p-6 text-center text-slate-400">No course data available.</td>
+              <td class="p-3 text-center text-emerald-700 font-bold">{{ report.approved }}</td>
+              <td class="p-3 text-center text-amber-700 font-bold">{{ report.pending }}</td>
+              <td class="p-3 text-center text-red-700 font-bold">{{ report.disapproved }}</td>
             </tr>
           </tbody>
         </table>
