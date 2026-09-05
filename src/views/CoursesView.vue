@@ -73,7 +73,7 @@ async function loadCoursesFromStorage() {
   isLoading.value = true
 
   try {
-    const response = await fetch(`${API_BASE_URL}/courses`, {
+    const response = await fetch(`http://127.0.0.1:8000/courses`, {
       method: 'GET',
       headers: getAuthHeaders()
     })
@@ -363,7 +363,7 @@ async function handleSaveCourse() {
 
     if (editingCourseId.value) {
       response = await fetch(
-        `${API_BASE_URL}/courses/${editingCourseId.value}`,
+        `http://127.0.0.1:8000/courses/${editingCourseId.value}`,
         {
           method: 'PUT',
           headers: getAuthHeaders(),
@@ -378,7 +378,7 @@ async function handleSaveCourse() {
 
     else {
       response = await fetch(
-        `${API_BASE_URL}/courses`,
+        `http://127.0.0.1:8000/courses`,
         {
           method: 'POST',
           headers: getAuthHeaders(),
@@ -712,7 +712,7 @@ async function submitBulkCourses() {
       }
 
       const response = await fetch(
-        `${API_BASE_URL}/courses`,
+        `http://127.0.0.1:8000/courses`,
         {
           method: 'POST',
           headers: getAuthHeaders(),
@@ -792,7 +792,7 @@ async function deleteCourse(id) {
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/courses/${id}`,
+      `http://127.0.0.1:8000/courses/${id}`,
       {
         method: 'DELETE',
         headers: getAuthHeaders()
