@@ -1383,9 +1383,14 @@ async function saveQuestion() {
   isSubmitting.value = true
 
   try {
-    const response = await fetch(`http://127.0.0.1:8000/questions`, {
+    // FIX 1: Added /api/ to the endpoint URL
+    const response = await fetch('http://127.0.0.1:8000/api/questions', {
       method: 'POST',
-      headers: getAuthHeaders(true),
+      headers: {
+        'Accept': 'application/json', // FIX 2: Forces Laravel to send back JSON errors instead of HTML
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(true)
+      },
       body: JSON.stringify(payload)
     })
 
@@ -1515,7 +1520,7 @@ async function saveEditedQuestion() {
   }
 
   try {
-    const response = await fetch(`http://127.0.0.1:8000/questions/${editingQuestion.value.id}`, {
+    const response = await fetch(`http://127.0.0.1:8000/api/questions/${editingQuestion.value.id}`, {
       method: 'PUT',
       headers: getAuthHeaders(true),
       body: JSON.stringify(payload)
@@ -1549,7 +1554,7 @@ async function updateQuestionStatus(id, status) {
   }
 
   try {
-    const response = await fetch(`http://127.0.0.1:8000/questions/${id}`, {
+    const response = await fetch(`http://127.0.0.1:8000/api/questions/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(true),
       body: JSON.stringify({
@@ -1590,7 +1595,7 @@ async function deleteQuestion(id) {
   if (!confirm('Are you sure you want to remove this question item?')) return
 
   try {
-    const response = await fetch(`http://127.0.0.1:8000/questions/${id}`, {
+    const response = await fetch(`http://127.0.0.1:8000/api/questions/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders()
     })
@@ -1621,7 +1626,7 @@ async function bulkUpdateStatus(status) {
       const question = questions.value.find(item => item.id === id)
       if (!question) continue
 
-      const response = await fetch(`http://127.0.0.1:8000/questions/${id}`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/questions/${id}`, {
         method: 'PUT',
         headers: getAuthHeaders(true),
         body: JSON.stringify({
@@ -1671,7 +1676,7 @@ async function bulkDeleteQuestions() {
 
   try {
     for (const id of selectedQuestionIds.value) {
-      const response = await fetch(`http://127.0.0.1:8000/questions/${id}`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/questions/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       })
@@ -2014,7 +2019,7 @@ async function handleBulkCSVUpload(event) {
           retained_ai: false
         }
 
-        const response = await fetch(`http://127.0.0.1:8000/questions`, {
+        const response = await fetch(`http://127.0.0.1:8000/api/questions`, {
           method: 'POST',
           headers: getAuthHeaders(true),
           body: JSON.stringify(payload)
@@ -2091,7 +2096,7 @@ async function loadCachedQuestions() {
 async function fetchCourses() {
   await loadCachedCourses()
   try {
-    const response = await fetch(`http://127.0.0.1:8000/courses`, {
+    const response = await fetch(`http://127.0.0.1:8000/api/courses`, {
       method: 'GET',
       headers: getAuthHeaders()
     })
@@ -2114,7 +2119,7 @@ async function fetchCourses() {
 async function fetchQuestions() {
   await loadCachedQuestions()
   try {
-    const response = await fetch(`http://127.0.0.1:8000/questions`, {
+    const response = await fetch(`http://127.0.0.1:8000/api/questions`, {
       method: 'GET',
       headers: getAuthHeaders()
     })

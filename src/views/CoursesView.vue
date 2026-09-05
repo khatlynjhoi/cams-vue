@@ -45,7 +45,7 @@ const bulkPreview = ref([])
 const STORAGE_KEY = 'cams_courses_data'
 
 // Laravel API
-const API_BASE_URL = 'http://127.0.0.1:8000/api'
+const API_BASE_URL = 'http://127.0.0.1:8000/api/api'
 
 // --------------------------------------------------
 // AUTHENTICATION HELPER
@@ -73,7 +73,7 @@ async function loadCoursesFromStorage() {
   isLoading.value = true
 
   try {
-    const response = await fetch(`http://127.0.0.1:8000/courses`, {
+    const response = await fetch(`http://127.0.0.1:8000/api/courses`, {
       method: 'GET',
       headers: getAuthHeaders()
     })
@@ -363,7 +363,7 @@ async function handleSaveCourse() {
 
     if (editingCourseId.value) {
       response = await fetch(
-        `http://127.0.0.1:8000/courses/${editingCourseId.value}`,
+        `http://127.0.0.1:8000/api/courses/${editingCourseId.value}`,
         {
           method: 'PUT',
           headers: getAuthHeaders(),
@@ -378,7 +378,7 @@ async function handleSaveCourse() {
 
     else {
       response = await fetch(
-        `http://127.0.0.1:8000/courses`,
+        `http://127.0.0.1:8000/api/courses`,
         {
           method: 'POST',
           headers: getAuthHeaders(),
@@ -712,7 +712,7 @@ async function submitBulkCourses() {
       }
 
       const response = await fetch(
-        `http://127.0.0.1:8000/courses`,
+        `http://127.0.0.1:8000/api/courses`,
         {
           method: 'POST',
           headers: getAuthHeaders(),
@@ -792,7 +792,7 @@ async function deleteCourse(id) {
 
   try {
     const response = await fetch(
-      `http://127.0.0.1:8000/courses/${id}`,
+      `http://127.0.0.1:8000/api/courses/${id}`,
       {
         method: 'DELETE',
         headers: getAuthHeaders()
