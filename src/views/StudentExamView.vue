@@ -25,7 +25,7 @@ let timerInterval = null
 const scoreResults = ref({ score: 0, total: 0, percentage: 0, breakdown: {} })
 
 function startExam() {
-  fetch('http://localhost:3001/api/exams/generate', {
+  fetch('http://127.0.0.1:8000/api/exams/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ courseId: courseCodeInput.value, totalItems: 10 })

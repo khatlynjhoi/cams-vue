@@ -335,7 +335,7 @@ async function fetchQuestions() {
       questions.value = JSON.parse(saved)
       return
     }
-    const res = await fetch('http://localhost:3001/api/questions')
+    const res = await fetch('http://127.0.0.1:8000/api/questions')
     const data = await res.json()
     if (data.success) {
       questions.value = data.data
@@ -354,7 +354,7 @@ async function fetchCourses() {
       return
     }
 
-    const res = await fetch('http://localhost:3001/api/courses')
+    const res = await fetch('http://127.0.0.1:8000/api/courses')
     const data = await res.json()
     if (data.success) {
       courses.value = data.data
@@ -404,7 +404,7 @@ async function saveQuestion() {
 
   isSubmitting.value = true
   try {
-    const res = await fetch('http://localhost:3001/api/questions', {
+    const res = await fetch('http://127.0.0.1:8000/api/questions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -585,7 +585,7 @@ function handleBulkCSVUpload(event) {
       }
 
       try {
-        const res = await fetch('http://localhost:3001/api/questions/bulk', {
+        const res = await fetch('http://127.0.0.1:8000/api/questions/bulk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ questions: parsedQuestions })

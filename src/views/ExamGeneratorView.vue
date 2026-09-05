@@ -28,7 +28,7 @@ function onProgramChange() {
 
 async function fetchCourses() {
   try {
-    const res = await fetch('http://localhost:3001/api/courses')
+    const res = await fetch('http://127.0.0.1:8000/api/courses')
     const data = await res.json()
     if (data.success) courses.value = data.data
   } catch (err) {
@@ -46,7 +46,7 @@ async function generateExamPaper() {
 
   isGenerating.value = true
   try {
-    const res = await fetch('http://localhost:3001/api/exams/generate', {
+    const res = await fetch('http://127.0.0.1:8000/api/exams/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
