@@ -1,15 +1,13 @@
-```vue
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import {
-  Plus, Trash2, Clock, BookOpen, FileSpreadsheet, Download,
+  Plus, Trash2, Clock, Download,
   Upload, ChevronDown, ChevronRight, Search, Filter, ArrowUpDown,
   Pencil, RotateCcw
 } from 'lucide-vue-next'
 
 const courses = ref([])
 const isLoading = ref(true)
-const entryMode = ref('manual')
 
 // Accordion State
 const expandedCourses = ref(new Set())
@@ -40,12 +38,11 @@ const courseOutcomes = ref([
 const csvFileName = ref('')
 const csvParseError = ref('')
 const bulkPreview = ref([])
+const isUploadingBulk = ref(false)
+const bulkFileInput = ref(null)
 
 // Local Storage Cache
 const STORAGE_KEY = 'cams_courses_data'
-
-// Laravel API
-const API_BASE_URL = 'http://127.0.0.1:8000/api/api'
 
 // --------------------------------------------------
 // AUTHENTICATION HELPER
@@ -92,20 +89,15 @@ async function loadCoursesFromStorage() {
     courses.value = Array.isArray(data)
       ? data.map(course => ({
           ...course,
-
-          // Laravel stores this as course_outcomes.
-          // Vue continues using courseOutcomes.
           courseOutcomes: course.course_outcomes || []
         }))
       : []
 
-    // Keep localStorage synchronized as a temporary cache.
     saveCoursesToStorage()
 
   } catch (err) {
     console.error('Failed to load courses from Laravel:', err)
 
-    // Temporary fallback to existing localStorage.
     try {
       const savedData = localStorage.getItem(STORAGE_KEY)
 
@@ -286,8 +278,6 @@ function startEditCourse(course) {
     addCourseOutcome()
   }
 
-  entryMode.value = 'manual'
-
   window.scrollTo({
     top: 0,
     behavior: 'smooth'
@@ -329,10 +319,8 @@ async function handleSaveCourse() {
     return
   }
 
-  let token
-
   try {
-    token = localStorage.getItem('token')
+    const token = localStorage.getItem('token')
 
     if (!token) {
       alert('Your session has expired. Please log in again.')
@@ -357,10 +345,6 @@ async function handleSaveCourse() {
   try {
     let response
 
-    // ----------------------------------------------
-    // UPDATE EXISTING COURSE
-    // ----------------------------------------------
-
     if (editingCourseId.value) {
       response = await fetch(
         `http://127.0.0.1:8000/api/courses/${editingCourseId.value}`,
@@ -370,13 +354,7 @@ async function handleSaveCourse() {
           body: JSON.stringify(payload)
         }
       )
-    }
-
-    // ----------------------------------------------
-    // CREATE NEW COURSE
-    // ----------------------------------------------
-
-    else {
+    } else {
       response = await fetch(
         `http://127.0.0.1:8000/api/courses`,
         {
@@ -396,16 +374,10 @@ async function handleSaveCourse() {
       )
     }
 
-    // Laravel returns course_outcomes.
-    // Vue continues using courseOutcomes.
     const savedCourse = {
       ...data,
       courseOutcomes: data.course_outcomes || []
     }
-
-    // ----------------------------------------------
-    // UPDATE LOCAL ARRAY
-    // ----------------------------------------------
 
     if (editingCourseId.value) {
       const index = courses.value.findIndex(
@@ -417,32 +389,20 @@ async function handleSaveCourse() {
       }
 
       alert('Course syllabus updated successfully!')
-    }
-
-    // ----------------------------------------------
-    // ADD NEW COURSE TO LOCAL ARRAY
-    // ----------------------------------------------
-
-    else {
+    } else {
       courses.value.unshift(savedCourse)
-
       alert('Course syllabus saved successfully!')
     }
 
-    // Keep temporary cache synchronized.
     saveCoursesToStorage()
-
-    // Reset form.
     cancelEdit()
 
   } catch (err) {
     console.error('Course save error:', err)
-
     alert(
       err.message ||
       'Unable to save course to Laravel.'
     )
-
   } finally {
     isLoading.value = false
   }
@@ -520,7 +480,6 @@ function downloadCSVTemplate() {
     ].join('\n')
 
   const encodedUri = encodeURI(csvContent)
-
   const link = document.createElement('a')
 
   link.setAttribute('href', encodedUri)
@@ -535,6 +494,37 @@ function downloadCSVTemplate() {
 }
 
 // --------------------------------------------------
+// CSV ROW PARSER HELPER
+// --------------------------------------------------
+
+function parseCSVLine(line) {
+  const row = []
+  let current = ''
+  let inQuotes = false
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"'
+        i++ // handle double-quote escape ("")
+      } else {
+        inQuotes = !inQuotes
+      }
+    } else if (char === ',' && !inQuotes) {
+      row.push(current.trim().replace(/^"|"$/g, ''))
+      current = ''
+    } else {
+      current += char
+    }
+  }
+
+  row.push(current.trim().replace(/^"|"$/g, ''))
+  return row
+}
+
+// --------------------------------------------------
 // PARSE COURSE CSV
 // --------------------------------------------------
 
@@ -544,69 +534,37 @@ function parseCourseCSVText(csvText) {
     .filter(line => line.trim() !== '')
 
   if (lines.length < 2) {
-    throw new Error(
-      'CSV file must contain a header row.'
-    )
+    throw new Error('CSV file must contain a header row.')
   }
 
-  const headers = lines[0]
-    .split(',')
-    .map(h =>
-      h.trim().replace(/^"|"$/g, '')
-    )
-
+  const headers = parseCSVLine(lines[0])
   const courseMap = new Map()
 
   for (let i = 1; i < lines.length; i++) {
-    const row =
-      lines[i].match(
-        /(".*?"|[^",\s]+)(?=\s*,|\s*$)/g
-      ) ||
-      lines[i].split(',')
-
-    const cleanRow = row.map(cell =>
-      cell
-        .trim()
-        .replace(/^"|"$/g, '')
-        .replace(/""/g, '"')
-    )
+    const cleanRow = parseCSVLine(lines[i])
 
     if (cleanRow.length < 2) continue
 
     const rowObj = {}
 
     headers.forEach((header, idx) => {
-      rowObj[header] =
-        cleanRow[idx] || ''
+      rowObj[header] = cleanRow[idx] || ''
     })
 
-    const program =
-      rowObj.program || 'BSMT'
-
+    const program = rowObj.program || 'BSMT'
     const code = rowObj.courseCode
     const title = rowObj.courseTitle
     const coId = rowObj.courseOutcomeId
     const coTitle = rowObj.courseOutcomeTitle
     const loId = rowObj.learningOutcomeId
-    const loDesc =
-      rowObj.learningOutcomeDescription
-
-    const hours =
-      Number(rowObj.hours) || 0
+    const loDesc = rowObj.learningOutcomeDescription
+    const hours = Number(rowObj.hours) || 0
 
     if (!code || !title) continue
 
     if (!courseMap.has(code)) {
       courseMap.set(code, {
-        // Temporary frontend ID.
-        // Laravel will generate the real database ID
-        // when the course is imported.
-        id:
-          Date.now().toString() +
-          Math.random()
-            .toString(36)
-            .substring(2, 7),
-
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
         program,
         code,
         title,
@@ -617,10 +575,7 @@ function parseCourseCSVText(csvText) {
     const course = courseMap.get(code)
 
     if (coId) {
-      let co =
-        course.courseOutcomes.find(
-          c => c.id === coId
-        )
+      let co = course.courseOutcomes.find(c => c.id === coId)
 
       if (!co) {
         co = {
@@ -646,12 +601,11 @@ function parseCourseCSVText(csvText) {
 }
 
 // --------------------------------------------------
-// CSV UPLOAD
+// CSV UPLOAD HANDLER
 // --------------------------------------------------
 
-function handleCSVUpload(event) {
+function handleBulkCSVUpload(event) {
   const file = event.target.files[0]
-
   csvParseError.value = ''
 
   if (!file) return
@@ -662,12 +616,12 @@ function handleCSVUpload(event) {
 
   reader.onload = e => {
     try {
-      bulkPreview.value =
-        parseCourseCSVText(e.target.result)
-
+      bulkPreview.value = parseCourseCSVText(e.target.result)
     } catch (err) {
       csvParseError.value = err.message
       bulkPreview.value = []
+    } finally {
+      event.target.value = ''
     }
   }
 
@@ -679,9 +633,7 @@ function handleCSVUpload(event) {
 // --------------------------------------------------
 
 async function submitBulkCourses() {
-  if (bulkPreview.value.length === 0) {
-    return
-  }
+  if (bulkPreview.value.length === 0) return
 
   const token = localStorage.getItem('token')
 
@@ -698,6 +650,7 @@ async function submitBulkCourses() {
     return
   }
 
+  isUploadingBulk.value = true
   isLoading.value = true
 
   try {
@@ -720,8 +673,7 @@ async function submitBulkCourses() {
         }
       )
 
-      const data =
-        await response.json().catch(() => ({}))
+      const data = await response.json().catch(() => ({}))
 
       if (!response.ok) {
         throw new Error(
@@ -732,8 +684,7 @@ async function submitBulkCourses() {
 
       importedCourses.push({
         ...data,
-        courseOutcomes:
-          data.course_outcomes || []
+        courseOutcomes: data.course_outcomes || []
       })
     }
 
@@ -746,24 +697,13 @@ async function submitBulkCourses() {
 
     bulkPreview.value = []
     csvFileName.value = ''
-    entryMode.value = 'manual'
-
-    alert(
-      `${importedCourses.length} course(s) imported successfully!`
-    )
+    alert(`${importedCourses.length} course(s) imported successfully!`)
 
   } catch (err) {
-    console.error(
-      'Bulk course import error:',
-      err
-    )
-
-    alert(
-      err.message ||
-      'Unable to import courses to Laravel.'
-    )
-
+    console.error('Bulk course import error:', err)
+    alert(err.message || 'Unable to import courses to Laravel.')
   } finally {
+    isUploadingBulk.value = false
     isLoading.value = false
   }
 }
@@ -799,8 +739,7 @@ async function deleteCourse(id) {
       }
     )
 
-    const data =
-      await response.json().catch(() => ({}))
+    const data = await response.json().catch(() => ({}))
 
     if (!response.ok) {
       throw new Error(
@@ -809,81 +748,98 @@ async function deleteCourse(id) {
       )
     }
 
-    // Remove from Vue state only after Laravel confirms deletion.
-    courses.value =
-      courses.value.filter(
-        c => c.id !== id
-      )
+    courses.value = courses.value.filter(c => c.id !== id)
 
     if (editingCourseId.value === id) {
       cancelEdit()
     }
 
     saveCoursesToStorage()
-
     alert('Course deleted successfully!')
 
   } catch (err) {
-    console.error(
-      'Course deletion error:',
-      err
-    )
-
-    alert(
-      err.message ||
-      'Unable to delete course from Laravel.'
-    )
-
+    console.error('Course deletion error:', err)
+    alert(err.message || 'Unable to delete course from Laravel.')
   } finally {
     isLoading.value = false
   }
 }
 </script>
-```
-
 
 <template>
-  <div class="p-6 max-w-7xl mx-auto space-y-6 font-sans text-slate-800">
+  <div class="p-6 md:p-8 space-y-6 min-h-screen bg-[#f4f6f9] text-slate-800">
     <!-- Header -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900 text-white p-6 rounded-2xl shadow-sm">
-      <div>
-        <h1 class="text-2xl font-bold flex items-center gap-2">
-          <BookOpen :size="24" class="text-emerald-400" /> Course Builder
+    <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-sm">
+      <div class="space-y-1">
+        <h1 class="text-xl font-bold flex items-center gap-2 text-white tracking-tight">
+          Course Builder
         </h1>
-        <p class="text-xs text-slate-300">Define Programs, Course Codes, Titles, Outcomes (COs), and Learning Objectives (LOs) with hours allocation.</p>
-      </div>
-
-      <div class="flex items-center gap-2 bg-slate-800 p-1.5 rounded-xl border border-slate-700">
-        <button 
-          @click="entryMode = 'manual'"
-          :class="['px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5', entryMode === 'manual' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white']"
-        >
-          <Plus :size="16" /> Manual Creation
-        </button>
-        <button 
-          @click="entryMode = 'bulk'"
-          :class="['px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5', entryMode === 'bulk' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white']"
-        >
-          <FileSpreadsheet :size="16" /> CSV Bulk Upload
-        </button>
+        <p class="text-xs text-white/80 font-normal">
+          Define Programs, Course Codes, Titles, Outcomes (COs), and Learning Objectives (LOs) with hours allocation.
+        </p>
       </div>
     </div>
 
     <!-- Manual Entry / Edit View -->
-    <div v-if="entryMode === 'manual'" class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-6">
-      <div class="flex justify-between items-center border-b pb-3">
+    <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-6">
+      
+      <!-- Header -->
+      <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-3 border-b pb-3">
+
+        <!-- Title -->
         <h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
-          <Pencil v-if="editingCourseId" :size="18" class="text-amber-600" />
-          <Plus v-else :size="18" class="text-emerald-600" /> 
+          <Pencil 
+            v-if="editingCourseId" 
+            :size="18" 
+            class="text-amber-600" 
+          />
+          <Plus 
+            v-else 
+            :size="18" 
+            class="text-emerald-600" 
+          /> 
           {{ editingCourseId ? 'Edit Course Syllabus' : 'Create New Course Syllabus' }}
         </h2>
-        <button 
-          v-if="editingCourseId" 
-          @click="cancelEdit" 
-          class="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 font-semibold bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200"
-        >
-          <RotateCcw :size="14" /> Cancel Edit
-        </button>
+
+        <!-- CSV Actions -->
+        <div class="flex items-center gap-2 shrink-0">
+
+          <!-- Download CSV Template -->
+          <button 
+            @click="downloadCSVTemplate" 
+            type="button"
+            class="px-4 py-2.5 bg-white hover:bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-xl border border-emerald-500 flex items-center gap-2 transition shadow-sm"
+          >
+            <Download :size="14" class="text-emerald-600" />
+            Download .CSV Template
+          </button>
+
+          <!-- Bulk Upload CSV -->
+          <label 
+            class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-900 text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-sm"
+          >
+            <Upload :size="14" /> 
+            <span>{{ isUploadingBulk ? 'Uploading...' : 'Bulk Upload CSV' }}</span>
+            
+            <input 
+              ref="bulkFileInput" 
+              type="file" 
+              accept=".csv" 
+              @change="handleBulkCSVUpload" 
+              :disabled="isUploadingBulk" 
+              class="hidden" 
+            />
+          </label>
+
+          <!-- Cancel Edit -->
+          <button 
+            v-if="editingCourseId" 
+            @click="cancelEdit" 
+            class="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 font-semibold bg-slate-100 px-2.5 py-2.5 rounded-xl border border-slate-200"
+          >
+            <RotateCcw :size="14" /> Cancel Edit
+          </button>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -960,6 +916,91 @@ async function deleteCourse(id) {
         </button>
       </div>
 
+      <!-- CSV Upload Preview -->
+      <div 
+        v-if="bulkPreview.length > 0 || csvParseError || csvFileName" 
+        class="border-t border-gray-200 pt-5 space-y-4"
+      >
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <h3 class="text-xs font-bold text-slate-800">
+            CSV Course Import
+          </h3>
+
+          <span 
+            v-if="csvFileName" 
+            class="text-[11px] text-emerald-700 font-semibold"
+          >
+            Loaded File: {{ csvFileName }}
+          </span>
+        </div>
+
+        <p 
+          v-if="csvParseError" 
+          class="text-xs text-red-600 font-semibold"
+        >
+          {{ csvParseError }}
+        </p>
+
+        <!-- Preview parsed CSV structures -->
+        <div v-if="bulkPreview.length > 0" class="space-y-4">
+          <h3 class="text-xs font-bold text-slate-800">
+            Parsed Course Preview ({{ bulkPreview.length }} Courses)
+          </h3>
+
+          <div class="space-y-3 max-h-80 overflow-y-auto pr-1">
+            <div 
+              v-for="(c, idx) in bulkPreview" 
+              :key="idx" 
+              class="border rounded-xl p-4 bg-slate-50 space-y-2"
+            >
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 bg-slate-800 text-white font-mono text-xs font-bold rounded">
+                  {{ c.program || 'BSMT' }}
+                </span>
+                <span class="px-2 py-0.5 bg-slate-200 text-slate-800 font-mono text-xs font-bold rounded">
+                  {{ c.code }}
+                </span>
+                <span class="text-xs font-bold text-slate-900">
+                  {{ c.title }}
+                </span>
+              </div>
+
+              <div class="pl-4 space-y-1">
+                <div 
+                  v-for="co in c.courseOutcomes" 
+                  :key="co.id" 
+                  class="text-xs"
+                >
+                  <span class="font-bold text-slate-700">
+                    {{ co.id }}: {{ co.title }}
+                  </span>
+
+                  <div 
+                    v-for="lo in co.learningOutcomes" 
+                    :key="lo.id" 
+                    class="pl-4 text-gray-600 text-[11px] flex justify-between"
+                  >
+                    <span>
+                      <strong>{{ lo.id }}:</strong> {{ lo.description }}
+                    </span>
+                    <span class="font-mono font-bold">
+                      {{ lo.hours }} hrs
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button 
+            @click="submitBulkCourses" 
+            class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm"
+          >
+            Import All {{ bulkPreview.length }} Courses
+          </button>
+        </div>
+      </div>
+
       <div class="flex items-center gap-3">
         <button 
           @click="handleSaveCourse" 
@@ -974,59 +1015,6 @@ async function deleteCourse(id) {
           class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-300"
         >
           Cancel
-        </button>
-      </div>
-    </div>
-
-    <!-- Bulk CSV View -->
-    <div v-else class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-6">
-      <div class="flex justify-between items-center border-b pb-3">
-        <h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
-          <FileSpreadsheet :size="18" class="text-emerald-600" /> Bulk Course Import
-        </h2>
-        <button 
-          @click="downloadCSVTemplate" 
-          class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold text-xs rounded-lg flex items-center gap-1.5 transition-colors"
-        >
-          <Download :size="14" /> Download .CSV Template
-        </button>
-      </div>
-
-      <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-emerald-500 transition-colors">
-        <Upload :size="32" class="mx-auto text-gray-400 mb-2" />
-        <p class="text-xs font-bold text-gray-700">Select a course structure CSV file</p>
-        <p class="text-[11px] text-gray-500 mt-1">Columns: program, courseCode, courseTitle, courseOutcomeId, courseOutcomeTitle, learningOutcomeId, learningOutcomeDescription, hours</p>
-        <input type="file" accept=".csv" @change="handleCSVUpload" class="mt-3 text-xs" />
-        <p v-if="csvFileName" class="text-xs text-emerald-700 font-bold mt-2">Loaded File: {{ csvFileName }}</p>
-        <p v-if="csvParseError" class="text-xs text-red-600 font-semibold mt-2">{{ csvParseError }}</p>
-      </div>
-
-      <!-- Preview parsed CSV structures -->
-      <div v-if="bulkPreview.length > 0" class="space-y-4">
-        <h3 class="text-xs font-bold text-slate-800">Parsed Course Preview ({{ bulkPreview.length }} Courses)</h3>
-        
-        <div class="space-y-3 max-h-80 overflow-y-auto pr-1">
-          <div v-for="(c, idx) in bulkPreview" :key="idx" class="border rounded-xl p-4 bg-slate-50 space-y-2">
-            <div class="flex items-center gap-2">
-              <span class="px-2 py-0.5 bg-slate-800 text-white font-mono text-xs font-bold rounded">{{ c.program || 'BSMT' }}</span>
-              <span class="px-2 py-0.5 bg-slate-200 text-slate-800 font-mono text-xs font-bold rounded">{{ c.code }}</span>
-              <span class="text-xs font-bold text-slate-900">{{ c.title }}</span>
-            </div>
-
-            <div class="pl-4 space-y-1">
-              <div v-for="co in c.courseOutcomes" :key="co.id" class="text-xs">
-                <span class="font-bold text-slate-700">{{ co.id }}: {{ co.title }}</span>
-                <div v-for="lo in co.learningOutcomes" :key="lo.id" class="pl-4 text-gray-600 text-[11px] flex justify-between">
-                  <span><strong>{{ lo.id }}:</strong> {{ lo.description }}</span>
-                  <span class="font-mono font-bold">{{ lo.hours }} hrs</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <button @click="submitBulkCourses" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm">
-          Import All {{ bulkPreview.length }} Courses
         </button>
       </div>
     </div>

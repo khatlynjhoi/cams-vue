@@ -2,34 +2,16 @@
   <div class="p-6 md:p-8 space-y-6 min-h-screen bg-[#f4f6f9] text-slate-800">
     
     <!-- Dark Hero Banner -->
-    <div class="bg-[#0b132b] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-sm">
+    <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-sm">
       <div class="space-y-1">
         <h1 class="text-xl font-bold flex items-center gap-2 text-white tracking-tight">
-          <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">?</span>
           Assessment Question Authoring
         </h1>
-        <p class="text-xs text-slate-300 font-normal">
+        <p class="text-xs text-white-300 font-normal">
           Map items by Program, Term, Course Code, Outcomes, and Bloom's Taxonomy.
         </p>
       </div>
 
-      <!-- Top Action Buttons -->
-      <div class="flex items-center gap-3 shrink-0">
-        <button 
-          @click="downloadCSVTemplate" 
-          type="button" 
-          class="px-4 py-2.5 bg-[#1c2538] hover:bg-[#25314a] text-slate-200 text-xs font-semibold rounded-xl border border-slate-700/60 flex items-center gap-2 transition shadow-sm"
-        >
-          <Download :size="14" class="text-slate-300"></Download> 
-          Download CSV Template
-        </button>
-
-        <label class="px-4 py-2.5 bg-[#00c068] hover:bg-[#00a358] text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-sm">
-          <Upload :size="14"></Upload> 
-          <span>{{ isUploadingBulk ? 'Uploading...' : 'Bulk Upload CSV' }}</span>
-          <input ref="bulkFileInput" type="file" accept=".csv" @change="handleBulkCSVUpload" :disabled="isUploadingBulk" class="hidden" />
-        </label>
-      </div>
     </div>
 
     <!-- Navigation Tabs -->
@@ -39,7 +21,7 @@
         :class="[
           'px-5 py-2.5 rounded-full font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer',
           activeTab === 'repository' 
-            ? 'bg-[#0b132b] text-white shadow-sm' 
+            ? 'bg-[#123524] text-white shadow-sm' 
             : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80 shadow-2xs'
         ]"
       >
@@ -58,12 +40,12 @@
         :class="[
           'px-5 py-2.5 rounded-full font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer',
           activeTab === 'create' 
-            ? 'bg-[#0b132b] text-white shadow-sm' 
+            ? 'bg-[#123524] text-white shadow-sm' 
             : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80 shadow-2xs'
         ]"
       >
         <PlusCircle :size="14" :class="activeTab === 'create' ? 'text-white' : 'text-slate-500'"></PlusCircle> 
-        Author New Question
+        Create New Question
       </button>
 
       <button 
@@ -71,7 +53,7 @@
         :class="[
           'px-5 py-2.5 rounded-full font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer',
           activeTab === 'report' 
-            ? 'bg-[#0b132b] text-white shadow-sm' 
+            ? 'bg-[#123524] text-white shadow-sm' 
             : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80 shadow-2xs'
         ]"
       >
@@ -191,7 +173,7 @@
               <component :is="collapsedCourses[group.courseKey] ? ChevronRight : ChevronDown" :size="16" class="text-slate-600"></component>
               <div>
                 <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2">
-                  <span class="bg-[#0b132b] text-white px-2.5 py-0.5 rounded text-[11px] font-mono tracking-wide">{{ group.code }}</span>
+                  <span class="bg-[#123524] text-white px-2.5 py-0.5 rounded text-[11px] font-mono tracking-wide">{{ group.code }}</span>
                   <span>{{ group.title }}</span>
                 </h3>
               </div>
@@ -355,63 +337,150 @@
     </div>
 
     <!-- TAB 2: AUTHORING FORM -->
-    <div v-show="activeTab === 'create'" class="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-2xs space-y-6 max-w-5xl mx-auto">
-      
+    <div v-show="activeTab === 'create'"
+    class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-6">
+
       <!-- 1. PROGRAM & CURRICULUM MAPPING -->
-      <div>
-        <h2 class="text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200 pb-2 mb-4">
-          1. PROGRAM & CURRICULUM MAPPING
-        </h2>
+      <div class="space-y-4">
+
+      <!-- Section Title + Action Buttons -->
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+
+      <!-- Section Title -->
+      <h2 class="text-base font-bold text-slate-900 flex items-center gap-2 tracking-tight">
+      1. Program & Curriculum Mapping
+      </h2>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-2 shrink-0">
+
+      <!-- Download Template -->
+      <button 
+        @click="downloadCSVTemplate" 
+        type="button" 
+        class="px-4 py-2.5 bg-white hover:bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-xl border border-emerald-500 flex items-center gap-2 transition shadow-sm"
+      >
+        <Download :size="14" class="text-emerald-600"></Download> 
+        Download CSV Template
+      </button>
+
+      <!-- Bulk Upload -->
+      <label 
+        class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-900 text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-sm"
+      >
+        <Upload :size="14"></Upload> 
+        <span>{{ isUploadingBulk ? 'Uploading...' : 'Bulk Upload CSV' }}</span>
         
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs">
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Program</label>
-            <select v-model="form.program" @change="handleProgramChange" class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
-              <option value="Both">Both (BSMT & BSMarE)</option>
-              <option value="BSMT">BSMT</option>
-              <option value="BSMarE">BSMarE</option>
-            </select>
-          </div>
+        <input 
+          ref="bulkFileInput" 
+          type="file" 
+          accept=".csv" 
+          @change="handleBulkCSVUpload" 
+          :disabled="isUploadingBulk" 
+          class="hidden" 
+        />
+      </label>
 
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Academic Term</label>
-            <select v-model="form.term" class="w-full p-2.5 border border-slate-300 rounded-xl bg-emerald-50/60 font-medium text-emerald-900 focus:ring-2 focus:ring-emerald-500 outline-none">
-              <option value="Midterm">Midterm</option>
-              <option value="Final">Final</option>
-            </select>
-          </div>
+    </div>
+  </div>
 
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Course / Subject</label>
-            <select v-model="form.courseId" @change="handleCourseChange" class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
-              <option value="" disabled>Select Subject...</option>
-              <option v-for="c in filteredCourses" :key="c.id" :value="c.code || c.id">
-                {{ c.code }} — {{ c.title }}
-              </option>
-            </select>
-          </div>
+  <!-- Curriculum Mapping Fields -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs">
 
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Course Outcome (CO)</label>
-            <select v-model="form.courseOutcomeId" @change="handleCourseOutcomeChange" class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
-              <option value="">Select CO...</option>
-              <option v-for="co in availableCourseOutcomes" :key="co.id || co.code" :value="co.id || co.code">
-                {{ co.code }}: {{ co.description || co.title }}
-              </option>
-            </select>
-          </div>
+    <!-- Program -->
+    <div>
+      <label class="font-bold text-slate-700 block mb-1">
+        Program
+      </label>
+      <select 
+        v-model="form.program" 
+        @change="handleProgramChange" 
+        class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+      >
+        <option value="Both">Both (BSMT & BSMarE)</option>
+        <option value="BSMT">BSMT</option>
+        <option value="BSMarE">BSMarE</option>
+      </select>
+    </div>
 
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Learning Outcome (LO)</label>
-            <select v-model="form.learningOutcomeId" class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
-              <option value="">Select LO...</option>
-              <option v-for="lo in availableLearningOutcomes" :key="lo.id || lo.code" :value="lo.id || lo.code">
-                {{ lo.code }}: {{ lo.description || lo.title }}
-              </option>
-            </select>
-          </div>
-        </div>
-      </div>
+    <!-- Academic Term -->
+    <div>
+      <label class="font-bold text-slate-700 block mb-1">
+        Academic Term
+      </label>
+      <select 
+        v-model="form.term" 
+        @change="handleTermChange"
+        class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+      >
+        <option value="Midterm">Midterm</option>
+        <option value="Final">Final</option>
+      </select>
+    </div>
+
+    <!-- Course / Subject -->
+    <div>
+      <label class="font-bold text-slate-700 block mb-1">
+        Course / Subject
+      </label>
+      <select 
+        v-model="form.courseId" 
+        @change="handleCourseChange" 
+        class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+      >
+        <option value="" disabled>Select Course / Subject...</option>
+        <option 
+          v-for="c in filteredCourses" 
+          :key="c.id" 
+          :value="c.code || c.id"
+        >
+          {{ c.code }} — {{ c.title }}
+        </option>
+      </select>
+    </div>
+
+    <!-- Course Outcome -->
+    <div>
+      <label class="font-bold text-slate-700 block mb-1">
+        Course Outcome (CO)
+      </label>
+      <select 
+        v-model="form.courseOutcomeId" 
+        @change="handleCourseOutcomeChange" 
+        class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+      >
+        <option value="" disabled>Select Course Outcome...</option>
+        <option 
+          v-for="co in availableCourseOutcomes" 
+          :key="co.id || co.code" 
+          :value="co.id || co.code"
+        >
+          {{ co.code }}: {{ co.description || co.title }}
+        </option>
+      </select>
+    </div>
+
+    <!-- Learning Outcome -->
+    <div>
+      <label class="font-bold text-slate-700 block mb-1">
+        Learning Outcome (LO)
+      </label>
+      <select 
+        v-model="form.learningOutcomeId" 
+        class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+      >
+        <option value="" disabled>Select Learning Outcome...</option>
+        <option 
+          v-for="lo in availableLearningOutcomes" 
+          :key="lo.id || lo.code" 
+          :value="lo.id || lo.code"
+        >
+          {{ lo.code }}: {{ lo.description || lo.title }}
+        </option>
+      </select>
+    </div>
+  </div>
+</div>
 
       <!-- 2. ITEM CLASSIFICATION -->
       <div>
@@ -613,7 +682,7 @@
           <p class="text-xs text-slate-500">View question counts, approval status, accepted AI suggestions, and AI overrides grouped per course.</p>
         </div>
 
-        <button @click="exportCourseReportCSV" type="button" class="px-4 py-2 bg-[#00c068] hover:bg-[#00a358] text-white text-xs font-bold rounded-xl flex items-center gap-2 transition shadow-2xs cursor-pointer">
+        <button @click="exportCourseReportCSV" type="button" class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-900 text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-sm cursor-pointer">
           <Download :size="14"></Download> Export Report CSV
         </button>
       </div>
