@@ -7,11 +7,10 @@
         <h1 class="text-xl font-bold flex items-center gap-2 text-white tracking-tight">
           Assessment Question Authoring
         </h1>
-        <p class="text-xs text-white-300 font-normal">
+        <p class="text-xs text-emerald-100 font-normal">
           Map items by Program, Term, Course Code, Outcomes, and Bloom's Taxonomy.
         </p>
       </div>
-
     </div>
 
     <!-- Navigation Tabs -->
@@ -270,13 +269,15 @@
                 </div>
               </div>
 
-              <!-- AI Audit Bar -->
+              <!-- AI Audit Bar (Scoped Single Evaluation) -->
               <div
+                v-for="ai in [generateAiSuggestion(q)]"
+                :key="'ai-' + q.id"
                 class="p-3 rounded-xl text-xs border"
                 :class="{
-                  'bg-amber-50/80 border-amber-200 text-amber-900': generateAiSuggestion(q).type === 'warning',
-                  'bg-blue-50/80 border-blue-200 text-blue-900': generateAiSuggestion(q).type === 'info',
-                  'bg-emerald-50/50 border-emerald-200 text-emerald-900': generateAiSuggestion(q).type === 'success'
+                  'bg-amber-50/80 border-amber-200 text-amber-900': ai.type === 'warning',
+                  'bg-blue-50/80 border-blue-200 text-blue-900': ai.type === 'info',
+                  'bg-emerald-50/50 border-emerald-200 text-emerald-900': ai.type === 'success'
                 }"
               >
                 <div class="flex items-start gap-2">
@@ -288,15 +289,15 @@
                     </span>
 
                     <div class="space-y-1.5 text-[11px] leading-relaxed">
-                      <div>{{ generateAiSuggestion(q).bloom }}</div>
-                      <div>{{ generateAiSuggestion(q).loAlignment }}</div>
-                      <div>{{ generateAiSuggestion(q).coAlignment }}</div>
-                      <div>{{ generateAiSuggestion(q).construction }}</div>
-                      <div>{{ generateAiSuggestion(q).answer }}</div>
+                      <div>{{ ai.bloom }}</div>
+                      <div>{{ ai.loAlignment }}</div>
+                      <div>{{ ai.coAlignment }}</div>
+                      <div>{{ ai.construction }}</div>
+                      <div>{{ ai.answer }}</div>
 
-                      <div v-if="generateAiSuggestion(q).suggestions.length" class="pt-1.5">
+                      <div v-if="ai.suggestions.length" class="pt-1.5">
                         <span class="font-semibold">💡 AI Suggestion:</span>
-                        <span>{{ generateAiSuggestion(q).suggestions.slice(0, 2).join(' ') }}</span>
+                        <span>{{ ai.suggestions.slice(0, 2).join(' ') }}</span>
                       </div>
 
                       <div v-else class="pt-1.5">
@@ -308,7 +309,7 @@
                 </div>
 
                 <div
-                  v-if="generateAiSuggestion(q).type === 'warning' && q.status !== 'Approved'"
+                  v-if="ai.type === 'warning' && q.status !== 'Approved'"
                   class="flex items-center gap-2 mt-3 ml-6"
                 >
                   <button
@@ -337,150 +338,123 @@
     </div>
 
     <!-- TAB 2: AUTHORING FORM -->
-    <div v-show="activeTab === 'create'"
-    class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-6">
-
+    <div v-show="activeTab === 'create'" class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-6">
       <!-- 1. PROGRAM & CURRICULUM MAPPING -->
       <div class="space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <h2 class="text-base font-bold text-slate-900 flex items-center gap-2 tracking-tight">
+            1. Program & Curriculum Mapping
+          </h2>
 
-      <!-- Section Title + Action Buttons -->
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div class="flex items-center gap-2 shrink-0">
+            <button 
+              @click="downloadCSVTemplate" 
+              type="button" 
+              class="px-4 py-2.5 bg-white hover:bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-xl border border-emerald-500 flex items-center gap-2 transition shadow-sm cursor-pointer"
+            >
+              <Download :size="14" class="text-emerald-600"></Download> 
+              Download CSV Template
+            </button>
 
-      <!-- Section Title -->
-      <h2 class="text-base font-bold text-slate-900 flex items-center gap-2 tracking-tight">
-      1. Program & Curriculum Mapping
-      </h2>
+            <label 
+              class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-900 text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-sm"
+            >
+              <Upload :size="14"></Upload> 
+              <span>{{ isUploadingBulk ? 'Uploading...' : 'Bulk Upload CSV' }}</span>
+              
+              <input 
+                ref="bulkFileInput" 
+                type="file" 
+                accept=".csv" 
+                @change="handleBulkCSVUpload" 
+                :disabled="isUploadingBulk" 
+                class="hidden" 
+              />
+            </label>
+          </div>
+        </div>
 
-      <!-- Action Buttons -->
-      <div class="flex items-center gap-2 shrink-0">
+        <!-- Curriculum Mapping Fields -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs">
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Program</label>
+            <select 
+              v-model="form.program" 
+              @change="handleProgramChange" 
+              class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+            >
+              <option value="Both">Both (BSMT & BSMarE)</option>
+              <option value="BSMT">BSMT</option>
+              <option value="BSMarE">BSMarE</option>
+            </select>
+          </div>
 
-      <!-- Download Template -->
-      <button 
-        @click="downloadCSVTemplate" 
-        type="button" 
-        class="px-4 py-2.5 bg-white hover:bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-xl border border-emerald-500 flex items-center gap-2 transition shadow-sm"
-      >
-        <Download :size="14" class="text-emerald-600"></Download> 
-        Download CSV Template
-      </button>
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Academic Term</label>
+            <select 
+              v-model="form.term" 
+              @change="handleTermChange"
+              class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+            >
+              <option value="Midterm">Midterm</option>
+              <option value="Final">Final</option>
+            </select>
+          </div>
 
-      <!-- Bulk Upload -->
-      <label 
-        class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-900 text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-sm"
-      >
-        <Upload :size="14"></Upload> 
-        <span>{{ isUploadingBulk ? 'Uploading...' : 'Bulk Upload CSV' }}</span>
-        
-        <input 
-          ref="bulkFileInput" 
-          type="file" 
-          accept=".csv" 
-          @change="handleBulkCSVUpload" 
-          :disabled="isUploadingBulk" 
-          class="hidden" 
-        />
-      </label>
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Course / Subject</label>
+            <select 
+              v-model="form.courseId" 
+              @change="handleCourseChange" 
+              class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+            >
+              <option value="" disabled>Select Course / Subject...</option>
+              <option 
+                v-for="c in filteredCourses" 
+                :key="c.id" 
+                :value="c.code || c.id"
+              >
+                {{ c.code }} — {{ c.title }}
+              </option>
+            </select>
+          </div>
 
-    </div>
-  </div>
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Course Outcome (CO)</label>
+            <select 
+              v-model="form.courseOutcomeId" 
+              @change="handleCourseOutcomeChange" 
+              class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+            >
+              <option value="" disabled>Select Course Outcome...</option>
+              <option 
+                v-for="co in availableCourseOutcomes" 
+                :key="co.id || co.code" 
+                :value="co.id || co.code"
+              >
+                {{ co.code }}: {{ co.description || co.title }}
+              </option>
+            </select>
+          </div>
 
-  <!-- Curriculum Mapping Fields -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs">
-
-    <!-- Program -->
-    <div>
-      <label class="font-bold text-slate-700 block mb-1">
-        Program
-      </label>
-      <select 
-        v-model="form.program" 
-        @change="handleProgramChange" 
-        class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-      >
-        <option value="Both">Both (BSMT & BSMarE)</option>
-        <option value="BSMT">BSMT</option>
-        <option value="BSMarE">BSMarE</option>
-      </select>
-    </div>
-
-    <!-- Academic Term -->
-    <div>
-      <label class="font-bold text-slate-700 block mb-1">
-        Academic Term
-      </label>
-      <select 
-        v-model="form.term" 
-        @change="handleTermChange"
-        class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-      >
-        <option value="Midterm">Midterm</option>
-        <option value="Final">Final</option>
-      </select>
-    </div>
-
-    <!-- Course / Subject -->
-    <div>
-      <label class="font-bold text-slate-700 block mb-1">
-        Course / Subject
-      </label>
-      <select 
-        v-model="form.courseId" 
-        @change="handleCourseChange" 
-        class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-      >
-        <option value="" disabled>Select Course / Subject...</option>
-        <option 
-          v-for="c in filteredCourses" 
-          :key="c.id" 
-          :value="c.code || c.id"
-        >
-          {{ c.code }} — {{ c.title }}
-        </option>
-      </select>
-    </div>
-
-    <!-- Course Outcome -->
-    <div>
-      <label class="font-bold text-slate-700 block mb-1">
-        Course Outcome (CO)
-      </label>
-      <select 
-        v-model="form.courseOutcomeId" 
-        @change="handleCourseOutcomeChange" 
-        class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-      >
-        <option value="" disabled>Select Course Outcome...</option>
-        <option 
-          v-for="co in availableCourseOutcomes" 
-          :key="co.id || co.code" 
-          :value="co.id || co.code"
-        >
-          {{ co.code }}: {{ co.description || co.title }}
-        </option>
-      </select>
-    </div>
-
-    <!-- Learning Outcome -->
-    <div>
-      <label class="font-bold text-slate-700 block mb-1">
-        Learning Outcome (LO)
-      </label>
-      <select 
-        v-model="form.learningOutcomeId" 
-        class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-      >
-        <option value="" disabled>Select Learning Outcome...</option>
-        <option 
-          v-for="lo in availableLearningOutcomes" 
-          :key="lo.id || lo.code" 
-          :value="lo.id || lo.code"
-        >
-          {{ lo.code }}: {{ lo.description || lo.title }}
-        </option>
-      </select>
-    </div>
-  </div>
-</div>
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Learning Outcome (LO)</label>
+            <select 
+              v-model="form.learningOutcomeId" 
+              class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+            >
+              <option value="" disabled>Select Learning Outcome...</option>
+              <option 
+                v-for="lo in availableLearningOutcomes" 
+                :key="lo.id || lo.code" 
+                :value="lo.id || lo.code"
+              >
+                {{ lo.code }}: {{ lo.description || lo.title }}
+              </option>
+            </select>
+          </div>
+        </div>
+      </div>
 
       <!-- 2. ITEM CLASSIFICATION -->
       <div>
@@ -512,7 +486,6 @@
             </div>
           </div>
 
-          <!-- Question Stem Input -->
           <div>
             <label class="font-bold text-xs text-slate-700 block mb-1">Question Stem</label>
             <textarea 
@@ -523,7 +496,6 @@
             ></textarea>
           </div>
 
-          <!-- Question Image Picker Box -->
           <div class="border border-dashed border-slate-300 rounded-xl p-3 text-xs bg-slate-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
               <span class="font-bold text-slate-700 block">Question Image (Optional)</span>
@@ -669,7 +641,6 @@
           <span>{{ isSubmitting ? 'Saving...' : 'Save Question Item' }}</span>
         </button>
       </div>
-
     </div>
 
     <!-- TAB 3: COURSE REPORTS & AUDITS -->
@@ -682,7 +653,7 @@
           <p class="text-xs text-slate-500">View question counts, approval status, accepted AI suggestions, and AI overrides grouped per course.</p>
         </div>
 
-        <button @click="exportCourseReportCSV" type="button" class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-900 text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-sm cursor-pointer">
+        <button @click="exportCourseReportCSV" type="button" class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-900 text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-sm">
           <Download :size="14"></Download> Export Report CSV
         </button>
       </div>
@@ -881,7 +852,6 @@
               </div>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <!-- Left side -->
                 <div class="space-y-1 border p-2 rounded bg-slate-50/50">
                   <span class="font-semibold text-[10px] text-slate-500">Left Item</span>
                   <input v-model="pair.leftText" class="w-full p-1.5 border rounded text-xs bg-white outline-none" />
@@ -899,7 +869,6 @@
                   </div>
                 </div>
 
-                <!-- Right side -->
                 <div class="space-y-1 border p-2 rounded bg-slate-50/50">
                   <span class="font-semibold text-[10px] text-slate-500">Right Target</span>
                   <input v-model="pair.rightText" class="w-full p-1.5 border rounded text-xs bg-white outline-none" />
@@ -918,6 +887,25 @@
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- Edit True / False -->
+          <div v-if="editingQuestion.type === 'true_false'" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <label class="font-bold text-slate-700 block">Select Correct Answer</label>
+            <div class="flex gap-6 font-bold text-slate-800">
+              <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2.5 rounded-xl border border-slate-300 hover:border-emerald-500">
+                <input type="radio" :value="0" v-model="editingQuestion.correctAnswer[0]" name="edit_tf_answer" class="text-emerald-600" /> True
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2.5 rounded-xl border border-slate-300 hover:border-emerald-500">
+                <input type="radio" :value="1" v-model="editingQuestion.correctAnswer[0]" name="edit_tf_answer" class="text-emerald-600" /> False
+              </label>
+            </div>
+          </div>
+
+          <!-- Edit Short Answer -->
+          <div v-if="editingQuestion.type === 'short_answer'" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <label class="font-bold text-slate-700 block">Expected Answer Keywords (Comma Separated)</label>
+            <input v-model="editingQuestion.shortAnswerText" placeholder="e.g. ECDIS, navigation, chart" class="w-full p-2.5 border border-slate-300 rounded-xl bg-white outline-none focus:ring-1 focus:ring-emerald-500" />
           </div>
         </div>
 
@@ -1037,15 +1025,17 @@ async function getApiError(response) {
 }
 
 function getAuthHeaders(includeJson = false) {
-  const token = localStorage.getItem('token')
-  if (!token) {
-    throw new Error('No authentication token found. Please log in again.')
+  const token = localStorage.getItem('token') || ''
+  const headers = {
+    Accept: 'application/json'
   }
-  return {
-    Accept: 'application/json',
-    Authorization: `Bearer ${token}`,
-    ...(includeJson ? { 'Content-Type': 'application/json' } : {})
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
   }
+  if (includeJson) {
+    headers['Content-Type'] = 'application/json'
+  }
+  return headers
 }
 
 // FORM RESET
@@ -1199,7 +1189,7 @@ function normalizeCourse(course) {
 
 function normalizeQuestion(question) {
   const course = courses.value.find(
-    course => String(course.id) === String(question.course_id)
+    c => String(c.id) === String(question.course_id)
   )
 
   let matchingPairs = question.matching_pairs
@@ -1440,7 +1430,7 @@ async function saveQuestion() {
     text: form.text.trim(),
     image_url: form.imageUrl || null,
     options: formattedOptions,
-    correct_answer: formattedCorrectAnswer ? JSON.stringify(formattedCorrectAnswer) : null,
+    correct_answer: formattedCorrectAnswer !== null ? JSON.stringify(formattedCorrectAnswer) : null,
     matching_pairs: formattedMatchingPairs,
     stcw_standard: null,
     bloom_level: form.bloomLevel,
@@ -1452,14 +1442,9 @@ async function saveQuestion() {
   isSubmitting.value = true
 
   try {
-    // FIX 1: Added /api/ to the endpoint URL
-    const response = await fetch('http://127.0.0.1:8000/api/questions', {
+    const response = await fetch(`${API_BASE_URL}/questions`, {
       method: 'POST',
-      headers: {
-        'Accept': 'application/json', // FIX 2: Forces Laravel to send back JSON errors instead of HTML
-        'Content-Type': 'application/json',
-        ...getAuthHeaders(true)
-      },
+      headers: getAuthHeaders(true),
       body: JSON.stringify(payload)
     })
 
@@ -1491,11 +1476,16 @@ async function saveQuestion() {
 
 // EDIT QUESTION MODAL
 function editQuestion(question) {
+  let parsedCorrect = Array.isArray(question.correctAnswer)
+    ? [...question.correctAnswer]
+    : (question.correctAnswer !== null && question.correctAnswer !== undefined ? [question.correctAnswer] : [0])
+
   editingQuestion.value = {
     ...question,
     options: Array.isArray(question.options) ? question.options.map(opt => ({ ...opt })) : [],
     matchingPairs: Array.isArray(question.matchingPairs) ? question.matchingPairs.map(p => ({ ...p })) : [],
-    correctAnswer: Array.isArray(question.correctAnswer) ? [...question.correctAnswer] : question.correctAnswer
+    correctAnswer: parsedCorrect,
+    shortAnswerText: Array.isArray(question.correctAnswer) ? question.correctAnswer.join(', ') : String(question.correctAnswer || '')
   }
 }
 
@@ -1555,9 +1545,10 @@ async function saveEditedQuestion() {
     formattedOptions = ['True', 'False']
     formattedCorrectAnswer = editingQuestion.value.correctAnswer?.[0] === 1 ? [1] : [0]
   } else if (editingQuestion.value.type === 'short_answer') {
-    formattedCorrectAnswer = Array.isArray(editingQuestion.value.correctAnswer)
-      ? editingQuestion.value.correctAnswer
-      : String(editingQuestion.value.correctAnswer || '').split(',').map(k => k.trim()).filter(Boolean)
+    formattedCorrectAnswer = String(editingQuestion.value.shortAnswerText || '')
+      .split(',')
+      .map(k => k.trim())
+      .filter(Boolean)
 
     if (formattedCorrectAnswer.length === 0) {
       alert('Please enter at least one expected answer keyword.')
@@ -1579,7 +1570,7 @@ async function saveEditedQuestion() {
     text: editingQuestion.value.text.trim(),
     image_url: editingQuestion.value.imageUrl || null,
     options: formattedOptions,
-    correct_answer: formattedCorrectAnswer ? JSON.stringify(formattedCorrectAnswer) : null,
+    correct_answer: formattedCorrectAnswer !== null ? JSON.stringify(formattedCorrectAnswer) : null,
     matching_pairs: formattedMatchingPairs,
     stcw_standard: editingQuestion.value.stcwStandard || null,
     bloom_level: editingQuestion.value.bloomLevel || 'Understanding',
@@ -1589,7 +1580,7 @@ async function saveEditedQuestion() {
   }
 
   try {
-    const response = await fetch(`http://127.0.0.1:8000/api/questions/${editingQuestion.value.id}`, {
+    const response = await fetch(`${API_BASE_URL}/questions/${editingQuestion.value.id}`, {
       method: 'PUT',
       headers: getAuthHeaders(true),
       body: JSON.stringify(payload)
@@ -1623,7 +1614,7 @@ async function updateQuestionStatus(id, status) {
   }
 
   try {
-    const response = await fetch(`http://127.0.0.1:8000/api/questions/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/questions/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(true),
       body: JSON.stringify({
@@ -1664,7 +1655,7 @@ async function deleteQuestion(id) {
   if (!confirm('Are you sure you want to remove this question item?')) return
 
   try {
-    const response = await fetch(`http://127.0.0.1:8000/api/questions/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/questions/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders()
     })
@@ -1695,7 +1686,7 @@ async function bulkUpdateStatus(status) {
       const question = questions.value.find(item => item.id === id)
       if (!question) continue
 
-      const response = await fetch(`http://127.0.0.1:8000/api/questions/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/questions/${id}`, {
         method: 'PUT',
         headers: getAuthHeaders(true),
         body: JSON.stringify({
@@ -1709,7 +1700,7 @@ async function bulkUpdateStatus(status) {
           text: question.text,
           image_url: question.imageUrl || null,
           options: question.options || null,
-          correct_answer: question.correctAnswer ? JSON.stringify(question.correctAnswer) : null,
+          correct_answer: question.correctAnswer !== null && question.correctAnswer !== undefined ? JSON.stringify(question.correctAnswer) : null,
           matching_pairs: question.matchingPairs || null,
           stcw_standard: question.stcwStandard || null,
           bloom_level: question.bloomLevel || 'Understanding',
@@ -1745,7 +1736,7 @@ async function bulkDeleteQuestions() {
 
   try {
     for (const id of selectedQuestionIds.value) {
-      const response = await fetch(`http://127.0.0.1:8000/api/questions/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/questions/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       })
@@ -2088,7 +2079,7 @@ async function handleBulkCSVUpload(event) {
           retained_ai: false
         }
 
-        const response = await fetch(`http://127.0.0.1:8000/api/questions`, {
+        const response = await fetch(`${API_BASE_URL}/questions`, {
           method: 'POST',
           headers: getAuthHeaders(true),
           body: JSON.stringify(payload)
@@ -2165,7 +2156,7 @@ async function loadCachedQuestions() {
 async function fetchCourses() {
   await loadCachedCourses()
   try {
-    const response = await fetch(`http://127.0.0.1:8000/api/courses`, {
+    const response = await fetch(`${API_BASE_URL}/courses`, {
       method: 'GET',
       headers: getAuthHeaders()
     })
@@ -2188,7 +2179,7 @@ async function fetchCourses() {
 async function fetchQuestions() {
   await loadCachedQuestions()
   try {
-    const response = await fetch(`http://127.0.0.1:8000/api/questions`, {
+    const response = await fetch(`${API_BASE_URL}/questions`, {
       method: 'GET',
       headers: getAuthHeaders()
     })
