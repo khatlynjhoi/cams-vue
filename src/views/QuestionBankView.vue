@@ -759,15 +759,30 @@
             </div>
             <div>
               <label class="font-bold text-slate-700 block mb-1">Course Code</label>
-              <input v-model="editingQuestion.courseId" class="w-full p-2 border rounded-lg bg-white" placeholder="e.g. CRS-101" />
+              <select v-model="editingQuestion.courseId" @change="handleEditCourseChange" class="w-full p-2 border rounded-lg bg-white font-medium text-slate-900">
+                <option value="" disabled>Select Course / Subject...</option>
+                <option v-for="c in courses" :key="c.id" :value="c.code || c.id">
+                  {{ c.code }} — {{ c.title }}
+                </option>
+              </select>
             </div>
             <div>
               <label class="font-bold text-slate-700 block mb-1">Course Outcome (CO)</label>
-              <input v-model="editingQuestion.courseOutcomeId" class="w-full p-2 border rounded-lg bg-white" placeholder="e.g. CO1" />
+              <select v-model="editingQuestion.courseOutcomeId" @change="handleEditCourseOutcomeChange" class="w-full p-2 border rounded-lg bg-white font-medium text-slate-900">
+                <option value="">Select CO (Optional)</option>
+                <option v-for="co in editAvailableCourseOutcomes" :key="co.id || co.code" :value="co.id || co.code">
+                  {{ co.code }}: {{ co.description || co.title }}
+                </option>
+              </select>
             </div>
             <div>
               <label class="font-bold text-slate-700 block mb-1">Learning Outcome (LO)</label>
-              <input v-model="editingQuestion.learningOutcomeId" class="w-full p-2 border rounded-lg bg-white" placeholder="e.g. LO1.1" />
+              <select v-model="editingQuestion.learningOutcomeId" class="w-full p-2 border rounded-lg bg-white font-medium text-slate-900">
+                <option value="">Select LO (Optional)</option>
+                <option v-for="lo in editAvailableLearningOutcomes" :key="lo.id || lo.code" :value="lo.id || lo.code">
+                  {{ lo.code }}: {{ lo.description || lo.title }}
+                </option>
+              </select>
             </div>
             <div>
               <label class="font-bold text-slate-700 block mb-1">Bloom's Level</label>
@@ -894,10 +909,10 @@
             <label class="font-bold text-slate-700 block">Select Correct Answer</label>
             <div class="flex gap-6 font-bold text-slate-800">
               <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2.5 rounded-xl border border-slate-300 hover:border-emerald-500">
-                <input type="radio" :value="0" v-model="editingQuestion.correctAnswer[0]" name="edit_tf_answer" class="text-emerald-600" /> True
+                <input type="radio" value="true" v-model="editingQuestion.tfCorrect" name="edit_tf_answer" class="text-emerald-600" /> True
               </label>
               <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2.5 rounded-xl border border-slate-300 hover:border-emerald-500">
-                <input type="radio" :value="1" v-model="editingQuestion.correctAnswer[0]" name="edit_tf_answer" class="text-emerald-600" /> False
+                <input type="radio" value="false" v-model="editingQuestion.tfCorrect" name="edit_tf_answer" class="text-emerald-600" /> False
               </label>
             </div>
           </div>
@@ -1065,13 +1080,18 @@ function resetForm() {
 
 // COURSE COMPUTED PROPERTIES
 const filteredCourses = computed(() => {
-  let result = [...courses.value]
-  if (filterProgram.value !== 'All') {
-    result = result.filter(
-      course => course.program === filterProgram.value || course.program === 'Both'
-    )
+  const currentProgram = form.program
+
+  if (!currentProgram || currentProgram === 'All' || currentProgram === 'Both') {
+    return courses.value
   }
-  return result
+
+  const selectedProg = currentProgram.trim().toUpperCase()
+
+  return courses.value.filter(course => {
+    const courseProg = (course.program || '').trim().toUpperCase()
+    return courseProg === selectedProg || courseProg === 'BOTH'
+  })
 })
 
 const availableCourseOutcomes = computed(() => {
@@ -1086,6 +1106,25 @@ const availableCourseOutcomes = computed(() => {
 const availableLearningOutcomes = computed(() => {
   const selectedCO = availableCourseOutcomes.value.find(
     co => String(co.id || co.code) === String(form.courseOutcomeId)
+  )
+  return selectedCO?.learningOutcomes || []
+})
+
+// EDIT MODAL COMPUTED PROPERTIES
+const editAvailableCourseOutcomes = computed(() => {
+  if (!editingQuestion.value) return []
+  const selectedCourse = courses.value.find(
+    course =>
+      String(course.id) === String(editingQuestion.value.courseId) ||
+      String(course.code) === String(editingQuestion.value.courseId)
+  )
+  return selectedCourse?.courseOutcomes || []
+})
+
+const editAvailableLearningOutcomes = computed(() => {
+  if (!editingQuestion.value) return []
+  const selectedCO = editAvailableCourseOutcomes.value.find(
+    co => String(co.id || co.code) === String(editingQuestion.value.courseOutcomeId)
   )
   return selectedCO?.learningOutcomes || []
 })
@@ -1237,6 +1276,11 @@ function handleProgramChange() {
   form.learningOutcomeId = ''
 }
 
+function handleTermChange() {
+  form.courseOutcomeId = ''
+  form.learningOutcomeId = ''
+}
+
 function handleCourseChange() {
   form.courseOutcomeId = ''
   form.learningOutcomeId = ''
@@ -1244,6 +1288,17 @@ function handleCourseChange() {
 
 function handleCourseOutcomeChange() {
   form.learningOutcomeId = ''
+}
+
+function handleEditCourseChange() {
+  if (!editingQuestion.value) return
+  editingQuestion.value.courseOutcomeId = ''
+  editingQuestion.value.learningOutcomeId = ''
+}
+
+function handleEditCourseOutcomeChange() {
+  if (!editingQuestion.value) return
+  editingQuestion.value.learningOutcomeId = ''
 }
 
 // OPTIONS & PAIRS MANAGEMENT
@@ -1480,11 +1535,17 @@ function editQuestion(question) {
     ? [...question.correctAnswer]
     : (question.correctAnswer !== null && question.correctAnswer !== undefined ? [question.correctAnswer] : [0])
 
+  let initialTfCorrect = 'true'
+  if (question.type === 'true_false') {
+    initialTfCorrect = parsedCorrect[0] === 1 || String(parsedCorrect[0]).toLowerCase() === 'false' ? 'false' : 'true'
+  }
+
   editingQuestion.value = {
     ...question,
     options: Array.isArray(question.options) ? question.options.map(opt => ({ ...opt })) : [],
     matchingPairs: Array.isArray(question.matchingPairs) ? question.matchingPairs.map(p => ({ ...p })) : [],
     correctAnswer: parsedCorrect,
+    tfCorrect: initialTfCorrect,
     shortAnswerText: Array.isArray(question.correctAnswer) ? question.correctAnswer.join(', ') : String(question.correctAnswer || '')
   }
 }
@@ -1543,7 +1604,7 @@ async function saveEditedQuestion() {
     }
   } else if (editingQuestion.value.type === 'true_false') {
     formattedOptions = ['True', 'False']
-    formattedCorrectAnswer = editingQuestion.value.correctAnswer?.[0] === 1 ? [1] : [0]
+    formattedCorrectAnswer = editingQuestion.value.tfCorrect === 'false' ? [1] : [0]
   } else if (editingQuestion.value.type === 'short_answer') {
     formattedCorrectAnswer = String(editingQuestion.value.shortAnswerText || '')
       .split(',')
@@ -1681,45 +1742,56 @@ async function bulkUpdateStatus(status) {
 
   if (!confirm(`Mark ${selectedQuestionIds.value.length} question(s) as ${status}?`)) return
 
+  const failedIds = []
+
   try {
     for (const id of selectedQuestionIds.value) {
       const question = questions.value.find(item => item.id === id)
       if (!question) continue
 
-      const response = await fetch(`${API_BASE_URL}/questions/${id}`, {
-        method: 'PUT',
-        headers: getAuthHeaders(true),
-        body: JSON.stringify({
-          program: question.program || null,
-          term: question.term || null,
-          course_id: question.courseDbId || resolveCourseId(question.courseId),
-          course_outcome_id: question.courseOutcomeId || null,
-          learning_outcome_id: question.learningOutcomeId || null,
-          code: question.code,
-          type: question.type,
-          text: question.text,
-          image_url: question.imageUrl || null,
-          options: question.options || null,
-          correct_answer: question.correctAnswer !== null && question.correctAnswer !== undefined ? JSON.stringify(question.correctAnswer) : null,
-          matching_pairs: question.matchingPairs || null,
-          stcw_standard: question.stcwStandard || null,
-          bloom_level: question.bloomLevel || 'Understanding',
-          status,
-          ai_accepted: Boolean(question.aiAccepted),
-          retained_ai: Boolean(question.retainedAi)
+      try {
+        const response = await fetch(`${API_BASE_URL}/questions/${id}`, {
+          method: 'PUT',
+          headers: getAuthHeaders(true),
+          body: JSON.stringify({
+            program: question.program || null,
+            term: question.term || null,
+            course_id: question.courseDbId || resolveCourseId(question.courseId),
+            course_outcome_id: question.courseOutcomeId || null,
+            learning_outcome_id: question.learningOutcomeId || null,
+            code: question.code,
+            type: question.type,
+            text: question.text,
+            image_url: question.imageUrl || null,
+            options: question.options || null,
+            correct_answer: question.correctAnswer !== null && question.correctAnswer !== undefined ? JSON.stringify(question.correctAnswer) : null,
+            matching_pairs: question.matchingPairs || null,
+            stcw_standard: question.stcwStandard || null,
+            bloom_level: question.bloomLevel || 'Understanding',
+            status,
+            ai_accepted: Boolean(question.aiAccepted),
+            retained_ai: Boolean(question.retainedAi)
+          })
         })
-      })
 
-      if (!response.ok) throw await getApiError(response)
+        if (!response.ok) throw await getApiError(response)
 
-      const updated = normalizeQuestion(await response.json())
-      const index = questions.value.findIndex(item => item.id === id)
-      if (index !== -1) questions.value[index] = updated
+        const updated = normalizeQuestion(await response.json())
+        const index = questions.value.findIndex(item => item.id === id)
+        if (index !== -1) questions.value[index] = updated
+      } catch (err) {
+        failedIds.push(id)
+      }
     }
 
-    selectedQuestionIds.value = []
+    selectedQuestionIds.value = selectedQuestionIds.value.filter(id => failedIds.includes(id))
     syncQuestionsStorage()
-    alert(`Selected question(s) marked as ${status}.`)
+
+    if (failedIds.length > 0) {
+      alert(`Bulk update finished with warnings. Failed to update ${failedIds.length} question(s).`)
+    } else {
+      alert(`Selected question(s) marked as ${status}.`)
+    }
   } catch (err) {
     console.error('Bulk status update failed:', err)
     alert(err.message || 'Unable to update selected questions.')
@@ -1734,20 +1806,30 @@ async function bulkDeleteQuestions() {
 
   if (!confirm(`Delete ${selectedQuestionIds.value.length} selected question(s)?`)) return
 
+  const failedIds = []
+
   try {
     for (const id of selectedQuestionIds.value) {
-      const response = await fetch(`${API_BASE_URL}/questions/${id}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      })
-      if (!response.ok) throw await getApiError(response)
+      try {
+        const response = await fetch(`${API_BASE_URL}/questions/${id}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders()
+        })
+        if (!response.ok) throw await getApiError(response)
+        questions.value = questions.value.filter(question => question.id !== id)
+      } catch (err) {
+        failedIds.push(id)
+      }
     }
 
-    questions.value = questions.value.filter(question => !selectedQuestionIds.value.includes(question.id))
-    selectedQuestionIds.value = []
+    selectedQuestionIds.value = selectedQuestionIds.value.filter(id => failedIds.includes(id))
     syncQuestionsStorage()
 
-    alert('Selected questions deleted successfully.')
+    if (failedIds.length > 0) {
+      alert(`Bulk deletion finished with warnings. Could not delete ${failedIds.length} question(s).`)
+    } else {
+      alert('Selected questions deleted successfully.')
+    }
   } catch (err) {
     console.error('Bulk delete failed:', err)
     alert(err.message || 'Unable to delete selected questions.')
