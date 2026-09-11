@@ -240,7 +240,13 @@
               <!-- Stem -->
               <div>
                 <p class="text-xs font-semibold text-slate-800">{{ q.text }}</p>
-                <img v-if="q.imageUrl" :src="q.imageUrl" class="mt-2 h-28 object-cover rounded-lg border shadow-2xs" />
+                <img 
+                  v-if="q.imageUrl" 
+                  :src="q.imageUrl" 
+                  @click="openLightbox(q.imageUrl, 'Question Stem Image')" 
+                  title="Click to view full size"
+                  class="mt-2 h-28 object-cover rounded-lg border shadow-2xs cursor-pointer hover:opacity-90 transition" 
+                />
               </div>
 
               <!-- Multiple Choice Options -->
@@ -249,7 +255,13 @@
                   <div>
                     <span class="font-bold mr-1">{{ String.fromCharCode(65 + oIdx) }}.</span> {{ typeof opt === 'string' ? opt : opt.text }}
                   </div>
-                  <img v-if="opt.imageUrl" :src="opt.imageUrl" class="h-16 w-16 object-cover rounded border" />
+                  <img 
+                    v-if="opt.imageUrl" 
+                    :src="opt.imageUrl" 
+                    @click="openLightbox(opt.imageUrl, `Option ${String.fromCharCode(65 + oIdx)} Image`)" 
+                    title="Click to view full size"
+                    class="h-16 w-16 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
+                  />
                 </div>
               </div>
 
@@ -259,12 +271,24 @@
                   <div class="flex items-center gap-2">
                     <span class="font-bold text-slate-500">{{ pIdx + 1 }}.</span>
                     <span>{{ pair.leftText }}</span>
-                    <img v-if="pair.leftImageUrl" :src="pair.leftImageUrl" class="h-10 w-10 object-cover rounded border" />
+                    <img 
+                      v-if="pair.leftImageUrl" 
+                      :src="pair.leftImageUrl" 
+                      @click="openLightbox(pair.leftImageUrl, `Pair #${pIdx + 1} Premise Image`)" 
+                      title="Click to view full size"
+                      class="h-10 w-10 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
+                    />
                   </div>
                   <span class="font-bold text-slate-400">⟶</span>
                   <div class="flex items-center gap-2">
                     <span>{{ pair.rightText }}</span>
-                    <img v-if="pair.rightImageUrl" :src="pair.rightImageUrl" class="h-10 w-10 object-cover rounded border" />
+                    <img 
+                      v-if="pair.rightImageUrl" 
+                      :src="pair.rightImageUrl" 
+                      @click="openLightbox(pair.rightImageUrl, `Pair #${pIdx + 1} Match Image`)" 
+                      title="Click to view full size"
+                      class="h-10 w-10 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
+                    />
                   </div>
                 </div>
               </div>
@@ -502,7 +526,12 @@
               <input type="file" accept="image/*" @change="e => handleImageUpload(e, form, 'imageUrl')" class="text-xs mt-1 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer" />
             </div>
             <div v-if="form.imageUrl" class="relative shrink-0">
-              <img :src="form.imageUrl" class="h-16 w-16 object-cover rounded-lg border shadow-2xs" />
+              <img 
+                :src="form.imageUrl" 
+                @click="openLightbox(form.imageUrl, 'Question Stem Preview')" 
+                title="Click to view full size"
+                class="h-16 w-16 object-cover rounded-lg border shadow-2xs cursor-pointer hover:opacity-90 transition" 
+              />
               <button @click="removeImage(form, 'imageUrl')" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-2xs">
                 <X :size="10"></X>
               </button>
@@ -534,13 +563,18 @@
 
             <div class="flex items-center gap-2 self-end sm:self-auto">
               <label class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300/80 cursor-pointer flex items-center gap-1.5 transition">
-                <Image :size="14" class="text-slate-500"></Image>
+                <ImageIcon :size="14" class="text-slate-500"></ImageIcon>
                 <span>Image</span>
                 <input type="file" accept="image/*" @change="e => handleImageUpload(e, opt, 'imageUrl')" class="hidden" />
               </label>
 
               <div v-if="opt.imageUrl" class="relative">
-                <img :src="opt.imageUrl" class="h-8 w-8 object-cover rounded border" />
+                <img 
+                  :src="opt.imageUrl" 
+                  @click="openLightbox(opt.imageUrl, `Option #${idx + 1} Preview`)" 
+                  title="Click to view full size"
+                  class="h-8 w-8 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
+                />
                 <button @click="removeImage(opt, 'imageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600">
                   <X :size="8"></X>
                 </button>
@@ -577,11 +611,16 @@
                 
                 <div class="flex items-center justify-between">
                   <label class="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-semibold rounded border cursor-pointer flex items-center gap-1">
-                    <Image :size="12"></Image> Image
+                    <ImageIcon :size="12"></ImageIcon> Image
                     <input type="file" accept="image/*" @change="e => handleImageUpload(e, pair, 'leftImageUrl')" class="hidden" />
                   </label>
                   <div v-if="pair.leftImageUrl" class="relative">
-                    <img :src="pair.leftImageUrl" class="h-8 w-8 object-cover rounded border" />
+                    <img 
+                      :src="pair.leftImageUrl" 
+                      @click="openLightbox(pair.leftImageUrl, `Pair #${idx + 1} Left Preview`)" 
+                      title="Click to view full size"
+                      class="h-8 w-8 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
+                    />
                     <button @click="removeImage(pair, 'leftImageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5">
                       <X :size="8"></X>
                     </button>
@@ -595,11 +634,16 @@
                 
                 <div class="flex items-center justify-between">
                   <label class="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-semibold rounded border cursor-pointer flex items-center gap-1">
-                    <Image :size="12"></Image> Image
+                    <ImageIcon :size="12"></ImageIcon> Image
                     <input type="file" accept="image/*" @change="e => handleImageUpload(e, pair, 'rightImageUrl')" class="hidden" />
                   </label>
                   <div v-if="pair.rightImageUrl" class="relative">
-                    <img :src="pair.rightImageUrl" class="h-8 w-8 object-cover rounded border" />
+                    <img 
+                      :src="pair.rightImageUrl" 
+                      @click="openLightbox(pair.rightImageUrl, `Pair #${idx + 1} Right Preview`)" 
+                      title="Click to view full size"
+                      class="h-8 w-8 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
+                    />
                     <button @click="removeImage(pair, 'rightImageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5">
                       <X :size="8"></X>
                     </button>
@@ -809,7 +853,12 @@
               <input type="file" accept="image/*" @change="e => handleImageUpload(e, editingQuestion, 'imageUrl')" class="text-xs mt-1 cursor-pointer" />
             </div>
             <div v-if="editingQuestion.imageUrl" class="relative">
-              <img :src="editingQuestion.imageUrl" class="h-14 w-14 object-cover rounded border" />
+              <img 
+                :src="editingQuestion.imageUrl" 
+                @click="openLightbox(editingQuestion.imageUrl, 'Stem Image Preview')" 
+                title="Click to view full size"
+                class="h-14 w-14 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
+              />
               <button @click="removeImage(editingQuestion, 'imageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 cursor-pointer">
                 <X :size="10"></X>
               </button>
@@ -836,11 +885,16 @@
 
               <div class="flex items-center justify-between pt-1 border-t border-slate-100">
                 <label class="px-2 py-1 bg-slate-100 text-slate-700 text-[11px] font-semibold rounded cursor-pointer flex items-center gap-1">
-                  <Image :size="12"></Image> {{ opt.imageUrl ? 'Change Image' : 'Add Image' }}
+                  <ImageIcon :size="12"></ImageIcon> {{ opt.imageUrl ? 'Change Image' : 'Add Image' }}
                   <input type="file" accept="image/*" @change="e => handleImageUpload(e, opt, 'imageUrl')" class="hidden" />
                 </label>
                 <div v-if="opt.imageUrl" class="relative">
-                  <img :src="opt.imageUrl" class="h-8 w-8 object-cover rounded border" />
+                  <img 
+                    :src="opt.imageUrl" 
+                    @click="openLightbox(opt.imageUrl, `Option #${oIdx + 1} Image Preview`)" 
+                    title="Click to view full size"
+                    class="h-8 w-8 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
+                  />
                   <button @click="removeImage(opt, 'imageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 cursor-pointer">
                     <X :size="8"></X>
                   </button>
@@ -872,11 +926,16 @@
                   <input v-model="pair.leftText" class="w-full p-1.5 border rounded text-xs bg-white outline-none" />
                   <div class="flex items-center justify-between pt-1">
                     <label class="px-2 py-0.5 bg-white border text-[10px] font-semibold rounded cursor-pointer flex items-center gap-1">
-                      <Image :size="10"></Image> Image
+                      <ImageIcon :size="10"></ImageIcon> Image
                       <input type="file" accept="image/*" @change="e => handleImageUpload(e, pair, 'leftImageUrl')" class="hidden" />
                     </label>
                     <div v-if="pair.leftImageUrl" class="relative">
-                      <img :src="pair.leftImageUrl" class="h-6 w-6 object-cover rounded border" />
+                      <img 
+                        :src="pair.leftImageUrl" 
+                        @click="openLightbox(pair.leftImageUrl, `Pair #${pIdx + 1} Left Preview`)" 
+                        title="Click to view full size"
+                        class="h-6 w-6 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
+                      />
                       <button @click="removeImage(pair, 'leftImageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 cursor-pointer">
                         <X :size="6"></X>
                       </button>
@@ -889,11 +948,16 @@
                   <input v-model="pair.rightText" class="w-full p-1.5 border rounded text-xs bg-white outline-none" />
                   <div class="flex items-center justify-between pt-1">
                     <label class="px-2 py-0.5 bg-white border text-[10px] font-semibold rounded cursor-pointer flex items-center gap-1">
-                      <Image :size="10"></Image> Image
+                      <ImageIcon :size="10"></ImageIcon> Image
                       <input type="file" accept="image/*" @change="e => handleImageUpload(e, pair, 'rightImageUrl')" class="hidden" />
                     </label>
                     <div v-if="pair.rightImageUrl" class="relative">
-                      <img :src="pair.rightImageUrl" class="h-6 w-6 object-cover rounded border" />
+                      <img 
+                        :src="pair.rightImageUrl" 
+                        @click="openLightbox(pair.rightImageUrl, `Pair #${pIdx + 1} Right Preview`)" 
+                        title="Click to view full size"
+                        class="h-6 w-6 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
+                      />
                       <button @click="removeImage(pair, 'rightImageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 cursor-pointer">
                         <X :size="6"></X>
                       </button>
@@ -935,11 +999,41 @@
       </div>
     </div>
 
+    <!-- OVERLAY MODAL LIGHTBOX -->
+    <Transition name="fade">
+      <div 
+        v-if="lightboxImage" 
+        class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4"
+        @click.self="closeLightbox"
+      >
+        <div class="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center justify-center">
+          <button 
+            @click="closeLightbox" 
+            class="absolute -top-10 right-0 p-1.5 text-white/80 hover:text-white bg-slate-800/80 hover:bg-slate-800 rounded-full transition cursor-pointer"
+            title="Close Lightbox (Esc)"
+          >
+            <X :size="20" />
+          </button>
+
+          <div class="bg-white/10 p-2 rounded-2xl border border-white/20 shadow-2xl overflow-hidden flex flex-col items-center max-h-[85vh]">
+            <img 
+              :src="lightboxImage.url" 
+              :alt="lightboxImage.caption || 'Enlarged Image'" 
+              class="max-h-[75vh] max-w-full object-contain rounded-xl select-none" 
+            />
+            <p v-if="lightboxImage.caption" class="text-xs font-semibold text-slate-100 mt-2 px-3 py-1 bg-slate-900/80 rounded-full border border-slate-700/50">
+              {{ lightboxImage.caption }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 
 import {
   Plus,
@@ -947,7 +1041,7 @@ import {
   X,
   Upload,
   Download,
-  Image,
+  Image as ImageIcon,
   CheckCircle,
   XCircle,
   Sparkles,
@@ -986,6 +1080,24 @@ const searchQuery = ref('')
 
 const selectedQuestionIds = ref([])
 const editingQuestion = ref(null)
+
+// LIGHTBOX STATE
+const lightboxImage = ref(null)
+
+function openLightbox(url, caption = '') {
+  if (!url) return
+  lightboxImage.value = { url, caption }
+}
+
+function closeLightbox() {
+  lightboxImage.value = null
+}
+
+function handleKeydown(e) {
+  if (e.key === 'Escape' && lightboxImage.value) {
+    closeLightbox()
+  }
+}
 
 // QUESTION FORM
 const form = reactive({
@@ -1228,14 +1340,21 @@ function normalizeCourse(course) {
 
 function normalizeQuestion(question) {
   const course = courses.value.find(
-    c => String(c.id) === String(question.course_id)
+    c => String(c.id) === String(question.course_id || question.courseDbId)
   )
 
-  let matchingPairs = question.matching_pairs
+  let matchingPairs = question.matching_pairs || question.matchingPairs
   if (typeof matchingPairs === 'string') {
     matchingPairs = parseCorrectAnswer(matchingPairs)
   }
   if (!Array.isArray(matchingPairs)) matchingPairs = []
+
+  matchingPairs = matchingPairs.map(pair => ({
+    leftText: pair.leftText || pair.left_text || '',
+    leftImageUrl: pair.leftImageUrl || pair.left_image_url || '',
+    rightText: pair.rightText || pair.right_text || '',
+    rightImageUrl: pair.rightImageUrl || pair.right_image_url || ''
+  }))
 
   let options = question.options
   if (typeof options === 'string') {
@@ -1243,23 +1362,55 @@ function normalizeQuestion(question) {
   }
   if (!Array.isArray(options)) options = []
 
+  options = options.map(opt => {
+    if (typeof opt === 'string') {
+      return { text: opt, imageUrl: '' }
+    }
+    return {
+      text: opt.text || '',
+      imageUrl: opt.imageUrl || opt.image_url || ''
+    }
+  })
+
   return {
     ...question,
     id: question.id,
-    courseId: course?.code || question.course_id || '',
-    courseDbId: question.course_id || null,
-    courseOutcomeId: question.course_outcome_id || '',
-    learningOutcomeId: question.learning_outcome_id || '',
-    imageUrl: question.image_url || '',
+    courseId: course?.code || question.course_id || question.courseId || '',
+    courseDbId: question.course_id || question.courseDbId || null,
+    courseOutcomeId: question.course_outcome_id || question.courseOutcomeId || '',
+    learningOutcomeId: question.learning_outcome_id || question.learningOutcomeId || '',
+    imageUrl: question.image_url || question.imageUrl || '',
     options,
-    correctAnswer: parseCorrectAnswer(question.correct_answer),
+    correctAnswer: parseCorrectAnswer(question.correct_answer !== undefined ? question.correct_answer : question.correctAnswer),
     matchingPairs,
-    bloomLevel: question.bloom_level || 'Understanding',
-    stcwStandard: question.stcw_standard || '',
-    aiAccepted: Boolean(question.ai_accepted),
-    retainedAi: Boolean(question.retained_ai),
+    bloomLevel: question.bloom_level || question.bloomLevel || 'Understanding',
+    stcwStandard: question.stcw_standard || question.stcwStandard || '',
+    aiAccepted: Boolean(question.ai_accepted || question.aiAccepted),
+    retainedAi: Boolean(question.retained_ai || question.retainedAi),
     status: question.status || 'Pending'
   }
+}
+
+// PAYLOAD FORMATTERS FOR API SAVES
+function formatQuestionOptionsPayload(opts) {
+  if (!Array.isArray(opts)) return null
+  return opts.map(opt => ({
+    text: typeof opt === 'string' ? opt : opt.text,
+    imageUrl: typeof opt === 'string' ? null : (opt.imageUrl || opt.image_url || null),
+    image_url: typeof opt === 'string' ? null : (opt.imageUrl || opt.image_url || null)
+  }))
+}
+
+function formatQuestionMatchingPairsPayload(pairs) {
+  if (!Array.isArray(pairs)) return null
+  return pairs.map(pair => ({
+    leftText: pair.leftText || pair.left_text || '',
+    leftImageUrl: pair.leftImageUrl || pair.left_image_url || null,
+    left_image_url: pair.leftImageUrl || pair.left_image_url || null,
+    rightText: pair.rightText || pair.right_text || '',
+    rightImageUrl: pair.rightImageUrl || pair.right_image_url || null,
+    right_image_url: pair.rightImageUrl || pair.right_image_url || null
+  }))
 }
 
 // RESOLUTION HELPERS
@@ -1326,7 +1477,7 @@ function removeMatchingPair(index) {
   form.matchingPairs.splice(index, 1)
 }
 
-// IMAGE HANDLING
+// CLIENT-SIDE IMAGE COMPRESSION (Prevents payload overload)
 function handleImageUpload(event, targetObj, propertyName) {
   const file = event.target.files?.[0]
   if (!file) return
@@ -1335,9 +1486,41 @@ function handleImageUpload(event, targetObj, propertyName) {
     event.target.value = ''
     return
   }
+
   const reader = new FileReader()
-  reader.onload = () => {
-    targetObj[propertyName] = reader.result
+  reader.onload = (e) => {
+    const img = new window.Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      const MAX_WIDTH = 800
+      const MAX_HEIGHT = 800
+      let width = img.width
+      let height = img.height
+
+      if (width > height) {
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width
+          width = MAX_WIDTH
+        }
+      } else {
+        if (height > MAX_HEIGHT) {
+          width *= MAX_HEIGHT / height
+          height = MAX_HEIGHT
+        }
+      }
+
+      canvas.width = width
+      canvas.height = height
+
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, width, height)
+
+      targetObj[propertyName] = canvas.toDataURL('image/jpeg', 0.75)
+    }
+    img.onerror = () => {
+      targetObj[propertyName] = e.target.result
+    }
+    img.src = e.target.result
   }
   reader.readAsDataURL(file)
   event.target.value = ''
@@ -1444,10 +1627,7 @@ async function saveQuestion() {
   let formattedMatchingPairs = null
 
   if (form.type === 'multiple_choice') {
-    formattedOptions = form.options.map(option => ({
-      text: option.text,
-      imageUrl: option.imageUrl || null
-    }))
+    formattedOptions = formatQuestionOptionsPayload(form.options)
     formattedCorrectAnswer = form.options
       .map((option, index) => (option.isCorrect ? index : null))
       .filter(value => value !== null)
@@ -1457,7 +1637,7 @@ async function saveQuestion() {
       return
     }
   } else if (form.type === 'true_false') {
-    formattedOptions = ['True', 'False']
+    formattedOptions = formatQuestionOptionsPayload(['True', 'False'])
     formattedCorrectAnswer = form.tfCorrect === 'true' ? [0] : [1]
   } else if (form.type === 'short_answer') {
     formattedCorrectAnswer = form.shortAnswerKeywords
@@ -1470,7 +1650,7 @@ async function saveQuestion() {
       return
     }
   } else if (form.type === 'matching') {
-    formattedMatchingPairs = form.matchingPairs
+    formattedMatchingPairs = formatQuestionMatchingPairsPayload(form.matchingPairs)
     formattedCorrectAnswer = null
   }
 
@@ -1542,8 +1722,20 @@ function editQuestion(question) {
 
   editingQuestion.value = {
     ...question,
-    options: Array.isArray(question.options) ? question.options.map(opt => ({ ...opt })) : [],
-    matchingPairs: Array.isArray(question.matchingPairs) ? question.matchingPairs.map(p => ({ ...p })) : [],
+    options: Array.isArray(question.options)
+      ? question.options.map(opt => ({
+          text: typeof opt === 'string' ? opt : opt.text || '',
+          imageUrl: typeof opt === 'string' ? '' : (opt.imageUrl || opt.image_url || '')
+        }))
+      : [],
+    matchingPairs: Array.isArray(question.matchingPairs)
+      ? question.matchingPairs.map(p => ({
+          leftText: p.leftText || p.left_text || '',
+          leftImageUrl: p.leftImageUrl || p.left_image_url || '',
+          rightText: p.rightText || p.right_text || '',
+          rightImageUrl: p.rightImageUrl || p.right_image_url || ''
+        }))
+      : [],
     correctAnswer: parsedCorrect,
     tfCorrect: initialTfCorrect,
     shortAnswerText: Array.isArray(question.correctAnswer) ? question.correctAnswer.join(', ') : String(question.correctAnswer || '')
@@ -1590,11 +1782,8 @@ async function saveEditedQuestion() {
   let formattedMatchingPairs = null
 
   if (editingQuestion.value.type === 'multiple_choice') {
-    formattedOptions = (editingQuestion.value.options || []).map(opt => ({
-      text: opt.text,
-      imageUrl: opt.imageUrl || null
-    }))
-    formattedCorrectAnswer = formattedOptions
+    formattedOptions = formatQuestionOptionsPayload(editingQuestion.value.options)
+    formattedCorrectAnswer = (editingQuestion.value.options || [])
       .map((_, index) => (editingQuestion.value.correctAnswer?.includes(index) ? index : null))
       .filter(value => value !== null)
 
@@ -1603,7 +1792,7 @@ async function saveEditedQuestion() {
       return
     }
   } else if (editingQuestion.value.type === 'true_false') {
-    formattedOptions = ['True', 'False']
+    formattedOptions = formatQuestionOptionsPayload(['True', 'False'])
     formattedCorrectAnswer = editingQuestion.value.tfCorrect === 'false' ? [1] : [0]
   } else if (editingQuestion.value.type === 'short_answer') {
     formattedCorrectAnswer = String(editingQuestion.value.shortAnswerText || '')
@@ -1616,7 +1805,7 @@ async function saveEditedQuestion() {
       return
     }
   } else if (editingQuestion.value.type === 'matching') {
-    formattedMatchingPairs = editingQuestion.value.matchingPairs || []
+    formattedMatchingPairs = formatQuestionMatchingPairsPayload(editingQuestion.value.matchingPairs)
     formattedCorrectAnswer = null
   }
 
@@ -1688,9 +1877,9 @@ async function updateQuestionStatus(id, status) {
         type: question.type,
         text: question.text,
         image_url: question.imageUrl || null,
-        options: question.options || null,
+        options: formatQuestionOptionsPayload(question.options),
         correct_answer: question.correctAnswer !== null && question.correctAnswer !== undefined ? JSON.stringify(question.correctAnswer) : null,
-        matching_pairs: question.matchingPairs || null,
+        matching_pairs: formatQuestionMatchingPairsPayload(question.matchingPairs),
         stcw_standard: question.stcwStandard || null,
         bloom_level: question.bloomLevel || 'Understanding',
         status,
@@ -1763,9 +1952,9 @@ async function bulkUpdateStatus(status) {
             type: question.type,
             text: question.text,
             image_url: question.imageUrl || null,
-            options: question.options || null,
+            options: formatQuestionOptionsPayload(question.options),
             correct_answer: question.correctAnswer !== null && question.correctAnswer !== undefined ? JSON.stringify(question.correctAnswer) : null,
-            matching_pairs: question.matchingPairs || null,
+            matching_pairs: formatQuestionMatchingPairsPayload(question.matchingPairs),
             stcw_standard: question.stcwStandard || null,
             bloom_level: question.bloomLevel || 'Understanding',
             status,
@@ -2107,12 +2296,12 @@ async function handleBulkCSVUpload(event) {
         let formattedMatchingPairs = null
 
         if (type === 'multiple_choice') {
-          formattedOptions = [
+          formattedOptions = formatQuestionOptionsPayload([
             { text: clean(optionA), imageUrl: null },
             { text: clean(optionB), imageUrl: null },
             { text: clean(optionC), imageUrl: null },
             { text: clean(optionD), imageUrl: null }
-          ]
+          ])
 
           const answerLetters = clean(correctAnswerRaw).split('|').map(a => a.trim().toUpperCase()).filter(Boolean)
           if (!answerLetters.length) throw new Error('CorrectAnswer is empty.')
@@ -2125,7 +2314,7 @@ async function handleBulkCSVUpload(event) {
           }
           formattedCorrectAnswer = answerIndexes
         } else if (type === 'true_false') {
-          formattedOptions = ['True', 'False']
+          formattedOptions = formatQuestionOptionsPayload(['True', 'False'])
           const answer = clean(correctAnswerRaw).toUpperCase()
           if (answer === 'A' || answer === 'TRUE') formattedCorrectAnswer = [0]
           else if (answer === 'B' || answer === 'FALSE') formattedCorrectAnswer = [1]
@@ -2227,7 +2416,7 @@ async function loadCachedQuestions() {
   try {
     const parsed = JSON.parse(savedQuestions)
     if (!Array.isArray(parsed) || parsed.length === 0) return false
-    questions.value = parsed
+    questions.value = parsed.map(normalizeQuestion)
     return true
   } catch (err) {
     console.warn('CAMS: Unable to read cached questions.', err)
@@ -2282,7 +2471,24 @@ async function fetchQuestions() {
 }
 
 onMounted(async () => {
+  window.addEventListener('keydown', handleKeydown)
   await fetchCourses()
   await fetchQuestions()
 })
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
 </script>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>
