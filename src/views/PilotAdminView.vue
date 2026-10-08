@@ -359,3 +359,4 @@ function simulateCadetViolation() {
 
 .btn-primary { background: #2563eb; color: #ffffff; }
 .btn-primary:hover { background: #1d4ed8; }
+</style>
