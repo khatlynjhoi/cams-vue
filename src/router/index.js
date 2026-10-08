@@ -91,7 +91,8 @@ router.beforeEach((to, from, next) => {
     return next('/')
   }
 
-  if (to.meta.role && user.role !== to.meta.role) {
+  // Case-insensitive role validation check
+  if (to.meta.role && user.role?.toLowerCase() !== to.meta.role.toLowerCase()) {
     return next('/')
   }
 
