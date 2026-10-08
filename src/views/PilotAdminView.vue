@@ -1,679 +1,755 @@
+<script setup>
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { 
+  Sparkles, 
+  Sliders, 
+  Trash2, 
+  Plus, 
+  Search, 
+  X, 
+  BookOpen, 
+  Layers, 
+  List, 
+  FileText, 
+  Eye, 
+  Calendar, 
+  RotateCcw, 
+  CheckCircle2, 
+  Users, 
+  Clock, 
+  ShieldAlert, 
+  Play, 
+  Pause, 
+  Key,
+  ChevronRight
+} from 'lucide-vue-next'
+
+const router = useRouter()
+
+// Registry of Saved Tests (built in TestBuilderView)
+const savedTests = ref([])
+
+// Pilot Sessions Registry
+const pilotSessions = ref([])
+
+// UI & Modal States
+const isScheduleModalOpen = ref(false)
+const isTelemetryModalOpen = ref(false)
+const selectedSessionTelemetry = ref(null)
+
+// Search & Filter States
+const searchQuery = ref('')
+const statusFilter = ref('')
+const courseFilter = ref('')
+const sortBy = ref('newest')
+
+// Schedule Session Form State
+const selectedTestId = ref('')
+const sessionForm = ref({
+  title: '',
+  courseCode: '',
+  program: '',
+  accessCode: '',
+  linkedTestId: null,
+  expectedCandidates: 20,
+  durationMinutes: 60,
+  passingScorePercent: 75,
+  scheduledDate: new Date().toISOString().slice(0, 10)
+})
+
+// Safe LocalStorage Parser
+function safeParseStorage(key) {
+  try {
+    const val = localStorage.getItem(key)
+    return val && val.trim() ? JSON.parse(val) : null
+  } catch (e) {
+    console.error(`Failed to parse localStorage key "${key}":`, e)
+    return null
+  }
+}
+
+// Load Saved Tests built from TestBuilderView
+function loadSavedTests() {
+  const loaded = safeParseStorage('cams_saved_tests')
+  if (loaded && Array.isArray(loaded)) {
+    savedTests.value = loaded
+  } else {
+    savedTests.value = []
+  }
+}
+
+// Load Pilot Sessions from LocalStorage (or default initial dataset)
+function loadPilotSessions() {
+  const loaded = safeParseStorage('cams_pilot_sessions')
+  if (loaded && Array.isArray(loaded)) {
+    pilotSessions.value = loaded
+  } else {
+    // Initial sample session
+    pilotSessions.value = [
+      {
+        id: Date.now(),
+        title: 'NAV-101 Midterm Examination',
+        courseCode: 'NAV-101',
+        program: 'BSMT',
+        accessCode: 'NAV-8842',
+        linkedTestId: null,
+        linkedTestTitle: 'NAV-101 Midterm Examination Blueprint',
+        expectedCandidates: 24,
+        activeCandidates: 22,
+        durationMinutes: 60,
+        passingScorePercent: 75,
+        totalItems: 30,
+        totalPoints: 30,
+        status: 'Active',
+        flaggedAlerts: 1,
+        createdAt: new Date().toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        })
+      }
+    ]
+    saveSessionsToStorage()
+  }
+}
+
+function saveSessionsToStorage() {
+  localStorage.setItem('cams_pilot_sessions', JSON.stringify(pilotSessions.value))
+}
+
+// Auto Generate Random Access Code
+function generateAccessCode(course = 'PLT') {
+  const prefix = course ? course.split(' ')[0].toUpperCase() : 'PLT'
+  const randomNum = Math.floor(1000 + Math.random() * 9000)
+  return `${prefix}-${randomNum}`
+}
+
+// Handle Test Selection from TestBuilder Saved Tests Dropdown
+function onTestSelectionChange() {
+  if (!selectedTestId.value) {
+    sessionForm.value.linkedTestId = null
+    return
+  }
+
+  const foundTest = savedTests.value.find(t => String(t.id) === String(selectedTestId.value))
+  if (foundTest) {
+    sessionForm.value.linkedTestId = foundTest.id
+    sessionForm.value.title = foundTest.title || `${foundTest.course} Pilot Session`
+    sessionForm.value.courseCode = foundTest.course || ''
+    sessionForm.value.program = foundTest.program || ''
+    sessionForm.value.durationMinutes = foundTest.durationMinutes || 60
+    sessionForm.value.passingScorePercent = foundTest.passingScorePercent || 75
+    sessionForm.value.accessCode = generateAccessCode(foundTest.course)
+  }
+}
+
+// Reset Modal Form
+function resetScheduleForm() {
+  selectedTestId.value = ''
+  sessionForm.value = {
+    title: '',
+    courseCode: '',
+    program: '',
+    accessCode: generateAccessCode('NAV'),
+    linkedTestId: null,
+    expectedCandidates: 20,
+    durationMinutes: 60,
+    passingScorePercent: 75,
+    scheduledDate: new Date().toISOString().slice(0, 10)
+  }
+}
+
+function openScheduleModal() {
+  loadSavedTests()
+  resetScheduleForm()
+  isScheduleModalOpen.value = true
+}
+
+// Schedule / Launch New Session
+function launchSession() {
+  if (!sessionForm.value.title.trim() || !sessionForm.value.courseCode.trim()) {
+    alert('Please enter a Session Title and Course Code.')
+    return
+  }
+
+  const linkedTest = savedTests.value.find(t => String(t.id) === String(sessionForm.value.linkedTestId))
+
+  const newSession = {
+    id: Date.now(),
+    title: sessionForm.value.title,
+    courseCode: sessionForm.value.courseCode,
+    program: sessionForm.value.program || (linkedTest ? linkedTest.program : 'BSMT'),
+    accessCode: sessionForm.value.accessCode || generateAccessCode(sessionForm.value.courseCode),
+    linkedTestId: linkedTest ? linkedTest.id : null,
+    linkedTestTitle: linkedTest ? linkedTest.title : 'Direct Session (No Linked Paper)',
+    expectedCandidates: Number(sessionForm.value.expectedCandidates) || 0,
+    activeCandidates: 0,
+    durationMinutes: Number(sessionForm.value.durationMinutes) || 60,
+    passingScorePercent: Number(sessionForm.value.passingScorePercent) || 75,
+    totalItems: linkedTest ? (linkedTest.totalItems || (linkedTest.items ? linkedTest.items.length : 0)) : 0,
+    totalPoints: linkedTest ? (linkedTest.totalPoints || 0) : 0,
+    status: 'Scheduled',
+    flaggedAlerts: 0,
+    createdAt: new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
+  pilotSessions.value.unshift(newSession)
+  saveSessionsToStorage()
+  isScheduleModalOpen.value = false
+  alert(`Pilot Examination Session "${newSession.title}" scheduled successfully!`)
+}
+
+// Toggle Session Status (Scheduled -> Active -> Suspended / Completed)
+function updateSessionStatus(session, newStatus) {
+  session.status = newStatus
+  if (newStatus === 'Active' && session.activeCandidates === 0) {
+    session.activeCandidates = session.expectedCandidates
+  }
+  saveSessionsToStorage()
+}
+
+function deleteSession(id) {
+  if (confirm('Are you sure you want to delete this pilot administration session?')) {
+    pilotSessions.value = pilotSessions.value.filter(s => s.id !== id)
+    saveSessionsToStorage()
+  }
+}
+
+function openTelemetryModal(session) {
+  selectedSessionTelemetry.value = session
+  isTelemetryModalOpen.value = true
+}
+
+// Computed Statistics
+const activeSessionsCount = computed(() => pilotSessions.value.filter(s => s.status === 'Active').length)
+const totalCandidatesEnrolled = computed(() => pilotSessions.value.reduce((sum, s) => sum + (Number(s.expectedCandidates) || 0), 0))
+const totalFlaggedAlerts = computed(() => pilotSessions.value.reduce((sum, s) => sum + (Number(s.flaggedAlerts) || 0), 0))
+
+const uniqueCourses = computed(() => [...new Set(pilotSessions.value.map(s => s.courseCode).filter(Boolean))].sort())
+
+// Filtered Pilot Sessions List
+const filteredSessions = computed(() => {
+  let result = [...pilotSessions.value]
+
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase()
+    result = result.filter(s => 
+      s.title.toLowerCase().includes(q) ||
+      s.courseCode.toLowerCase().includes(q) ||
+      s.accessCode.toLowerCase().includes(q) ||
+      (s.linkedTestTitle && s.linkedTestTitle.toLowerCase().includes(q))
+    )
+  }
+
+  if (statusFilter.value) {
+    result = result.filter(s => s.status === statusFilter.value)
+  }
+
+  if (courseFilter.value) {
+    result = result.filter(s => s.courseCode === courseFilter.value)
+  }
+
+  if (sortBy.value === 'newest') {
+    result.sort((a, b) => b.id - a.id)
+  } else if (sortBy.value === 'oldest') {
+    result.sort((a, b) => a.id - b.id)
+  } else if (sortBy.value === 'title_asc') {
+    result.sort((a, b) => a.title.localeCompare(b.title))
+  }
+
+  return result
+})
+
+function resetFilters() {
+  searchQuery.value = ''
+  statusFilter.value = ''
+  courseFilter.value = ''
+  sortBy.value = 'newest'
+}
+
+onMounted(() => {
+  loadSavedTests()
+  loadPilotSessions()
+})
+</script>
+
 <template>
-  <div class="pilot-admin-container">
-    <!-- Header -->
-    <header class="page-header">
-      <div>
-        <h1>Pilot Administration Dashboard</h1>
-        <p>Monitor live proctored examination sessions and real-time candidate security telemetry.</p>
+  <div class="p-6 md:p-8 space-y-6 min-h-screen bg-[#f4f6f9] text-slate-800">
+    <!-- Header Banner - Standardized Theme matching TestBuilderView -->
+    <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-sm">
+      <div class="space-y-1">
+        <h1 class="text-xl font-bold flex items-center gap-2 text-white tracking-tight">
+          Pilot Administration Dashboard
+        </h1>
+        <p class="text-xs text-white/80 font-normal">
+          Monitor live proctored examination sessions, manage access codes, and stream real-time candidate security telemetry.
+        </p>
       </div>
-      <div class="header-actions">
+
+      <div class="flex items-center gap-2 shrink-0">
         <button 
-          class="btn btn-secondary" 
-          @click="simulateCadetViolation"
-          :disabled="activeSessionsCount === 0"
-          :title="activeSessionsCount === 0 ? 'Schedule an active session to test alerts' : 'Simulate student tab switch'"
+          @click="openScheduleModal"
+          class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl flex items-center gap-2 transition shadow-sm cursor-pointer"
         >
-          ⚡ Test Live Alert
-        </button>
-        <button class="btn btn-primary" @click="isNewPilotModalOpen = true">
-          + Schedule Pilot Session
-        </button>
-      </div>
-    </header>
-
-    <!-- KPI Summary Metrics -->
-    <div class="metrics-grid">
-      <div class="metric-card">
-        <span class="metric-label">Active Pilot Sessions</span>
-        <div class="metric-value text-blue">{{ activeSessionsCount }}</div>
-      </div>
-      <div class="metric-card">
-        <span class="metric-label">Total Cadets Enrolled</span>
-        <div class="metric-value">{{ totalCadetsCount }}</div>
-      </div>
-      <div class="metric-card">
-        <span class="metric-label">Flagged Security Alerts</span>
-        <div class="metric-value text-red">{{ totalAlertsCount }}</div>
-      </div>
-    </div>
-
-    <!-- Controls Bar: Search & Status Filter -->
-    <div class="filter-bar">
-      <div class="search-box">
-        <input v-model="searchQuery" type="text" placeholder="Search by title, course, or access code..." />
-      </div>
-      <div class="filter-options">
-        <select v-model="statusFilter">
-          <option value="ALL">All Statuses</option>
-          <option value="Active">Active Only</option>
-          <option value="Paused">Paused Only</option>
-          <option value="Completed">Completed Only</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Data Table & Empty States -->
-    <div class="table-card">
-      <table v-if="filteredSessions.length > 0" class="sessions-table">
-        <thead>
-          <tr>
-            <th>Session Title</th>
-            <th>Course</th>
-            <th>Access Code</th>
-            <th>Progress</th>
-            <th>Status</th>
-            <th>Security Alerts</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="session in filteredSessions" :key="session.id">
-            <td>
-              <span class="session-title">{{ session.title }}</span>
-              <span class="session-time">Scheduled: {{ session.scheduled_time }}</span>
-            </td>
-            <td><code>{{ session.course_code || 'N/A' }}</code></td>
-            <td><code class="code-badge">{{ session.access_code }}</code></td>
-            <td>{{ session.completed_count }} / {{ session.candidates_count }} Cadets</td>
-            <td>
-              <span :class="['status-badge', session.status.toLowerCase()]">
-                {{ session.status }}
-              </span>
-            </td>
-            <td>
-              <span :class="['alert-count', session.telemetryLogs.length > 0 ? 'has-alerts' : 'clean']">
-                {{ session.telemetryLogs.length }} Alert(s)
-              </span>
-            </td>
-            <td class="action-cells">
-              <button 
-                v-if="session.status !== 'Completed'" 
-                class="btn-sm btn-outline" 
-                @click="toggleStatus(session)"
-              >
-                {{ session.status === 'Active' ? 'Pause' : 'Resume' }}
-              </button>
-              <button class="btn-sm btn-info" @click="inspectSession(session)">
-                Inspect Logs
-              </button>
-              <button class="btn-sm btn-danger" @click="deleteSession(session.id)" title="Delete Session">
-                🗑️
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <!-- Empty State when no data -->
-      <div v-else class="empty-state-card">
-        <div class="empty-icon">📡</div>
-        <h3>No Pilot Sessions Found</h3>
-        <p v-if="pilotSessions.length === 0">
-          There are no pilot sessions scheduled yet. Click <strong>"+ Schedule Pilot Session"</strong> to create your first session on localhost.
-        </p>
-        <p v-else>
-          No pilot sessions match your current filter criteria.
-        </p>
-        <button v-if="pilotSessions.length === 0" class="btn btn-primary" @click="isNewPilotModalOpen = true">
-          Schedule First Session
+          <Plus :size="15" />
+          <span>Schedule Pilot Session</span>
         </button>
       </div>
     </div>
 
-    <!-- Modal: Schedule New Pilot Session -->
-    <div v-if="isNewPilotModalOpen" class="modal-overlay" @click.self="isNewPilotModalOpen = false">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>Schedule New Pilot Session</h2>
-          <button class="close-btn" @click="isNewPilotModalOpen = false">&times;</button>
+    <!-- Analytics / Telemetry Overview Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2">
+        <div class="flex justify-between items-center text-slate-500">
+          <span class="text-xs font-bold uppercase tracking-wider">Active Pilot Sessions</span>
+          <div class="p-2 bg-emerald-50 rounded-xl text-emerald-700">
+            <Play :size="16" />
+          </div>
         </div>
-        <form @submit.prevent="handleCreatePilot">
-          <div class="form-group">
-            <label>Session Title *</label>
-            <input v-model="newPilot.title" type="text" placeholder="e.g. NAV-101 Midterm Examination" required />
+        <div class="flex items-baseline gap-2">
+          <span class="text-2xl font-black text-slate-900 font-mono">{{ activeSessionsCount }}</span>
+          <span class="text-[11px] text-emerald-700 font-semibold">Sessions Live</span>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2">
+        <div class="flex justify-between items-center text-slate-500">
+          <span class="text-xs font-bold uppercase tracking-wider">Total Cadets Enrolled</span>
+          <div class="p-2 bg-blue-50 rounded-xl text-blue-700">
+            <Users :size="16" />
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-2xl font-black text-slate-900 font-mono">{{ totalCandidatesEnrolled }}</span>
+          <span class="text-[11px] text-slate-500 font-semibold">Candidates</span>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2">
+        <div class="flex justify-between items-center text-slate-500">
+          <span class="text-xs font-bold uppercase tracking-wider">Flagged Security Alerts</span>
+          <div class="p-2 bg-amber-50 rounded-xl text-amber-700">
+            <ShieldAlert :size="16" />
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-2xl font-black text-slate-900 font-mono" :class="totalFlaggedAlerts > 0 ? 'text-amber-600' : 'text-slate-900'">
+            {{ totalFlaggedAlerts }}
+          </span>
+          <span class="text-[11px] text-slate-500 font-semibold">Alerts Recorded</span>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2">
+        <div class="flex justify-between items-center text-slate-500">
+          <span class="text-xs font-bold uppercase tracking-wider">Available Test Papers</span>
+          <div class="p-2 bg-indigo-50 rounded-xl text-indigo-700">
+            <BookOpen :size="16" />
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-2xl font-black text-slate-900 font-mono">{{ savedTests.length }}</span>
+          <span class="text-[11px] text-indigo-700 font-semibold">In Test Builder</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search, Filter & Controls Bar -->
+    <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div class="relative lg:col-span-2">
+          <Search :size="14" class="absolute left-3 top-3 text-slate-400" />
+          <input 
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search by title, course, or access code..."
+            class="w-full text-xs pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+          />
+        </div>
+
+        <div>
+          <select 
+            v-model="statusFilter"
+            class="w-full text-xs p-2 bg-slate-50 border border-slate-300 rounded-xl outline-none font-semibold focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+          >
+            <option value="">All Statuses</option>
+            <option value="Active">Active</option>
+            <option value="Scheduled">Scheduled</option>
+            <option value="Completed">Completed</option>
+            <option value="Suspended">Suspended</option>
+          </select>
+        </div>
+
+        <div>
+          <select 
+            v-model="courseFilter"
+            class="w-full text-xs p-2 bg-slate-50 border border-slate-300 rounded-xl outline-none font-semibold focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+          >
+            <option value="">All Courses</option>
+            <option v-for="c in uniqueCourses" :key="c" :value="c">{{ c }}</option>
+          </select>
+        </div>
+
+        <div>
+          <select 
+            v-model="sortBy"
+            class="w-full text-xs p-2 bg-slate-50 border border-slate-300 rounded-xl outline-none font-semibold focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+          >
+            <option value="newest">Sort: Newest First</option>
+            <option value="oldest">Sort: Oldest First</option>
+            <option value="title_asc">Sort: Title A-Z</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+        <span class="text-slate-500 font-medium">
+          Showing <strong class="text-slate-800 font-bold">{{ filteredSessions.length }}</strong> of {{ pilotSessions.length }} session(s)
+        </span>
+
+        <button 
+          v-if="searchQuery || statusFilter || courseFilter || sortBy !== 'newest'"
+          @click="resetFilters"
+          class="text-emerald-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+        >
+          <RotateCcw :size="12" />
+          <span>Clear Filters</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div v-if="filteredSessions.length === 0" class="bg-white border border-slate-200 rounded-2xl p-12 text-center space-y-3 shadow-sm">
+      <div class="p-3 bg-slate-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto text-slate-400">
+        <List :size="24" />
+      </div>
+      <h3 class="text-sm font-bold text-slate-800">No Pilot Sessions Found</h3>
+      <p class="text-xs text-slate-500 max-w-sm mx-auto">
+        No active or scheduled sessions match your current criteria. Schedule a new session using an examination paper from the Test Builder.
+      </p>
+      <button 
+        @click="openScheduleModal"
+        class="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition cursor-pointer"
+      >
+        Schedule New Session
+      </button>
+    </div>
+
+    <!-- Pilot Sessions List View -->
+    <div v-else class="space-y-3">
+      <div 
+        v-for="session in filteredSessions" 
+        :key="session.id"
+        class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+      >
+        <div class="space-y-1.5 flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-2.5 py-0.5 bg-slate-900 text-white font-mono text-[10px] font-bold rounded">
+              {{ session.program || 'BSMT' }}
+            </span>
+
+            <span 
+              :class="[
+                'text-[10px] font-bold px-2.5 py-0.5 rounded border',
+                session.status === 'Active' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                session.status === 'Scheduled' ? 'bg-blue-50 text-blue-800 border-blue-200' :
+                session.status === 'Completed' ? 'bg-slate-100 text-slate-700 border-slate-200' :
+                'bg-red-50 text-red-700 border-red-200'
+              ]"
+            >
+              {{ session.status }}
+            </span>
+
+            <span class="text-[11px] font-mono font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded flex items-center gap-1">
+              <Key :size="11" class="text-slate-400" />
+              <span>Access Code: <strong class="text-slate-900">{{ session.accessCode }}</strong></span>
+            </span>
+
+            <span class="text-[11px] font-bold text-slate-400 flex items-center gap-1 font-mono">
+              <Calendar :size="12" />
+              <span>Created: {{ session.createdAt }}</span>
+            </span>
           </div>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label>Course Code *</label>
-              <input v-model="newPilot.course_code" type="text" placeholder="e.g. NAV-101" required />
-            </div>
+          <h3 class="text-base font-bold text-slate-900 leading-snug">{{ session.title }}</h3>
 
-            <div class="form-group">
-              <label>Access Code *</label>
-              <input v-model="newPilot.access_code" type="text" placeholder="e.g. NAV-8842" required />
-            </div>
+          <div class="text-xs text-slate-500 font-medium space-y-0.5">
+            <p>Course: <strong class="text-emerald-800 font-bold">{{ session.courseCode }}</strong></p>
+            <p v-if="session.linkedTestTitle" class="text-[11px] text-slate-400 flex items-center gap-1">
+              <FileText :size="12" class="text-emerald-700" />
+              <span>Linked Paper: <strong class="text-slate-700">{{ session.linkedTestTitle }}</strong></span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Metadata Stats Pills -->
+        <div class="flex items-center gap-3 shrink-0 text-xs">
+          <div class="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-center">
+            <span class="block text-[10px] text-slate-400 font-bold uppercase">Candidates</span>
+            <span class="font-bold text-slate-800 font-mono text-xs">{{ session.activeCandidates }} / {{ session.expectedCandidates }}</span>
           </div>
 
-          <div class="form-group">
-            <label>Link Course / Exam Paper (Optional)</label>
-            <select v-model="newPilot.exam_paper_id">
+          <div class="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-center">
+            <span class="block text-[10px] text-slate-400 font-bold uppercase">Paper Specs</span>
+            <span class="font-bold text-emerald-700 font-mono text-xs">{{ session.totalItems }} Qs ({{ session.totalPoints }} pts)</span>
+          </div>
+
+          <div class="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-center">
+            <span class="block text-[10px] text-slate-400 font-bold uppercase">Duration</span>
+            <span class="font-bold text-slate-800 text-xs">{{ session.durationMinutes }} Mins</span>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-2 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-4 shrink-0">
+          <button 
+            v-if="session.status === 'Scheduled'"
+            @click="updateSessionStatus(session, 'Active')"
+            class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="Launch Pilot Session"
+          >
+            <Play :size="14" />
+            <span>Launch</span>
+          </button>
+
+          <button 
+            v-else-if="session.status === 'Active'"
+            @click="updateSessionStatus(session, 'Suspended')"
+            class="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="Pause/Suspend Session"
+          >
+            <Pause :size="14" />
+            <span>Suspend</span>
+          </button>
+
+          <button 
+            v-else-if="session.status === 'Suspended'"
+            @click="updateSessionStatus(session, 'Active')"
+            class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <Play :size="14" />
+            <span>Resume</span>
+          </button>
+
+          <button 
+            @click="openTelemetryModal(session)"
+            class="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+            title="View Real-time Security Telemetry"
+          >
+            <Eye :size="14" />
+            <span>Telemetry</span>
+          </button>
+
+          <button 
+            @click="deleteSession(session.id)"
+            class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer"
+            title="Delete Pilot Session"
+          >
+            <Trash2 :size="16" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCHEDULE NEW PILOT SESSION MODAL -->
+    <div v-if="isScheduleModalOpen" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-lg w-full flex flex-col shadow-2xl border border-slate-100 overflow-hidden">
+        
+        <!-- Modal Header -->
+        <div class="p-5 bg-slate-900 text-white flex justify-between items-center">
+          <div class="flex items-center gap-2.5">
+            <Sliders :size="18" class="text-emerald-400" />
+            <div>
+              <h3 class="text-base font-bold text-white">Schedule New Pilot Session</h3>
+              <p class="text-xs text-slate-300">Link an examination paper created in the Test Builder.</p>
+            </div>
+          </div>
+          <button @click="isScheduleModalOpen = false" class="text-slate-400 hover:text-white transition cursor-pointer">
+            <X :size="20" />
+          </button>
+        </div>
+
+        <!-- Form Body -->
+        <div class="p-6 space-y-4 text-xs">
+          
+          <!-- LINK TEST PAPER DROPDOWN (Primary Selector) -->
+          <div>
+            <label class="block font-bold text-slate-800 mb-1">
+              Select Examination Paper (Built in Test Builder)
+            </label>
+            <select 
+              v-model="selectedTestId"
+              @change="onTestSelectionChange"
+              class="w-full text-xs p-2.5 border border-slate-300 rounded-xl font-semibold bg-emerald-50/50 text-emerald-900 focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"
+            >
               <option value="">-- Direct Creation (No Linked Paper) --</option>
-              <option v-for="paper in availablePapers" :key="paper.id" :value="paper.id">
-                {{ paper.course_code || paper.paper_code }} — {{ paper.title || paper.name }}
+              <option v-for="test in savedTests" :key="test.id" :value="test.id">
+                {{ test.title }} ({{ test.course }} - {{ test.totalItems || 0 }} Items)
               </option>
             </select>
+            <p class="text-[11px] text-slate-500 mt-1">
+              Selecting a test paper automatically populates session title, course code, duration, and passing marks.
+            </p>
           </div>
 
-          <div class="form-group">
-            <label>Expected Candidates Count</label>
-            <input v-model.number="newPilot.candidates_count" type="number" min="1" required />
+          <!-- Session Title -->
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Session Title *</label>
+            <input 
+              v-model="sessionForm.title"
+              type="text"
+              placeholder="e.g. NAV-101 Midterm Examination"
+              class="w-full text-xs p-2.5 border border-slate-300 rounded-xl font-semibold outline-none focus:ring-2 focus:ring-emerald-500"
+            />
           </div>
 
-          <div class="modal-actions">
-            <button type="button" class="btn btn-secondary" @click="isNewPilotModalOpen = false">Cancel</button>
-            <button type="submit" class="btn btn-primary">Launch Session</button>
+          <!-- Course Code & Access Code -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Course Code *</label>
+              <input 
+                v-model="sessionForm.courseCode"
+                type="text"
+                placeholder="e.g. NAV-101"
+                class="w-full text-xs p-2.5 border border-slate-300 rounded-xl font-semibold outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Access Code *</label>
+              <div class="relative">
+                <input 
+                  v-model="sessionForm.accessCode"
+                  type="text"
+                  placeholder="e.g. NAV-8842"
+                  class="w-full text-xs p-2.5 border border-slate-300 rounded-xl font-mono font-bold bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <button 
+                  type="button"
+                  @click="sessionForm.accessCode = generateAccessCode(sessionForm.courseCode)"
+                  class="absolute right-2 top-2 text-[10px] font-bold bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-2 py-1 rounded transition cursor-pointer"
+                >
+                  Regen
+                </button>
+              </div>
+            </div>
           </div>
-        </form>
+
+          <!-- Candidates & Duration -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Expected Candidates Count</label>
+              <input 
+                v-model.number="sessionForm.expectedCandidates"
+                type="number"
+                min="1"
+                class="w-full text-xs p-2.5 border border-slate-300 rounded-xl font-semibold text-center outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Duration (Minutes)</label>
+              <input 
+                v-model.number="sessionForm.durationMinutes"
+                type="number"
+                min="1"
+                class="w-full text-xs p-2.5 border border-slate-300 rounded-xl font-semibold text-center outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+          <button 
+            @click="isScheduleModalOpen = false"
+            class="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-300 transition cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button 
+            @click="launchSession"
+            class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition cursor-pointer flex items-center gap-1.5"
+          >
+            <Play :size="14" />
+            <span>Launch Session</span>
+          </button>
+        </div>
+
       </div>
     </div>
 
-    <!-- Telemetry Logs Drawer / Inspector Modal -->
-    <div v-if="selectedSessionForDrawer" class="modal-overlay" @click.self="selectedSessionForDrawer = null">
-      <div class="drawer-content">
-        <div class="drawer-header">
-          <div>
-            <h3>Security & Telemetry Logs</h3>
-            <p class="drawer-subtitle">{{ selectedSessionForDrawer.title }} ({{ selectedSessionForDrawer.course_code }})</p>
+    <!-- SECURITY TELEMETRY MODAL -->
+    <div v-if="isTelemetryModalOpen && selectedSessionTelemetry" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-2xl w-full flex flex-col shadow-2xl border border-slate-100 overflow-hidden">
+        
+        <div class="p-5 bg-slate-900 text-white flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <ShieldAlert :size="20" class="text-amber-400" />
+            <div>
+              <h3 class="text-base font-bold text-white">{{ selectedSessionTelemetry.title }}</h3>
+              <p class="text-xs text-slate-300">Proctoring Telemetry Stream & Candidate Security Logs</p>
+            </div>
           </div>
-          <button class="close-btn" @click="selectedSessionForDrawer = null">&times;</button>
+          <button @click="isTelemetryModalOpen = false" class="text-slate-400 hover:text-white transition cursor-pointer">
+            <X :size="20" />
+          </button>
         </div>
 
-        <div v-if="selectedSessionForDrawer.telemetryLogs.length === 0" class="empty-state-card">
-          <div class="empty-icon">🛡️</div>
-          <h4>No Security Violations Logged</h4>
-          <p>No proctoring infractions or window-blur events have been flagged for this session.</p>
+        <div class="p-6 space-y-4 text-xs bg-slate-50">
+          <div class="grid grid-cols-3 gap-3">
+            <div class="bg-white p-3 rounded-xl border border-slate-200 text-center">
+              <span class="block text-[10px] text-slate-400 font-bold uppercase">Active Candidates</span>
+              <span class="font-bold text-slate-800 text-sm font-mono">{{ selectedSessionTelemetry.activeCandidates }} / {{ selectedSessionTelemetry.expectedCandidates }}</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-slate-200 text-center">
+              <span class="block text-[10px] text-slate-400 font-bold uppercase">Security Status</span>
+              <span class="font-bold text-emerald-700 text-sm">Secure (Proctored)</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-slate-200 text-center">
+              <span class="block text-[10px] text-slate-400 font-bold uppercase">Flagged Events</span>
+              <span class="font-bold text-amber-600 text-sm font-mono">{{ selectedSessionTelemetry.flaggedAlerts }}</span>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+            <h4 class="font-bold text-slate-800 flex items-center gap-1.5">
+              <Clock :size="14" class="text-emerald-700" />
+              Recent Candidate Audit Events
+            </h4>
+
+            <div v-if="selectedSessionTelemetry.flaggedAlerts === 0" class="p-4 text-center text-slate-400 italic">
+              No suspicious tab switches or proctoring alerts detected for this session.
+            </div>
+
+            <div v-else class="space-y-2">
+              <div class="p-2.5 bg-amber-50 border border-amber-200 rounded-lg flex justify-between items-center">
+                <div class="space-y-0.5">
+                  <span class="font-bold text-amber-900 block">Focus Loss / Tab Switch Detected</span>
+                  <span class="text-[11px] text-amber-700">Cadet #2024-0019 (BSMT) switched focus for 4 seconds</span>
+                </div>
+                <span class="text-[10px] font-mono text-amber-600 font-bold">10:14:02 AM</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div v-else class="logs-list">
-          <div 
-            v-for="log in selectedSessionForDrawer.telemetryLogs" 
-            :key="log.id" 
-            :class="['log-card', log.severity.toLowerCase(), { 'is-locked': log.is_locked }]"
+        <div class="p-4 bg-white border-t border-slate-200 flex justify-end">
+          <button 
+            @click="isTelemetryModalOpen = false"
+            class="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
           >
-            <div class="log-info">
-              <span class="severity-tag">{{ log.severity }}</span>
-              <h4>{{ log.cadet_name }} <small>({{ log.student_id }})</small></h4>
-              <p class="event-desc">{{ log.event }}</p>
-              <small class="timestamp">Logged at: {{ log.logged_at }}</small>
-            </div>
-            <div class="log-actions">
-              <button 
-                :class="['btn-sm', log.is_locked ? 'btn-unlock' : 'btn-lock']"
-                @click="toggleCadetLock(log)"
-              >
-                {{ log.is_locked ? 'Unlock Terminal' : 'Lock Terminal' }}
-              </button>
-            </div>
-          </div>
+            Close Telemetry
+          </button>
         </div>
+
       </div>
     </div>
   </div>
 </template>
-
-<script setup>
-import { ref, computed, onMounted } from 'vue'
-
-const STORAGE_KEY = 'cams_pilot_sessions'
-
-// 1. Reactive State
-const pilotSessions = ref([])
-const availablePapers = ref([])
-
-const searchQuery = ref('')
-const statusFilter = ref('ALL')
-
-const isNewPilotModalOpen = ref(false)
-const selectedSessionForDrawer = ref(null)
-
-const newPilot = ref({
-  title: '',
-  course_code: '',
-  exam_paper_id: '',
-  access_code: '',
-  candidates_count: 30
-})
-
-// 2. Lifecycle: Load Actual Local Data
-onMounted(() => {
-  // Load saved sessions from localStorage
-  const saved = localStorage.getItem(STORAGE_KEY)
-  if (saved) {
-    try {
-      pilotSessions.value = JSON.parse(saved)
-    } catch (e) {
-      pilotSessions.value = []
-    }
-  }
-
-  // Load existing courses/papers saved locally in other views
-  const savedCourses = localStorage.getItem('cams_courses') || localStorage.getItem('cams_exam_papers')
-  if (savedCourses) {
-    try {
-      availablePapers.value = JSON.parse(savedCourses)
-    } catch (e) {
-      availablePapers.value = []
-    }
-  }
-})
-
-// Helper to persist updates to localStorage
-function persistData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(pilotSessions.value))
-}
-
-// 3. Computed Metrics & Filters
-const activeSessionsCount = computed(() => {
-  return pilotSessions.value.filter(s => s.status === 'Active').length
-})
-
-const totalCadetsCount = computed(() => {
-  return pilotSessions.value.reduce((acc, s) => acc + (s.candidates_count || 0), 0)
-})
-
-const totalAlertsCount = computed(() => {
-  return pilotSessions.value.reduce((acc, s) => acc + (s.telemetryLogs ? s.telemetryLogs.length : 0), 0)
-})
-
-const filteredSessions = computed(() => {
-  return pilotSessions.value.filter(session => {
-    const matchesSearch = 
-      session.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      session.course_code.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      session.access_code.toLowerCase().includes(searchQuery.value.toLowerCase())
-    
-    const matchesStatus = statusFilter.value === 'ALL' || session.status === statusFilter.value
-
-    return matchesSearch && matchesStatus
-  })
-})
-
-// 4. Action Handlers
-function handleCreatePilot() {
-  if (!newPilot.value.title || !newPilot.value.access_code) return
-
-  const createdSession = {
-    id: Date.now(),
-    title: newPilot.value.title,
-    course_code: newPilot.value.course_code || 'GEN-101',
-    access_code: newPilot.value.access_code.toUpperCase(),
-    candidates_count: Number(newPilot.value.candidates_count) || 20,
-    completed_count: 0,
-    status: 'Active',
-    scheduled_time: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    telemetryLogs: []
-  }
-
-  pilotSessions.value.unshift(createdSession)
-  persistData()
-
-  // Reset form & close modal
-  newPilot.value = { title: '', course_code: '', exam_paper_id: '', access_code: '', candidates_count: 30 }
-  isNewPilotModalOpen.value = false
-}
-
-function toggleStatus(session) {
-  if (session.status === 'Active') {
-    session.status = 'Paused'
-  } else if (session.status === 'Paused') {
-    session.status = 'Active'
-  }
-  persistData()
-}
-
-function deleteSession(sessionId) {
-  if (confirm('Are you sure you want to delete this pilot session?')) {
-    pilotSessions.value = pilotSessions.value.filter(s => s.id !== sessionId)
-    persistData()
-  }
-}
-
-function inspectSession(session) {
-  selectedSessionForDrawer.value = session
-}
-
-function toggleCadetLock(log) {
-  log.is_locked = !log.is_locked
-  persistData()
-}
-
-// Real-time alert simulation on user-created active session
-function simulateCadetViolation() {
-  const activeSession = pilotSessions.value.find(s => s.status === 'Active')
-  if (activeSession) {
-    if (!activeSession.telemetryLogs) activeSession.telemetryLogs = []
-    activeSession.telemetryLogs.unshift({
-      id: Date.now(),
-      cadet_name: 'Cadet Student ' + Math.floor(100 + Math.random() * 900),
-      student_id: '2026-' + Math.floor(1000 + Math.random() * 9000),
-      event: 'Browser Tab Switch / Window Blur Detected',
-      severity: 'High',
-      is_locked: false,
-      logged_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    })
-    persistData()
-  }
-}
-</script>
-
-<style scoped>
-.pilot-admin-container {
-  padding: 24px;
-  max-width: 1240px;
-  margin: 0 auto;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  color: #1e293b;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.page-header h1 {
-  margin: 0 0 4px 0;
-  font-size: 24px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.page-header p {
-  margin: 0;
-  color: #64748b;
-  font-size: 14px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 12px;
-}
-
-/* KPI Summary Metric Cards */
-.metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.metric-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 16px 20px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-}
-
-.metric-label {
-  font-size: 13px;
-  color: #64748b;
-  font-weight: 500;
-}
-
-.metric-value {
-  font-size: 26px;
-  font-weight: 700;
-  margin-top: 4px;
-  color: #0f172a;
-}
-
-.text-blue { color: #2563eb; }
-.text-red { color: #dc2626; }
-
-/* Search & Filters */
-.filter-bar {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.search-box {
-  flex: 1;
-}
-
-.search-box input, .filter-options select {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  font-size: 14px;
-  background-color: #ffffff;
-}
-
-.filter-options select {
-  width: 180px;
-}
-
-/* Data Table Styling */
-.table-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-}
-
-.sessions-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-.sessions-table th, .sessions-table td {
-  padding: 14px 16px;
-  border-bottom: 1px solid #f1f5f9;
-  font-size: 14px;
-}
-
-.sessions-table th {
-  background: #f8fafc;
-  color: #475569;
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.session-title {
-  display: block;
-  font-weight: 600;
-  color: #0f172a;
-}
-
-.session-time {
-  font-size: 12px;
-  color: #94a3b8;
-}
-
-.code-badge {
-  background: #f1f5f9;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-family: monospace;
-  color: #334155;
-}
-
-.status-badge {
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.status-badge.active { background: #dcfce7; color: #15803d; }
-.status-badge.paused { background: #fef9c3; color: #a16207; }
-.status-badge.completed { background: #f1f5f9; color: #475569; }
-
-.alert-count.has-alerts { color: #dc2626; font-weight: 600; }
-.alert-count.clean { color: #16a34a; }
-
-.action-cells { display: flex; gap: 6px; align-items: center; }
-
-/* Buttons */
-.btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  border: none;
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
-}
-
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.btn-primary { background: #2563eb; color: #ffffff; }
-.btn-primary:hover:not(:disabled) { background: #1d4ed8; }
-
-.btn-secondary { background: #f1f5f9; color: #334155; }
-.btn-secondary:hover:not(:disabled) { background: #e2e8f0; }
-
-.btn-sm {
-  padding: 5px 10px;
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  font-weight: 500;
-}
-
-.btn-outline { border-color: #cbd5e1; background: transparent; color: #334155; }
-.btn-outline:hover { background: #f8fafc; }
-.btn-info { background: #e0f2fe; color: #0369a1; }
-.btn-info:hover { background: #bae6fd; }
-.btn-danger { background: transparent; color: #ef4444; border: 1px solid #fee2e2; }
-.btn-danger:hover { background: #fee2e2; }
-
-/* Modals & Overlay */
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(2px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content, .drawer-content {
-  background: #ffffff;
-  border-radius: 10px;
-  padding: 24px;
-  width: 100%;
-  max-width: 520px;
-  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
-}
-
-.drawer-content {
-  max-width: 620px;
-  max-height: 85vh;
-  overflow-y: auto;
-}
-
-.modal-header, .drawer-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 20px;
-}
-
-.modal-header h2, .drawer-header h3 {
-  margin: 0;
-  font-size: 18px;
-  color: #0f172a;
-}
-
-.drawer-subtitle {
-  margin: 4px 0 0 0;
-  font-size: 13px;
-  color: #64748b;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 22px;
-  color: #94a3b8;
-  cursor: pointer;
-}
-
-.close-btn:hover { color: #0f172a; }
-
-.form-group { margin-bottom: 16px; }
-.form-row { display: flex; gap: 12px; }
-.form-row .form-group { flex: 1; }
-
-.form-group label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #334155;
-}
-
-.form-group input, .form-group select {
-  width: 100%;
-  padding: 9px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  box-sizing: border-box;
-  font-size: 14px;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
-}
-
-/* Telemetry Logs Cards */
-.logs-list { display: flex; flex-direction: column; gap: 12px; }
-
-.log-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  border-radius: 6px;
-  border-left: 4px solid #cbd5e1;
-  background: #f8fafc;
-}
-
-.log-card.high { border-left-color: #ef4444; background: #fef2f2; }
-.log-card.medium { border-left-color: #f59e0b; background: #fffbeb; }
-.log-card.is-locked { opacity: 0.5; }
-
-.log-info h4 { margin: 4px 0; font-size: 14px; }
-.event-desc { margin: 2px 0; font-size: 13px; color: #475569; }
-.timestamp { font-size: 11px; color: #94a3b8; }
-
-.severity-tag {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.high .severity-tag { background: #fee2e2; color: #991b1b; }
-.medium .severity-tag { background: #fef3c7; color: #92400e; }
-
-.btn-lock { background: #fee2e2; color: #991b1b; }
-.btn-unlock { background: #dcfce7; color: #166534; }
-
-/* Empty States */
-.empty-state-card {
-  text-align: center;
-  padding: 48px 24px;
-  color: #64748b;
-}
-
-.empty-icon { font-size: 36px; margin-bottom: 12px; }
-.empty-state-card h3, .empty-state-card h4 { color: #1e293b; margin: 0 0 8px 0; }
-.empty-state-card p { font-size: 14px; margin-bottom: 20px; max-width: 420px; margin-left: auto; margin-right: auto; }
-</style>
