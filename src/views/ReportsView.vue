@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from 'vue'
 import { 
   BarChart2, 
   Download, 
-  CheckCircle2, 
   AlertTriangle, 
   Users, 
   Award,
@@ -216,7 +215,7 @@ const cohortOptions = computed(() => {
   return list
 })
 
-// Export CSV Functionality with Dynamic Data
+// Export CSV Functionality
 function exportReportCSV() {
   if (competencyBreakdown.value.length === 0) {
     alert('No competency data available to export.')
@@ -330,4 +329,61 @@ function exportReportCSV() {
 
         <select 
           v-model="selectedCohort"
-          class="border border-slate-300 rounded-xl text-xs font-semibold px-3 py-2 bg-white
+          class="border border-slate-300 rounded-xl text-xs font-semibold px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700"
+        >
+          <option v-for="opt in cohortOptions" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </option>
+        </select>
+      </div>
+
+      <div v-if="competencyBreakdown.length === 0" class="py-12 text-center text-slate-400 space-y-2">
+        <FileText class="w-10 h-10 mx-auto text-slate-300" />
+        <p class="text-xs font-bold text-slate-600">No competency data available</p>
+        <p class="text-[11px] text-slate-400">Add questions or conduct exams in Test Builder / Student Exam views to populate metrics.</p>
+      </div>
+
+      <div v-else class="space-y-4 pt-2">
+        <div v-for="comp in competencyBreakdown" :key="comp.code" class="p-4 bg-slate-50/70 border border-slate-200/80 rounded-xl space-y-2">
+          <div class="flex justify-between items-center text-xs">
+            <div class="flex items-center gap-2">
+              <span class="font-mono font-bold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded-lg shadow-2xs">
+                {{ comp.code }}
+              </span>
+              <span class="font-bold text-slate-900">{{ comp.title }}</span>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <span class="font-bold text-slate-800">{{ comp.passRate }}% Proficiency</span>
+              <span 
+                :class="[
+                  'px-2 py-0.5 text-[10px] font-bold rounded-md border',
+                  comp.status === 'Compliant' 
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                    : comp.status === 'Pending Submissions'
+                    ? 'bg-slate-100 text-slate-600 border-slate-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                ]"
+              >
+                {{ comp.status }}
+              </span>
+            </div>
+          </div>
+
+          <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+            <div 
+              class="h-full transition-all duration-500 rounded-full"
+              :class="comp.passRate >= 75 ? 'bg-emerald-600' : 'bg-amber-500'"
+              :style="{ width: `${comp.passRate}%` }"
+            ></div>
+          </div>
+
+          <div class="text-[11px] text-slate-500 flex justify-between pt-1">
+            <span>Recorded Submissions: {{ comp.submissionsCount }}</span>
+            <span>Target Benchmark: 75% Pass Rate</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
