@@ -1,455 +1,601 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import axios from 'axios'
 import { 
-  FileText, 
+  BarChart2, 
   Download, 
   CheckCircle2, 
   AlertTriangle, 
-  Printer, 
-  Filter,
-  BarChart2,
-  ClipboardCheck,
+  Users, 
+  Award,
   FileSpreadsheet,
   RefreshCw,
-  Search,
-  BookOpen
+  TrendingUp,
+  FileText,
+  Filter,
+  Layers,
+  BookOpen,
+  HelpCircle,
+  Check
 } from 'lucide-vue-next'
 
-// Active Tab Stage ('exam-built' | 'post-pilot')
-const activeStage = ref('exam-built')
+// State
 const isLoading = ref(false)
+const selectedSubjectFilter = ref('all')
 
-// Global Filters
-const searchQuery = ref('')
-const selectedCourse = ref('All')
-const selectedTerm = ref('All')
-
-// Master Reactive Registries loaded from TestBuilder & Pilot System
-const savedTests = ref([])
+// Master data collections fetched from API / localStorage
 const examSubmissions = ref([])
+const questions = ref([])
 const courses = ref([])
+const savedTests = ref([])
+const pilotTests = ref([])
+const tosData = ref([])
 
-// Helper function to safely fetch JSON from backend or local storage fallback
-async function fetchJson(url) {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
-  return await res.json()
+// Safely parse JSON from localStorage
+function safeParse(key, fallback = []) {
+  try {
+    const item = localStorage.getItem(key)
+    return item ? JSON.parse(item) : fallback
+  } catch (err) {
+    console.warn(`Error parsing localStorage key '${key}':`, err)
+    return fallback
+  }
 }
 
-// Fetch live data from backend or LocalStorage sync points
-async function loadInstitutionalData() {
+// Fetch dynamic data from API and fall back to localStorage
+async function fetchData() {
   isLoading.value = true
   try {
-    // 1. Fetch Saved Tests generated from TestBuilder
+    // 1. Exam Submissions
     try {
-      const testsData = await fetchJson('/api/saved-tests')
-      savedTests.value = Array.isArray(testsData) ? testsData : []
+      const subRes = await axios.get('/api/exam-submissions')
+      examSubmissions.value = Array.isArray(subRes.data) ? subRes.data : []
     } catch {
-      const localTests = localStorage.getItem('cams_saved_tests')
-      savedTests.value = localTests ? JSON.parse(localTests) : []
+      examSubmissions.value = safeParse('cams_exam_submissions', safeParse('cams_student_submissions', []))
     }
 
-    // 2. Fetch Exam Submissions generated from Pilot / Student Exams
+    // 2. Questions
     try {
-      const subData = await fetchJson('/api/exam-submissions')
-      examSubmissions.value = Array.isArray(subData) ? subData : []
+      const qRes = await axios.get('/api/questions')
+      questions.value = Array.isArray(qRes.data) ? qRes.data : []
     } catch {
-      const localSubs = localStorage.getItem('cams_exam_submissions')
-      examSubmissions.value = localSubs ? JSON.parse(localSubs) : []
+      questions.value = safeParse('cams_questions', [])
     }
 
-    // 3. Fetch Master Courses
+    // 3. Courses
     try {
-      const courseData = await fetchJson('/api/courses')
-      courses.value = Array.isArray(courseData) ? courseData : []
+      const cRes = await axios.get('/api/courses')
+      courses.value = Array.isArray(cRes.data) ? cRes.data : []
     } catch {
-      const localCourses = localStorage.getItem('cams_courses')
-      courses.value = localCourses ? JSON.parse(localCourses) : []
+      courses.value = safeParse('cams_courses', [])
     }
+
+    // 4. Saved Tests (from Test-Exam Builder)
+    savedTests.value = safeParse('cams_saved_tests', safeParse('cams_tests', []))
+
+    // 5. Pilot Tests / Administrations (from Pilot Admin view)
+    pilotTests.value = safeParse('cams_pilot_tests', safeParse('cams_pilot_administrations', []))
+
+    // 6. TOS Data
+    tosData.value = safeParse('cams_tos_data', safeParse('cams_uploaded_questionnaires', []))
+
   } catch (err) {
-    console.error('Error loading Institutional Form data:', err)
+    console.error('Error fetching report data:', err)
   } finally {
     isLoading.value = false
   }
 }
 
 onMounted(() => {
-  loadInstitutionalData()
+  fetchData()
 })
 
-// Unique Terms for Filtering
-const availableTerms = computed(() => {
-  const terms = new Set(['Midterm', 'Final', 'Prelim'])
+// Unified collection of all dynamic subjects/courses identified in user data
+const dynamicSubjectsList = computed(() => {
+  const subjectsMap = new Map()
+
+  // Helper to register or update subject record
+  const registerSubject = (code, title, stcw = '', source = '') => {
+    if (!code && !title) return
+    const key = (code || title).trim().toUpperCase()
+    if (!key) return
+
+    if (!subjectsMap.has(key)) {
+      subjectsMap.set(key, {
+        key,
+        code: code || key,
+        title: title || code || key,
+        stcwStandard: stcw || (key.includes('STCW') ? key : ''),
+        sources: new Set([source])
+      })
+    } else {
+      const existing = subjectsMap.get(key)
+      if (title && (!existing.title || existing.title === existing.code)) existing.title = title
+      if (stcw && !existing.stcwStandard) existing.stcwStandard = stcw
+      existing.sources.add(source)
+    }
+  }
+
+  // 1. From Courses Registry
+  courses.value.forEach(c => {
+    registerSubject(c.code, c.title, c.stcw_standard || c.stcw, 'Courses')
+  })
+
+  // 2. From Saved Tests (Test Builder)
   savedTests.value.forEach(t => {
-    if (t.term) terms.add(t.term)
-  })
-  return Array.from(terms)
-})
-
-// Phase 1: Real Built Exams derived from TestBuilder (AD-09 & AD-10)
-const builtExams = computed(() => {
-  return savedTests.value
-    .map(test => {
-      const courseCode = test.courseCode || test.subjectCode || (test.course ? test.course.code : 'NAV-101')
-      const courseTitle = test.courseTitle || test.subjectTitle || (test.course ? test.course.title : 'Maritime Assessment')
-      const questionCount = test.questions ? test.questions.length : (test.totalItems || 0)
-      const dateString = test.createdAt 
-        ? new Date(test.createdAt).toISOString().split('T')[0] 
-        : (test.createdDate || new Date().toISOString().split('T')[0])
-
-      return {
-        id: test.id || `EX-${test.code || '2026'}`,
-        rawTest: test,
-        subjectCode: courseCode,
-        subjectTitle: courseTitle,
-        term: test.term || 'Midterm',
-        academicYear: test.academicYear || '2025-2026',
-        totalItems: questionCount,
-        createdDate: dateString,
-        status: test.status || 'Ready for Pilot'
-      }
-    })
-    .filter(exam => {
-      const matchesSearch = !searchQuery.value || 
-        exam.subjectCode.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-        exam.subjectTitle.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-        String(exam.id).toLowerCase().includes(searchQuery.value.toLowerCase())
-
-      const matchesCourse = selectedCourse.value === 'All' || exam.subjectCode === selectedCourse.value
-      const matchesTerm = selectedTerm.value === 'All' || exam.term === selectedTerm.value
-
-      return matchesSearch && matchesCourse && matchesTerm
-    })
-})
-
-// Phase 2: Real Completed Pilots aggregated from Student Exam Submissions (AD-11 & AD-18)
-const completedPilots = computed(() => {
-  // Group submissions by test/exam ID
-  const pilotMap = new Map()
-
-  // First, map existing tests
-  savedTests.value.forEach(test => {
-    const testId = String(test.id)
-    pilotMap.set(testId, {
-      id: `PL-${test.code || testId.slice(-6)}`,
-      testId: testId,
-      rawTest: test,
-      subjectCode: test.courseCode || test.subjectCode || 'NAV-101',
-      subjectTitle: test.courseTitle || test.subjectTitle || 'Navigation Watchkeeping',
-      term: test.term || 'Midterm',
-      submissions: []
-    })
+    const code = t.subjectCode || t.courseCode || t.subject || t.code || ''
+    const title = t.subjectTitle || t.courseTitle || t.title || t.name || ''
+    const stcw = t.stcwStandard || t.competency || ''
+    registerSubject(code, title, stcw, 'Test Builder')
   })
 
-  // Match submissions into test buckets
+  // 3. From Pilot Tests
+  pilotTests.value.forEach(pt => {
+    const code = pt.subjectCode || pt.courseCode || pt.subject || pt.code || ''
+    const title = pt.subjectTitle || pt.courseTitle || pt.title || pt.name || ''
+    registerSubject(code, title, pt.stcwStandard || '', 'Pilot Admin')
+  })
+
+  // 4. From Exam Submissions
   examSubmissions.value.forEach(sub => {
-    const key = String(sub.test_id || sub.exam_id || sub.testId || '1')
-    if (!pilotMap.has(key)) {
-      pilotMap.set(key, {
-        id: `PL-${key.slice(-6)}`,
-        testId: key,
-        rawTest: null,
-        subjectCode: sub.course_code || sub.subjectCode || 'MAR-100',
-        subjectTitle: sub.course_title || sub.subjectTitle || 'Maritime Operational Pilot',
-        term: sub.term || 'Midterm',
-        submissions: []
-      })
-    }
-    pilotMap.get(key).submissions.push(sub)
+    const code = sub.subject_code || sub.course_code || (sub.course ? sub.course.code : '') || sub.subject || ''
+    const title = sub.subject_title || sub.course_title || (sub.course ? sub.course.title : '') || sub.test_title || ''
+    registerSubject(code, title, '', 'Submissions')
   })
 
-  // Convert map into pilot records
-  const result = []
-  pilotMap.forEach((pilot) => {
-    const subs = pilot.submissions
-    const sampleCount = subs.length
-
-    // Calculate Average Duration (in minutes)
-    let totalMinutes = 0
-    subs.forEach(s => {
-      const mins = Number(s.durationMinutes || s.duration_minutes || (s.time_spent ? Math.round(s.time_spent / 60) : 45))
-      totalMinutes += mins
-    })
-    const avgDuration = sampleCount > 0 ? Math.round(totalMinutes / sampleCount) : 0
-
-    // Item discrimination / poor item calculation based on submissions
-    let poorCount = 0
-    if (pilot.rawTest && pilot.rawTest.questions) {
-      pilot.rawTest.questions.forEach(q => {
-        if (q.status === 'Flagged' || q.status === 'Needs Review' || q.retained_ai === false) {
-          poorCount++
-        }
-      })
-    }
-
-    result.push({
-      id: pilot.id,
-      examCode: `EX-${pilot.testId}`,
-      subjectCode: pilot.subjectCode,
-      subjectTitle: pilot.subjectTitle,
-      term: pilot.term,
-      sampleCount: sampleCount,
-      avgDurationMin: avgDuration || 45,
-      completionRate: sampleCount > 0 ? '100%' : '0%',
-      reliabilityStatus: sampleCount >= 5 ? 'Validated' : (sampleCount > 0 ? 'In Progress' : 'Pending Cohort'),
-      poorItemsCount: poorCount,
-      rawTest: pilot.rawTest,
-      submissions: subs
-    })
+  // 5. From Question Bank
+  questions.value.forEach(q => {
+    const code = q.course_code || (q.course ? q.course.code : '') || q.subject || ''
+    const title = q.course_title || (q.course ? q.course.title : '') || ''
+    const stcw = q.stcw_standard || q.stcw || ''
+    registerSubject(code, title, stcw, 'Question Bank')
   })
 
-  return result.filter(pilot => {
-    const matchesSearch = !searchQuery.value || 
-      pilot.subjectCode.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      pilot.subjectTitle.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      String(pilot.id).toLowerCase().includes(searchQuery.value.toLowerCase())
+  // 6. From TOS / Uploads
+  tosData.value.forEach(tos => {
+    const code = tos.subjectCode || tos.subject || tos.code || ''
+    const title = tos.subjectTitle || tos.title || ''
+    registerSubject(code, title, '', 'TOS Uploads')
+  })
 
-    const matchesCourse = selectedCourse.value === 'All' || pilot.subjectCode === selectedCourse.value
-    const matchesTerm = selectedTerm.value === 'All' || pilot.term === selectedTerm.value
+  return Array.from(subjectsMap.values())
+})
 
-    return matchesSearch && matchesCourse && matchesTerm
+// Filtered Exam Submissions based on selected subject
+const filteredSubmissions = computed(() => {
+  if (selectedSubjectFilter.value === 'all') return examSubmissions.value
+  const targetKey = selectedSubjectFilter.value.toUpperCase()
+
+  return examSubmissions.value.filter(s => {
+    if (!s) return false
+    const sCode = (s.subject_code || s.course_code || (s.course && s.course.code) || s.subject || '').trim().toUpperCase()
+    const sTitle = (s.subject_title || s.course_title || (s.course && s.course.title) || s.test_title || '').trim().toUpperCase()
+    return sCode === targetKey || sTitle === targetKey
   })
 })
 
-// Dynamic Institutional Form Handlers
-function generateAD09(exam) {
-  alert(`[Form AD-09: Table of Specifications (TOS)]\nGenerating official TOS document for ${exam.subjectCode} (${exam.term}).\nTotal Items: ${exam.totalItems} Qs.`)
-}
+// Filtered Pilot Tests based on selected subject
+const filteredPilotTests = computed(() => {
+  if (selectedSubjectFilter.value === 'all') return pilotTests.value
+  const targetKey = selectedSubjectFilter.value.toUpperCase()
 
-function generateAD10(exam) {
-  alert(`[Form AD-10: Exam Questionnaire]\nGenerating official Questionnaire Form for ${exam.subjectCode} (${exam.term}).\nReady for print/pdf export.`)
-}
+  return pilotTests.value.filter(pt => {
+    if (!pt) return false
+    const ptCode = (pt.subjectCode || pt.courseCode || pt.subject || pt.code || '').trim().toUpperCase()
+    const ptTitle = (pt.subjectTitle || pt.courseTitle || pt.title || pt.name || '').trim().toUpperCase()
+    return ptCode === targetKey || ptTitle === targetKey
+  })
+})
 
-function generateAD11(pilot) {
-  alert(`[Form AD-11: Item Analysis Result]\nGenerating item difficulty and discrimination indices for ${pilot.subjectCode}.\nCohort N = ${pilot.sampleCount} cadets.\nPoor items flagged: ${pilot.poorItemsCount}`)
-}
+// Dynamic Metrics Calculation
+const summaryMetrics = computed(() => {
+  const subs = filteredSubmissions.value
+  const pilots = filteredPilotTests.value
 
-function generateAD18(pilot) {
-  alert(`[Form AD-18: Review & Validation Checklist]\nGenerating JCMMC No. 01 S. 2022 Validation Checklist for ${pilot.subjectCode}.\nValidation Status: ${pilot.reliabilityStatus}`)
+  let totalExamsCompleted = subs.length
+  let totalScoresSum = 0
+  let passingExamsCount = 0
+
+  // Calculate scores from Exam Submissions
+  subs.forEach(sub => {
+    const totalItems = Number(sub.total_items || sub.totalItems) || 1
+    const score = Number(sub.score) || 0
+    const pct = (score / totalItems) * 100
+    totalScoresSum += pct
+    if (pct >= 75) passingExamsCount++
+  })
+
+  // Also factor in Pilot Administrations if student submissions exist inside pilot records
+  pilots.forEach(pt => {
+    if (Array.isArray(pt.submissions) && pt.submissions.length > 0) {
+      pt.submissions.forEach(ps => {
+        totalExamsCompleted++
+        const total = Number(ps.totalItems || pt.totalItems) || 1
+        const score = Number(ps.score) || 0
+        const pct = (score / total) * 100
+        totalScoresSum += pct
+        if (pct >= 75) passingExamsCount++
+      })
+    } else if (pt.completedCount || pt.averageScore) {
+      // Aggregate summary statistics provided in pilot objects
+      const count = Number(pt.completedCount || pt.examineesCount) || 1
+      const avgPct = Number(pt.averageScore) || 0
+      totalExamsCompleted += count
+      totalScoresSum += avgPct * count
+      if (avgPct >= 75) passingExamsCount += count
+    }
+  })
+
+  // Calculate Flagged Items across question bank and pilot item analysis
+  let flaggedCount = 0
+  questions.value.forEach(q => {
+    const status = (q.status || '').toLowerCase()
+    const diff = (q.difficulty_level || q.difficulty || '').toLowerCase()
+    if (status === 'flagged' || status === 'needs review' || q.retained_ai === false || diff === 'poor' || q.discriminationIndex < 0.2) {
+      flaggedCount++
+    }
+  })
+
+  if (totalExamsCompleted === 0) {
+    return {
+      overallPassRate: '0.0%',
+      averageScore: '0.0%',
+      completedExams: 0,
+      flaggedItems: flaggedCount
+    }
+  }
+
+  const avgPct = totalScoresSum / totalExamsCompleted
+  const passRatePct = (passingExamsCount / totalExamsCompleted) * 100
+
+  return {
+    overallPassRate: `${passRatePct.toFixed(1)}%`,
+    averageScore: `${avgPct.toFixed(1)}%`,
+    completedExams: totalExamsCompleted,
+    flaggedItems: flaggedCount
+  }
+})
+
+// Dynamic Breakdown by Subject / Competency
+const subjectBreakdown = computed(() => {
+  const breakdownMap = new Map()
+
+  // Initialize breakdown map from dynamic subjects list
+  dynamicSubjectsList.value.forEach(subj => {
+    const key = subj.key
+    breakdownMap.set(key, {
+      code: subj.code,
+      title: subj.title,
+      stcwStandard: subj.stcwStandard,
+      submissionsCount: 0,
+      totalScorePctSum: 0,
+      passingSubmissions: 0,
+      testCount: 0,
+      flaggedItems: 0
+    })
+  })
+
+  // Aggregate Exam Submissions into subjects
+  examSubmissions.value.forEach(sub => {
+    const code = (sub.subject_code || sub.course_code || (sub.course && sub.course.code) || sub.subject || '').trim()
+    const title = (sub.subject_title || sub.course_title || (sub.course && sub.course.title) || sub.test_title || '').trim()
+    const key = (code || title || 'GENERAL ASSESSMENT').toUpperCase()
+
+    if (!breakdownMap.has(key)) {
+      breakdownMap.set(key, {
+        code: code || key,
+        title: title || code || key,
+        stcwStandard: '',
+        submissionsCount: 0,
+        totalScorePctSum: 0,
+        passingSubmissions: 0,
+        testCount: 0,
+        flaggedItems: 0
+      })
+    }
+
+    const item = breakdownMap.get(key)
+    const total = Number(sub.total_items || sub.totalItems) || 1
+    const score = Number(sub.score) || 0
+    const pct = (score / total) * 100
+
+    item.submissionsCount++
+    item.totalScorePctSum += pct
+    if (pct >= 75) item.passingSubmissions++
+  })
+
+  // Aggregate Pilot Tests into subjects
+  pilotTests.value.forEach(pt => {
+    const code = (pt.subjectCode || pt.courseCode || pt.subject || pt.code || '').trim()
+    const title = (pt.subjectTitle || pt.courseTitle || pt.title || pt.name || '').trim()
+    const key = (code || title || 'GENERAL ASSESSMENT').toUpperCase()
+
+    if (!breakdownMap.has(key)) {
+      breakdownMap.set(key, {
+        code: code || key,
+        title: title || code || key,
+        stcwStandard: pt.stcwStandard || '',
+        submissionsCount: 0,
+        totalScorePctSum: 0,
+        passingSubmissions: 0,
+        testCount: 0,
+        flaggedItems: 0
+      })
+    }
+
+    const item = breakdownMap.get(key)
+    item.testCount++
+
+    if (Array.isArray(pt.submissions) && pt.submissions.length > 0) {
+      pt.submissions.forEach(ps => {
+        const total = Number(ps.totalItems || pt.totalItems) || 1
+        const score = Number(ps.score) || 0
+        const pct = (score / total) * 100
+        item.submissionsCount++
+        item.totalScorePctSum += pct
+        if (pct >= 75) item.passingSubmissions++
+      })
+    } else if (pt.completedCount || pt.averageScore) {
+      const count = Number(pt.completedCount || pt.examineesCount) || 1
+      const avgPct = Number(pt.averageScore) || 0
+      item.submissionsCount += count
+      item.totalScorePctSum += avgPct * count
+      if (avgPct >= 75) item.passingSubmissions += count
+    }
+  })
+
+  // Aggregate Saved Tests into subjects
+  savedTests.value.forEach(st => {
+    const code = (st.subjectCode || st.courseCode || st.subject || st.code || '').trim()
+    const title = (st.subjectTitle || st.courseTitle || st.title || st.name || '').trim()
+    const key = (code || title || 'GENERAL ASSESSMENT').toUpperCase()
+
+    if (breakdownMap.has(key)) {
+      breakdownMap.get(key).testCount++
+    }
+  })
+
+  // Filter breakdown list if specific subject selected
+  let results = []
+  breakdownMap.forEach((data, key) => {
+    if (selectedSubjectFilter.value !== 'all' && key !== selectedSubjectFilter.value.toUpperCase()) {
+      return
+    }
+
+    const passRate = data.submissionsCount > 0 
+      ? Math.round((data.passingSubmissions / data.submissionsCount) * 100) 
+      : 0
+
+    const avgScore = data.submissionsCount > 0
+      ? (data.totalScorePctSum / data.submissionsCount).toFixed(1)
+      : '0.0'
+
+    let status = 'Pending Submissions'
+    if (data.submissionsCount > 0) {
+      status = passRate >= 75 ? 'Compliant' : 'Needs Review'
+    }
+
+    results.push({
+      key,
+      code: data.code,
+      title: data.title,
+      stcwStandard: data.stcwStandard,
+      passRate: passRate,
+      avgScore: avgScore,
+      submissionsCount: data.submissionsCount,
+      testCount: data.testCount,
+      status: status
+    })
+  })
+
+  return results
+})
+
+// Filter dropdown options
+const subjectOptions = computed(() => {
+  const options = [{ value: 'all', label: 'All Subjects & Competencies' }]
+  dynamicSubjectsList.value.forEach(subj => {
+    options.push({
+      value: subj.key,
+      label: `${subj.code} ${subj.title ? '- ' + subj.title : ''}`
+    })
+  })
+  return options
+})
+
+// Export CSV Functionality with dynamic actual data
+function exportReportCSV() {
+  if (subjectBreakdown.value.length === 0) {
+    alert('No subject/competency data available to export.')
+    return
+  }
+
+  let csvContent = 'data:text/csv;charset=utf-8,'
+  csvContent += 'Subject Code,Subject Title,STCW Standard,Recorded Submissions,Pass Rate (%),Average Score (%),Status
+'
+
+  subjectBreakdown.value.forEach(row => {
+    const escape = (str) => `"${String(str || '').replace(/"/g, '""')}"`
+    csvContent += `${escape(row.code)},${escape(row.title)},${escape(row.stcwStandard)},${row.submissionsCount},${row.passRate}%,${row.avgScore}%,${escape(row.status)}
+`
+  })
+
+  csvContent += '
+SUMMARY METRICS
+'
+  csvContent += `Completed Assessment Submissions,${summaryMetrics.value.completedExams}
+`
+  csvContent += `Overall Pass Rate,${summaryMetrics.value.overallPassRate}
+`
+  csvContent += `Average Score,${summaryMetrics.value.averageScore}
+`
+  csvContent += `Flagged Items,${summaryMetrics.value.flaggedItems}
+`
+
+  const encodedUri = encodeURI(csvContent)
+  const link = document.createElement('a')
+  link.setAttribute('href', encodedUri)
+  link.setAttribute('download', `CAMS_Assessment_Report_${new Date().toISOString().slice(0, 10)}.csv`)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
 }
 </script>
 
 <template>
   <div class="p-6 max-w-7xl mx-auto space-y-6">
+    <!-- Header Banner -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
       <div>
-        <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-          <FileText class="w-6 h-6 text-emerald-600" />
-          Institutional Reports & Form Center
+        <h1 class="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+          <BarChart2 class="w-6 h-6 text-emerald-600" />
+          Assessment & Competency Compliance Reports
         </h1>
-        <p class="text-xs text-slate-500 mt-1">
-          Generate official institutional forms (AD-09, AD-10, AD-11, AD-18) synchronized with TestBuilder and Pilot Administration.
+        <p class="text-xs text-slate-500 mt-1 font-medium">
+          Real-time compliance analytics dynamic to user-uploaded questionnaires, TOS, saved tests, and pilot administrations.
         </p>
       </div>
 
       <div class="flex items-center gap-3">
         <button 
-          @click="loadInstitutionalData" 
+          @click="fetchData" 
           :disabled="isLoading"
           class="p-2.5 text-slate-600 hover:text-emerald-700 hover:bg-slate-100 border border-slate-200 rounded-xl transition cursor-pointer disabled:opacity-50"
-          title="Refresh Dynamic Data"
+          title="Refresh Data"
         >
           <RefreshCw :class="['w-4 h-4', { 'animate-spin': isLoading }]" />
         </button>
 
-        <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-          <button
-            @click="activeStage = 'exam-built'"
-            :class="[
-              'px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer',
-              activeStage === 'exam-built' 
-                ? 'bg-white text-emerald-800 shadow-sm' 
-                : 'text-slate-600 hover:text-slate-900'
-            ]"
+        <button 
+          @click="exportReportCSV"
+          class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition cursor-pointer"
+        >
+          <Download class="w-4 h-4" />
+          Export CSV Report
+        </button>
+      </div>
+    </div>
+
+    <!-- Metric Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+        <div class="flex items-center justify-between text-slate-500">
+          <span class="text-xs font-bold uppercase tracking-wider">Overall Pass Rate</span>
+          <Award class="w-5 h-5 text-emerald-600" />
+        </div>
+        <div class="text-2xl font-black text-slate-900">{{ summaryMetrics.overallPassRate }}</div>
+        <div class="text-[11px] text-slate-500 font-medium">Benchmark threshold: 75%</div>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+        <div class="flex items-center justify-between text-slate-500">
+          <span class="text-xs font-bold uppercase tracking-wider">Average Score</span>
+          <TrendingUp class="w-5 h-5 text-blue-600" />
+        </div>
+        <div class="text-2xl font-black text-slate-900">{{ summaryMetrics.averageScore }}</div>
+        <div class="text-[11px] text-slate-500 font-medium">Mean cadet percentage score</div>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+        <div class="flex items-center justify-between text-slate-500">
+          <span class="text-xs font-bold uppercase tracking-wider">Completed Assessments</span>
+          <Users class="w-5 h-5 text-purple-600" />
+        </div>
+        <div class="text-2xl font-black text-slate-900">{{ summaryMetrics.completedExams }}</div>
+        <div class="text-[11px] text-slate-500 font-medium">Total exam & pilot submissions</div>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+        <div class="flex items-center justify-between text-slate-500">
+          <span class="text-xs font-bold uppercase tracking-wider">Flagged Items</span>
+          <AlertTriangle class="w-5 h-5 text-amber-500" />
+        </div>
+        <div class="text-2xl font-black text-slate-900">{{ summaryMetrics.flaggedItems }}</div>
+        <div class="text-[11px] text-slate-500 font-medium">Questions requiring review</div>
+      </div>
+    </div>
+
+    <!-- Subject Competency Breakdown Section -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+        <div>
+          <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <FileSpreadsheet class="w-5 h-5 text-emerald-600" />
+            Subject & STCW Competency Compliance
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">Proficiency and pass-rate evaluation for created and uploaded subjects.</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <Filter class="w-4 h-4 text-slate-400" />
+          <select 
+            v-model="selectedSubjectFilter"
+            class="border border-slate-300 rounded-xl text-xs font-semibold px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700"
           >
-            Phase 1: Exam Built (AD-09 / AD-10)
-          </button>
-          <button
-            @click="activeStage = 'post-pilot'"
-            :class="[
-              'px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer',
-              activeStage === 'post-pilot' 
-                ? 'bg-white text-emerald-800 shadow-sm' 
-                : 'text-slate-600 hover:text-slate-900'
-            ]"
-          >
-            Phase 2: Post-Pilot (AD-11 / AD-18)
-          </button>
+            <option v-for="opt in subjectOptions" :key="opt.value" :value="opt.value">
+              {{ opt.label }}
+            </option>
+          </select>
         </div>
       </div>
-    </div>
 
-    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center gap-3">
-      <div class="relative flex-1 w-full">
-        <Search class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-        <input 
-          v-model="searchQuery"
-          type="text"
-          placeholder="Search by subject code, title, or test ID..."
-          class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition"
-        />
+      <div v-if="subjectBreakdown.length === 0" class="py-12 text-center text-slate-400 space-y-2">
+        <FileText class="w-10 h-10 mx-auto text-slate-300" />
+        <p class="text-xs font-bold text-slate-600">No subject data found</p>
+        <p class="text-[11px] text-slate-400">Create a test in Test Builder or upload a TOS/Questionnaire to view live subject analytics.</p>
       </div>
 
-      <div class="flex items-center gap-2 w-full sm:w-auto">
-        <select 
-          v-model="selectedCourse"
-          class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500"
+      <div v-else class="space-y-4 pt-2">
+        <div 
+          v-for="subj in subjectBreakdown" 
+          :key="subj.key" 
+          class="p-4 bg-slate-50/80 border border-slate-200/90 rounded-xl space-y-3 transition hover:border-slate-300"
         >
-          <option value="All">All Courses</option>
-          <option v-for="c in courses" :key="c.id" :value="c.code">
-            {{ c.code }}
-          </option>
-        </select>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <div class="flex items-center gap-2.5">
+              <span class="font-mono font-bold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded-lg shadow-2xs">
+                {{ subj.code }}
+              </span>
+              <span class="font-bold text-slate-900 text-sm">{{ subj.title }}</span>
+              <span v-if="subj.stcwStandard" class="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold px-2 py-0.5 rounded-md">
+                {{ subj.stcwStandard }}
+              </span>
+            </div>
 
-        <select 
-          v-model="selectedTerm"
-          class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500"
-        >
-          <option value="All">All Terms</option>
-          <option v-for="term in availableTerms" :key="term" :value="term">
-            {{ term }}
-          </option>
-        </select>
-      </div>
-    </div>
+            <div class="flex items-center gap-3">
+              <span class="font-bold text-slate-800 text-xs">{{ subj.passRate }}% Pass Rate</span>
+              <span 
+                :class="[
+                  'px-2.5 py-1 text-[10px] font-bold rounded-lg border',
+                  subj.status === 'Compliant' 
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                    : subj.status === 'Pending Submissions'
+                    ? 'bg-slate-100 text-slate-600 border-slate-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                ]"
+              >
+                {{ subj.status }}
+              </span>
+            </div>
+          </div>
 
-    <div v-if="activeStage === 'exam-built'" class="space-y-4">
-      <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <ClipboardCheck class="w-5 h-5 text-emerald-600" />
-          <div>
-            <h3 class="text-xs font-bold text-emerald-900">Exam Generation Documents</h3>
-            <p class="text-[11px] text-emerald-700">Form AD-09 (T.O.S.) and Form AD-10 (Questionnaire) are dynamically assembled from TestBuilder tests.</p>
+          <!-- Progress Bar -->
+          <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+            <div 
+              class="h-full transition-all duration-500 rounded-full"
+              :class="subj.passRate >= 75 ? 'bg-emerald-600' : subj.submissionsCount === 0 ? 'bg-slate-300' : 'bg-amber-500'"
+              :style="{ width: `${subj.submissionsCount === 0 ? 0 : subj.passRate}%` }"
+            ></div>
+          </div>
+
+          <div class="text-[11px] text-slate-500 flex flex-wrap justify-between items-center gap-2 pt-1 border-t border-slate-100">
+            <div class="flex items-center gap-4">
+              <span>Submissions: <strong class="text-slate-800">{{ subj.submissionsCount }}</strong></span>
+              <span>Average Score: <strong class="text-slate-800">{{ subj.avgScore }}%</strong></span>
+            </div>
+            <span>Target Benchmark: <strong>75% Pass Rate</strong></span>
           </div>
         </div>
-        <span class="text-xs font-bold text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full">
-          {{ builtExams.length }} Tests Available
-        </span>
-      </div>
-
-      <div v-if="builtExams.length === 0" class="bg-white p-12 text-center rounded-2xl border border-slate-200 text-slate-400 space-y-2">
-        <BookOpen class="w-10 h-10 mx-auto text-slate-300" />
-        <p class="text-xs font-bold text-slate-600">No built tests found in TestBuilder</p>
-        <p class="text-[11px] text-slate-400">Assemble and save tests in the Test Builder tab to generate AD-09 and AD-10 forms.</p>
-      </div>
-
-      <div v-else class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-        <table class="w-full text-left border-collapse">
-          <thead>
-            <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
-              <th class="p-3.5">Exam Code</th>
-              <th class="p-3.5">Subject</th>
-              <th class="p-3.5">Term / S.Y.</th>
-              <th class="p-3.5">Items</th>
-              <th class="p-3.5">Date Built</th>
-              <th class="p-3.5 text-right">Actions / Form Exports</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100 text-xs text-slate-700">
-            <tr v-for="exam in builtExams" :key="exam.id" class="hover:bg-slate-50 transition">
-              <td class="p-3.5 font-mono font-bold text-slate-800">{{ exam.id }}</td>
-              <td class="p-3.5">
-                <div class="font-bold text-slate-900">{{ exam.subjectCode }}</div>
-                <div class="text-[11px] text-slate-500">{{ exam.subjectTitle }}</div>
-              </td>
-              <td class="p-3.5">{{ exam.term }} ({{ exam.academicYear }})</td>
-              <td class="p-3.5 font-medium">{{ exam.totalItems }} Qs</td>
-              <td class="p-3.5 text-slate-500">{{ exam.createdDate }}</td>
-              <td class="p-3.5 text-right space-x-2">
-                <button 
-                  @click="generateAD09(exam)"
-                  class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition cursor-pointer"
-                >
-                  <FileSpreadsheet class="w-3.5 h-3.5 inline mr-1" /> Form AD-09 (TOS)
-                </button>
-                <button 
-                  @click="generateAD10(exam)"
-                  class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition cursor-pointer"
-                >
-                  <Printer class="w-3.5 h-3.5 inline mr-1" /> Form AD-10 (Exam)
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div v-if="activeStage === 'post-pilot'" class="space-y-4">
-      <div class="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <BarChart2 class="w-5 h-5 text-amber-600" />
-          <div>
-            <h3 class="text-xs font-bold text-amber-900">Post-Pilot Validation Documents</h3>
-            <p class="text-[11px] text-amber-700">Form AD-11 (Item Analysis) and Form AD-18 (Checklist) are dynamically computed from active Pilot Submissions.</p>
-          </div>
-        </div>
-        <span class="text-xs font-bold text-amber-800 bg-amber-100 px-3 py-1 rounded-full">
-          {{ completedPilots.length }} Pilots Recorded
-        </span>
-      </div>
-
-      <div v-if="completedPilots.length === 0" class="bg-white p-12 text-center rounded-2xl border border-slate-200 text-slate-400 space-y-2">
-        <BarChart2 class="w-10 h-10 mx-auto text-slate-300" />
-        <p class="text-xs font-bold text-slate-600">No pilot test submissions found</p>
-        <p class="text-[11px] text-slate-400">Conduct student exams in the Pilot Administration module to generate AD-11 and AD-18 reports.</p>
-      </div>
-
-      <div v-else class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-        <table class="w-full text-left border-collapse">
-          <thead>
-            <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
-              <th class="p-3.5">Pilot ID</th>
-              <th class="p-3.5">Subject</th>
-              <th class="p-3.5">Cohort Sample</th>
-              <th class="p-3.5">Avg Duration</th>
-              <th class="p-3.5">Validation Status</th>
-              <th class="p-3.5 text-right">Actions / Form Exports</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100 text-xs text-slate-700">
-            <tr v-for="pilot in completedPilots" :key="pilot.id" class="hover:bg-slate-50 transition">
-              <td class="p-3.5 font-mono font-bold text-slate-800">{{ pilot.id }}</td>
-              <td class="p-3.5">
-                <div class="font-bold text-slate-900">{{ pilot.subjectCode }}</div>
-                <div class="text-[11px] text-slate-500">{{ pilot.subjectTitle }}</div>
-              </td>
-              <td class="p-3.5">
-                <span class="font-bold text-slate-800">{{ pilot.sampleCount }} Cadets</span>
-                <span class="text-[11px] text-emerald-600 block">({{ pilot.completionRate }} Completed)</span>
-              </td>
-              <td class="p-3.5 font-medium">{{ pilot.avgDurationMin }} mins</td>
-              <td class="p-3.5">
-                <span 
-                  :class="[
-                    'inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full',
-                    pilot.reliabilityStatus === 'Validated' 
-                      ? 'bg-emerald-100 text-emerald-800' 
-                      : pilot.reliabilityStatus === 'In Progress'
-                      ? 'bg-blue-100 text-blue-800'
-                      : 'bg-slate-100 text-slate-600'
-                  ]"
-                >
-                  <CheckCircle2 class="w-3 h-3" /> {{ pilot.reliabilityStatus }}
-                </span>
-              </td>
-              <td class="p-3.5 text-right space-x-2">
-                <button 
-                  @click="generateAD11(pilot)"
-                  class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition cursor-pointer"
-                >
-                  <BarChart2 class="w-3.5 h-3.5 inline mr-1" /> Form AD-11 (Item Analysis)
-                </button>
-                <button 
-                  @click="generateAD18(pilot)"
-                  class="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition cursor-pointer"
-                >
-                  <ClipboardCheck class="w-3.5 h-3.5 inline mr-1" /> Form AD-18 (Checklist)
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
       </div>
     </div>
   </div>
