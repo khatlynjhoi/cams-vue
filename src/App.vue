@@ -1,4 +1,5 @@
 <script setup>
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { 
   LayoutDashboard, 
@@ -8,7 +9,10 @@ import {
   SlidersHorizontal, 
   BarChart3, 
   Users, 
-  GraduationCap 
+  GraduationCap,
+  LogOut,
+  MoreVertical,
+  Check
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -24,6 +28,46 @@ const navigationItems = [
   { name: 'User Management', path: '/users', icon: Users },
   { name: 'Student Exam Portal', path: '/student-exam', icon: GraduationCap }
 ]
+
+// Account Switcher State
+const showUserMenu = ref(false)
+
+const currentUser = ref({ 
+  name: 'Assessment Officer', 
+  email: 'admin@bma.edu.ph', 
+  role: 'admin',
+  initials: 'BMA' 
+})
+
+// Mock accounts for switching
+const availableAccounts = [
+  { name: 'Admin User', email: 'admin@bma.edu.ph', role: 'admin' },
+  { name: 'Capt. Ramirez', email: 'e.ramirez@bma.edu.ph', role: 'instructor' },
+  { name: 'Cadet Dela Cruz', email: 'j.delacruz@student.bma.edu.ph', role: 'cadet' }
+]
+
+onMounted(() => {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    if (user.name) {
+      currentUser.value = user
+      currentUser.value.initials = user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+    }
+  } catch (e) {}
+})
+
+function switchAccount(account) {
+  localStorage.setItem('user', JSON.stringify(account))
+  localStorage.setItem('token', 'mock-token-' + account.role)
+  showUserMenu.value = false
+  window.location.href = '/' // Hard reload to apply new role routes
+}
+
+function handleLogout() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+  router.push('/login')
+}
 </script>
 
 <template>
@@ -65,23 +109,21 @@ const navigationItems = [
         </nav>
       </div>
 
-      <!-- User Profile Card -->
-      <div class="p-4 border-t border-slate-100 bg-slate-50/50">
-        <div class="flex items-center gap-3">
-          <div class="w-8 h-8 rounded-full bg-emerald-700 text-white font-bold flex items-center justify-center text-xs shadow-sm">
-            BMA
-          </div>
-          <div class="truncate">
-            <p class="text-xs font-bold text-slate-800 truncate">Assessment Officer</p>
-            <p class="text-[10px] text-slate-400 truncate">admin@bma.edu.ph</p>
-          </div>
-        </div>
-      </div>
-    </aside>
-
-    <!-- Main View Content Area -->
-    <main class="flex-1 pl-64 min-h-screen">
-      <router-view />
-    </main>
-  </div>
-</template>
+      <!-- User Profile Card & Account Switcher -->
+      <div class="relative mt-auto border-t border-slate-100 bg-slate-50/50 p-4">
+        
+        <!-- Popup Menu -->
+        <div 
+          v-if="showUserMenu" 
+          class="absolute bottom-full left-4 mb-2 w-56 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-50"
+        >
+          <div class="p-2 space-y-1">
+            <div class="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Switch Account
+            </div>
+            
+            <button 
+              v-for="acc in availableAccounts" 
+              :key="acc.email"
+              @click="switchAccount(acc)"
+              class="w-full flex items-
