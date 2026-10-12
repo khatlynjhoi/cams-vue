@@ -32,22 +32,30 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/generator',
-    name: 'ExamGenerator',
-    component: () => import('../views/ExamGeneratorView.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
     path: '/pilot-admin',
     name: 'PilotAdmin',
     component: () => import('../views/PilotAdminView.vue'),
     meta: { requiresAuth: true, role: 'admin' }
   },
+  // Consolidated Analytics & Reports View
   {
     path: '/reports',
     name: 'Reports',
-    component: () => import('../views/ReportsView.vue'),
+    component: () => import('../views/AnalyticsAndReportsView.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/analytics-reports',
+    name: 'AnalyticsAndReports',
+    component: () => import('../views/AnalyticsAndReportsView.vue'),
+    meta: { requiresAuth: true }
+  },
+  // Alias route for legacy /analytics path -> redirects to Analytics tab
+  {
+    path: '/analytics',
+    redirect: to => {
+      return { path: '/reports', query: { tab: 'analytics' } }
+    }
   },
   {
     path: '/users',
