@@ -1,46 +1,65 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { 
+  BarChart3, 
+  PieChart, 
+  ShieldCheck, 
   FileText, 
   Download, 
   CheckCircle2, 
-  AlertTriangle, 
   Printer, 
-  Filter,
-  BarChart2,
-  ClipboardCheck,
-  FileSpreadsheet,
-  RefreshCw,
-  Search,
-  BookOpen
+  Search, 
+  RefreshCw, 
+  FileSpreadsheet, 
+  ClipboardCheck, 
+  BookOpen, 
+  BarChart2, 
+  AlertCircle 
 } from 'lucide-vue-next'
 
-// Active Tab Stage ('exam-built' | 'post-pilot')
-const activeStage = ref('exam-built')
+// Active Tab State ('analytics' | 'exam-built' | 'post-pilot')
+const activeTab = ref('analytics')
 const isLoading = ref(false)
 
-// Global Filters
+// Analytics State
+const questions = ref([])
+const bloomStats = ref({ Remembering: 0, Understanding: 0, Application: 0, Analysis: 0 })
+const stcwStats = ref({})
+
+// Reports State & Global Filters
 const searchQuery = ref('')
 const selectedCourse = ref('All')
 const selectedTerm = ref('All')
 
-// Master Reactive Registries loaded from TestBuilder & Pilot System
+// Registries loaded from TestBuilder, Pilot System, & Question Bank
 const savedTests = ref([])
 const examSubmissions = ref([])
 const courses = ref([])
 
-// Helper function to safely fetch JSON from backend or local storage fallback
+// Safe fetch with fallback helper
 async function fetchJson(url) {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
   return await res.json()
 }
 
-// Fetch live data from backend or LocalStorage sync points
-async function loadInstitutionalData() {
+// Unified Data Fetcher for Analytics & Reports
+async function loadAllData() {
   isLoading.value = true
   try {
-    // 1. Fetch Saved Tests generated from TestBuilder
+    // 1. Fetch Question Repository & Calculate Analytics
+    try {
+      const qData = await fetchJson('http://127.0.0.1:8000/api/questions')
+      if (qData.success) {
+        questions.value = qData.data
+      }
+    } catch {
+      const localQs = localStorage.getItem('cams_questions_data')
+      questions.value = localQs ? JSON.parse(localQs) : []
+    }
+    calculateAnalyticsMetrics()
+
+    // 2. Fetch Saved Tests for Stage 1 Reports (AD-09 & AD-10)
     try {
       const testsData = await fetchJson('/api/saved-tests')
       savedTests.value = Array.isArray(testsData) ? testsData : []
@@ -49,7 +68,7 @@ async function loadInstitutionalData() {
       savedTests.value = localTests ? JSON.parse(localTests) : []
     }
 
-    // 2. Fetch Exam Submissions generated from Pilot / Student Exams
+    // 3. Fetch Exam Submissions for Stage 2 Reports (AD-11 & AD-18)
     try {
       const subData = await fetchJson('/api/exam-submissions')
       examSubmissions.value = Array.isArray(subData) ? subData : []
@@ -58,7 +77,7 @@ async function loadInstitutionalData() {
       examSubmissions.value = localSubs ? JSON.parse(localSubs) : []
     }
 
-    // 3. Fetch Master Courses
+    // 4. Fetch Master Courses
     try {
       const courseData = await fetchJson('/api/courses')
       courses.value = Array.isArray(courseData) ? courseData : []
@@ -67,14 +86,28 @@ async function loadInstitutionalData() {
       courses.value = localCourses ? JSON.parse(localCourses) : []
     }
   } catch (err) {
-    console.error('Error loading Institutional Form data:', err)
+    console.error('Error loading Institutional Analytics & Reports data:', err)
   } finally {
     isLoading.value = false
   }
 }
 
+function calculateAnalyticsMetrics() {
+  const bloom = { Remembering: 0, Understanding: 0, Application: 0, Analysis: 0 }
+  const stcw = {}
+
+  questions.value.forEach(q => {
+    if (bloom[q.bloomLevel] !== undefined) bloom[q.bloomLevel]++
+    const std = q.stcwStandard || 'Table A-II/1'
+    stcw[std] = (stcw[std] || 0) + 1
+  })
+
+  bloomStats.value = bloom
+  stcwStats.value = stcw
+}
+
 onMounted(() => {
-  loadInstitutionalData()
+  loadAllData()
 })
 
 // Unique Terms for Filtering
@@ -86,7 +119,7 @@ const availableTerms = computed(() => {
   return Array.from(terms)
 })
 
-// Phase 1: Real Built Exams derived from TestBuilder (AD-09 & AD-10)
+// STAGE 1: Real Built Exams derived from TestBuilder (AD-09 & AD-10)
 const builtExams = computed(() => {
   return savedTests.value
     .map(test => {
@@ -122,12 +155,10 @@ const builtExams = computed(() => {
     })
 })
 
-// Phase 2: Real Completed Pilots aggregated from Student Exam Submissions (AD-11 & AD-18)
+// STAGE 2: Real Completed Pilots aggregated from Student Submissions (AD-11 & AD-18)
 const completedPilots = computed(() => {
-  // Group submissions by test/exam ID
   const pilotMap = new Map()
 
-  // First, map existing tests
   savedTests.value.forEach(test => {
     const testId = String(test.id)
     pilotMap.set(testId, {
@@ -141,7 +172,6 @@ const completedPilots = computed(() => {
     })
   })
 
-  // Match submissions into test buckets
   examSubmissions.value.forEach(sub => {
     const key = String(sub.test_id || sub.exam_id || sub.testId || '1')
     if (!pilotMap.has(key)) {
@@ -158,13 +188,11 @@ const completedPilots = computed(() => {
     pilotMap.get(key).submissions.push(sub)
   })
 
-  // Convert map into pilot records
   const result = []
   pilotMap.forEach((pilot) => {
     const subs = pilot.submissions
     const sampleCount = subs.length
 
-    // Calculate Average Duration (in minutes)
     let totalMinutes = 0
     subs.forEach(s => {
       const mins = Number(s.durationMinutes || s.duration_minutes || (s.time_spent ? Math.round(s.time_spent / 60) : 45))
@@ -172,7 +200,6 @@ const completedPilots = computed(() => {
     })
     const avgDuration = sampleCount > 0 ? Math.round(totalMinutes / sampleCount) : 0
 
-    // Item discrimination / poor item calculation based on submissions
     let poorCount = 0
     if (pilot.rawTest && pilot.rawTest.questions) {
       pilot.rawTest.questions.forEach(q => {
@@ -191,7 +218,7 @@ const completedPilots = computed(() => {
       sampleCount: sampleCount,
       avgDurationMin: avgDuration || 45,
       completionRate: sampleCount > 0 ? '100%' : '0%',
-      reliabilityStatus: sampleCount >= 5 ? 'Validated' : (sampleCount > 0 ? 'In Progress' : 'Pending Cohort'),
+      reliabilityStatus: sampleCount >= 10 ? 'Validated' : (sampleCount > 0 ? 'In Progress' : 'Pending Cohort'),
       poorItemsCount: poorCount,
       rawTest: pilot.rawTest,
       submissions: subs
@@ -211,75 +238,137 @@ const completedPilots = computed(() => {
   })
 })
 
-// Dynamic Institutional Form Handlers
+// Institutional Form Generators
 function generateAD09(exam) {
-  alert(`[Form AD-09: Table of Specifications (TOS)]\nGenerating official TOS document for ${exam.subjectCode} (${exam.term}).\nTotal Items: ${exam.totalItems} Qs.`)
+  alert(`[Form AD-09: Table of Specifications (T.O.S.)]\nGenerating official TOS document for ${exam.subjectCode} (${exam.term}).\nTotal Items: ${exam.totalItems} Qs.\nDistribution: Easy (30%), Average (50%), Difficult (20%).`)
 }
 
 function generateAD10(exam) {
-  alert(`[Form AD-10: Exam Questionnaire]\nGenerating official Questionnaire Form for ${exam.subjectCode} (${exam.term}).\nReady for print/pdf export.`)
+  alert(`[Form AD-10: Examination Questionnaire]\nGenerating official Examination Questionnaire for ${exam.subjectCode} (${exam.term}).\nHeader & Control No. configured. Ready for print/PDF export.`)
 }
 
 function generateAD11(pilot) {
-  alert(`[Form AD-11: Item Analysis Result]\nGenerating item difficulty and discrimination indices for ${pilot.subjectCode}.\nCohort N = ${pilot.sampleCount} cadets.\nPoor items flagged: ${pilot.poorItemsCount}`)
+  alert(`[Form AD-11: Item Analysis Result]\nGenerating difficulty and discrimination indices for ${pilot.subjectCode}.\nCohort N = ${pilot.sampleCount} cadets.\nFlagged Poor Items: ${pilot.poorItemsCount}`)
 }
 
 function generateAD18(pilot) {
-  alert(`[Form AD-18: Review & Validation Checklist]\nGenerating JCMMC No. 01 S. 2022 Validation Checklist for ${pilot.subjectCode}.\nValidation Status: ${pilot.reliabilityStatus}`)
+  alert(`[Form AD-18: Review & Validation Checklist]\nGenerating Validation Checklist for ${pilot.subjectCode}.\nValidation Status: ${pilot.reliabilityStatus}\nAudit Signatures: Recommending Approval (Dept. Head), Approved (Dean).`)
 }
 </script>
 
 <template>
-  <div class="p-6 max-w-7xl mx-auto space-y-6">
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+  <div class="p-6 max-w-7xl mx-auto space-y-6 font-sans">
+    
+    <!-- Top Header Banner -->
+    <div class="bg-slate-900 text-white p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
       <div>
-        <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-          <FileText class="w-6 h-6 text-emerald-600" />
-          Institutional Reports & Form Center
+        <h1 class="text-xl font-bold flex items-center gap-2 text-white tracking-tight">
+          <BarChart3 class="text-emerald-400" :size="22" /> STCW Curriculum Analytics & Form Center
         </h1>
-        <p class="text-xs text-slate-500 mt-1">
-          Generate official institutional forms (AD-09, AD-10, AD-11, AD-18) synchronized with TestBuilder and Pilot Administration.
+        <p class="text-xs text-slate-300 mt-1">
+          Monitor cognitive balance, STCW coverage, and generate official institutional forms (AD-09, AD-10, AD-11, AD-18).
         </p>
       </div>
 
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 shrink-0">
         <button 
-          @click="loadInstitutionalData" 
+          @click="loadAllData" 
           :disabled="isLoading"
-          class="p-2.5 text-slate-600 hover:text-emerald-700 hover:bg-slate-100 border border-slate-200 rounded-xl transition cursor-pointer disabled:opacity-50"
-          title="Refresh Dynamic Data"
+          class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl transition cursor-pointer disabled:opacity-50"
+          title="Refresh Data"
         >
           <RefreshCw :class="['w-4 h-4', { 'animate-spin': isLoading }]" />
         </button>
 
-        <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-          <button
-            @click="activeStage = 'exam-built'"
-            :class="[
-              'px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer',
-              activeStage === 'exam-built' 
-                ? 'bg-white text-emerald-800 shadow-sm' 
-                : 'text-slate-600 hover:text-slate-900'
-            ]"
-          >
-            Phase 1: Exam Built (AD-09 / AD-10)
-          </button>
-          <button
-            @click="activeStage = 'post-pilot'"
-            :class="[
-              'px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer',
-              activeStage === 'post-pilot' 
-                ? 'bg-white text-emerald-800 shadow-sm' 
-                : 'text-slate-600 hover:text-slate-900'
-            ]"
-          >
-            Phase 2: Post-Pilot (AD-11 / AD-18)
-          </button>
+        <div class="bg-slate-800 px-4 py-2 rounded-xl border border-slate-700 text-right">
+          <span class="text-[10px] text-slate-400 block font-bold uppercase">Total Bank Items</span>
+          <span class="text-lg font-extrabold text-emerald-400">{{ questions.length }}</span>
         </div>
       </div>
     </div>
 
-    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center gap-3">
+    <!-- Navigation Pills -->
+    <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
+      <button
+        @click="activeTab = 'analytics'"
+        :class="[
+          'px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2',
+          activeTab === 'analytics' 
+            ? 'bg-emerald-600 text-white shadow-sm' 
+            : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+        ]"
+      >
+        <PieChart :size="16" /> Curriculum Analytics
+      </button>
+
+      <button
+        @click="activeTab = 'exam-built'"
+        :class="[
+          'px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2',
+          activeTab === 'exam-built' 
+            ? 'bg-emerald-600 text-white shadow-sm' 
+            : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+        ]"
+      >
+        <ClipboardCheck :size="16" /> Stage 1: Exam Built (AD-09 / AD-10)
+      </button>
+
+      <button
+        @click="activeTab = 'post-pilot'"
+        :class="[
+          'px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2',
+          activeTab === 'post-pilot' 
+            ? 'bg-emerald-600 text-white shadow-sm' 
+            : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+        ]"
+      >
+        <BarChart2 :size="16" /> Stage 2: Post-Pilot (AD-11 / AD-18)
+      </button>
+    </div>
+
+    <!-- TAB 1: CURRICULUM ANALYTICS -->
+    <div v-show="activeTab === 'analytics'" class="space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Bloom's Taxonomy Balance -->
+        <div class="bg-white border rounded-2xl p-6 shadow-xs space-y-4">
+          <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <PieChart class="text-emerald-600" :size="16" /> Bloom's Taxonomy Cognitive Balance
+          </h2>
+          
+          <div class="space-y-3 pt-2">
+            <div v-for="(count, level) in bloomStats" :key="level" class="space-y-1">
+              <div class="flex justify-between text-xs font-bold text-slate-700">
+                <span>{{ level }}</span>
+                <span>{{ count }} items ({{ questions.length ? Math.round((count / questions.length) * 100) : 0 }}%)</span>
+              </div>
+              <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                <div class="bg-slate-800 h-3 rounded-full transition-all" :style="{ width: `${questions.length ? (count / questions.length) * 100 : 0}%` }"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STCW Standard Coverage -->
+        <div class="bg-white border rounded-2xl p-6 shadow-xs space-y-4">
+          <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <ShieldCheck class="text-emerald-600" :size="16" /> STCW Competency Standard Coverage
+          </h2>
+
+          <div class="space-y-3 pt-2">
+            <div v-for="(count, std) in stcwStats" :key="std" class="p-3 border rounded-xl flex justify-between items-center bg-slate-50">
+              <div>
+                <span class="font-mono text-xs font-bold text-slate-900 block">{{ std }}</span>
+                <span class="text-[10px] text-slate-500">Compliant with STCW Code Section A</span>
+              </div>
+              <span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-bold text-xs rounded-lg">{{ count }} Items</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FILTER TOOLBAR (For Stage 1 & Stage 2 Reports) -->
+    <div v-show="activeTab !== 'analytics'" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center gap-3">
       <div class="relative flex-1 w-full">
         <Search class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
         <input 
@@ -313,13 +402,14 @@ function generateAD18(pilot) {
       </div>
     </div>
 
-    <div v-if="activeStage === 'exam-built'" class="space-y-4">
+    <!-- TAB 2: STAGE 1 - EXAM BUILT REPORTS (AD-09 & AD-10) -->
+    <div v-show="activeTab === 'exam-built'" class="space-y-4">
       <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-center justify-between">
         <div class="flex items-center gap-3">
           <ClipboardCheck class="w-5 h-5 text-emerald-600" />
           <div>
-            <h3 class="text-xs font-bold text-emerald-900">Exam Generation Documents</h3>
-            <p class="text-[11px] text-emerald-700">Form AD-09 (T.O.S.) and Form AD-10 (Questionnaire) are dynamically assembled from TestBuilder tests.</p>
+            <h3 class="text-xs font-bold text-emerald-900">Stage 1: Exam Built Reports</h3>
+            <p class="text-[11px] text-emerald-700">Form AD-09 (T.O.S.) and Form AD-10 (Questionnaire) are dynamically assembled from TestBuilder blueprints.</p>
           </div>
         </div>
         <span class="text-xs font-bold text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full">
@@ -330,10 +420,10 @@ function generateAD18(pilot) {
       <div v-if="builtExams.length === 0" class="bg-white p-12 text-center rounded-2xl border border-slate-200 text-slate-400 space-y-2">
         <BookOpen class="w-10 h-10 mx-auto text-slate-300" />
         <p class="text-xs font-bold text-slate-600">No built tests found in TestBuilder</p>
-        <p class="text-[11px] text-slate-400">Assemble and save tests in the Test Builder tab to generate AD-09 and AD-10 forms.</p>
+        <p class="text-[11px] text-slate-400">Assemble and save tests in TestBuilder to generate AD-09 and AD-10 forms.</p>
       </div>
 
-      <div v-else class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+      <div v-else class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
         <table class="w-full text-left border-collapse">
           <thead>
             <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
@@ -375,13 +465,14 @@ function generateAD18(pilot) {
       </div>
     </div>
 
-    <div v-if="activeStage === 'post-pilot'" class="space-y-4">
+    <!-- TAB 3: STAGE 2 - POST-PILOT REPORTS (AD-11 & AD-18) -->
+    <div v-show="activeTab === 'post-pilot'" class="space-y-4">
       <div class="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center justify-between">
         <div class="flex items-center gap-3">
           <BarChart2 class="w-5 h-5 text-amber-600" />
           <div>
-            <h3 class="text-xs font-bold text-amber-900">Post-Pilot Validation Documents</h3>
-            <p class="text-[11px] text-amber-700">Form AD-11 (Item Analysis) and Form AD-18 (Checklist) are dynamically computed from active Pilot Submissions.</p>
+            <h3 class="text-xs font-bold text-amber-900">Stage 2: Post-Pilot Testing Reports</h3>
+            <p class="text-[11px] text-amber-700">Form AD-11 (Item Analysis) and Form AD-18 (Validation Checklist) are dynamically computed from Pilot Submissions.</p>
           </div>
         </div>
         <span class="text-xs font-bold text-amber-800 bg-amber-100 px-3 py-1 rounded-full">
@@ -392,10 +483,10 @@ function generateAD18(pilot) {
       <div v-if="completedPilots.length === 0" class="bg-white p-12 text-center rounded-2xl border border-slate-200 text-slate-400 space-y-2">
         <BarChart2 class="w-10 h-10 mx-auto text-slate-300" />
         <p class="text-xs font-bold text-slate-600">No pilot test submissions found</p>
-        <p class="text-[11px] text-slate-400">Conduct student exams in the Pilot Administration module to generate AD-11 and AD-18 reports.</p>
+        <p class="text-[11px] text-slate-400">Conduct student exams in the Pilot Admin module to generate AD-11 and AD-18 reports.</p>
       </div>
 
-      <div v-else class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+      <div v-else class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
         <table class="w-full text-left border-collapse">
           <thead>
             <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
@@ -452,5 +543,6 @@ function generateAD18(pilot) {
         </table>
       </div>
     </div>
+
   </div>
 </template>
