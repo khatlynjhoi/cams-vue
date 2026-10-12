@@ -1,5 +1,6 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { 
   HelpCircle, 
   SlidersHorizontal, 
@@ -7,9 +8,27 @@ import {
   CheckCircle2, 
   Clock, 
   ArrowUpRight,
-  ShieldCheck
+  ShieldCheck,
+  FileText,
+  Settings,
+  BarChart3
 } from 'lucide-vue-next'
 
+const router = useRouter()
+const currentUser = ref({ name: 'User', role: 'Guest' })
+
+onMounted(() => {
+  try {
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}')
+    if (storedUser.name) {
+      currentUser.value = storedUser
+    }
+  } catch (e) {
+    console.error("Failed to parse user data")
+  }
+})
+
+// System Statistics[cite: 29]
 const stats = ref([
   { title: 'Total Banked Questions', value: '1,248', change: '+12 this week', icon: HelpCircle, color: 'text-blue-600', bg: 'bg-blue-50' },
   { title: 'Active Pilot Sessions', value: '3', change: '2 live right now', icon: SlidersHorizontal, color: 'text-emerald-600', bg: 'bg-emerald-50' },
@@ -17,22 +36,32 @@ const stats = ref([
   { title: 'STCW Compliance Index', value: '98.2%', change: 'Fully Audited', icon: CheckCircle2, color: 'text-amber-600', bg: 'bg-amber-50' }
 ])
 
+// Recent Operations[cite: 29]
 const recentActivities = ref([
   { id: 1, title: 'NAV-101 Midterm Examination 2026', time: '10 mins ago', user: 'Capt. Ramirez', action: 'Session Started' },
   { id: 2, title: 'ENG-202 Diesel Simulator Quiz', time: '1 hour ago', user: 'Chief Engr. Santos', action: 'Exam Finalized' },
   { id: 3, title: 'SAF-301 Safety & MARPOL Compliance', time: '3 hours ago', user: 'Assessment Admin', action: 'Item Bank Updated' }
 ])
+
+function navigateTo(path) {
+  router.push(path)
+}
 </script>
 
 <template>
   <div class="p-6 max-w-7xl mx-auto space-y-6">
     <!-- Header -->
-    <div>
-      <h1 class="text-3xl font-bold text-gray-900">System Dashboard</h1>
-      <p class="text-gray-500 mt-1">Overview of STCW assessment operations, item metrics, and active examinations.</p>
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-bold text-gray-900">Welcome back, {{ currentUser.name }}</h1>
+        <p class="text-gray-500 mt-1">
+          <span class="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded mr-2">{{ currentUser.role }}</span> 
+          Overview of STCW assessment operations, item metrics, and active examinations.
+        </p>
+      </div>
     </div>
 
-    <!-- Stats Grid -->
+    <!-- Stats Grid[cite: 29] -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <div v-for="(stat, idx) in stats" :key="idx" class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex justify-between items-start">
         <div>
@@ -50,7 +79,8 @@ const recentActivities = ref([
 
     <!-- Dashboard Content Sections -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Recent Operations -->
+      
+      <!-- Recent Operations[cite: 29] -->
       <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
         <div class="flex items-center justify-between pb-2 border-b border-gray-100">
           <h2 class="text-lg font-bold text-gray-900">Recent Operational Activity</h2>
@@ -77,27 +107,55 @@ const recentActivities = ref([
         </div>
       </div>
 
-      <!-- Quick Health Status -->
-      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
-        <h2 class="text-lg font-bold text-gray-900">AI & Security Status</h2>
-
-        <div class="space-y-3">
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-start gap-3">
-            <ShieldCheck :size="20" class="text-emerald-600 shrink-0 mt-0.5" />
-            <div>
-              <p class="text-xs font-bold text-gray-900">Bloom's Taxonomy Balancer</p>
-              <p class="text-[11px] text-gray-500">Active - Cognitive weights validated for all active test blueprints.</p>
-            </div>
+      <!-- Quick Links & System Health -->
+      <div class="space-y-6">
+        
+        <!-- Quick Actions -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <h2 class="text-lg font-bold text-gray-900">Quick Actions</h2>
+          <div class="grid grid-cols-2 gap-3">
+            <button @click="navigateTo('/questions')" class="p-3 text-left bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-lg transition-colors group cursor-pointer">
+              <HelpCircle :size="18" class="text-slate-500 group-hover:text-emerald-600 mb-2" />
+              <p class="text-xs font-bold text-gray-900">Question Bank</p>
+            </button>
+            <button @click="navigateTo('/test-builder')" class="p-3 text-left bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-lg transition-colors group cursor-pointer">
+              <FileText :size="18" class="text-slate-500 group-hover:text-emerald-600 mb-2" />
+              <p class="text-xs font-bold text-gray-900">Test Builder</p>
+            </button>
+            <button @click="navigateTo('/reports')" class="p-3 text-left bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-lg transition-colors group cursor-pointer">
+              <BarChart3 :size="18" class="text-slate-500 group-hover:text-emerald-600 mb-2" />
+              <p class="text-xs font-bold text-gray-900">Analytics</p>
+            </button>
+            <button v-if="currentUser.role?.toLowerCase() === 'admin'" @click="navigateTo('/users')" class="p-3 text-left bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-lg transition-colors group cursor-pointer">
+              <Settings :size="18" class="text-slate-500 group-hover:text-emerald-600 mb-2" />
+              <p class="text-xs font-bold text-gray-900">Manage Users</p>
+            </button>
           </div>
+        </div>
 
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-start gap-3">
-            <CheckCircle2 :size="20" class="text-blue-600 shrink-0 mt-0.5" />
-            <div>
-              <p class="text-xs font-bold text-gray-900">Proctoring Telemetry</p>
-              <p class="text-[11px] text-gray-500">Connected to active candidate pilot sessions.</p>
+        <!-- Quick Health Status[cite: 29] -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <h2 class="text-lg font-bold text-gray-900">AI & Security Status</h2>
+
+          <div class="space-y-3">
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-start gap-3">
+              <ShieldCheck :size="20" class="text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <p class="text-xs font-bold text-gray-900">Bloom's Taxonomy Balancer</p>
+                <p class="text-[11px] text-gray-500">Active - Cognitive weights validated for all active test blueprints.</p>
+              </div>
+            </div>
+
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-start gap-3">
+              <CheckCircle2 :size="20" class="text-blue-600 shrink-0 mt-0.5" />
+              <div>
+                <p class="text-xs font-bold text-gray-900">Proctoring Telemetry</p>
+                <p class="text-[11px] text-gray-500">Connected to active candidate pilot sessions.</p>
+              </div>
             </div>
           </div>
         </div>
+
       </div>
     </div>
   </div>
