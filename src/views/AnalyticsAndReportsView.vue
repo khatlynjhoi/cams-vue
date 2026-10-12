@@ -36,7 +36,12 @@ const savedTests = ref([])
 const examSubmissions = ref([])
 const courses = ref([])
 
-// Safe fetch with fallback helper
+// Tab Switcher Handler
+function setActiveTab(tab) {
+  activeTab.value = tab
+}
+
+// Safe Fetch Helper
 async function fetchJson(url) {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
@@ -50,8 +55,10 @@ async function loadAllData() {
     // 1. Fetch Question Repository & Calculate Analytics
     try {
       const qData = await fetchJson('http://127.0.0.1:8000/api/questions')
-      if (qData.success) {
-        questions.value = qData.data
+      if (qData && qData.success) {
+        questions.value = Array.isArray(qData.data) ? qData.data : []
+      } else if (Array.isArray(qData)) {
+        questions.value = qData
       }
     } catch {
       const localQs = localStorage.getItem('cams_questions_data')
@@ -82,7 +89,7 @@ async function loadAllData() {
       const courseData = await fetchJson('/api/courses')
       courses.value = Array.isArray(courseData) ? courseData : []
     } catch {
-      const localCourses = localStorage.getItem('cams_courses')
+      const localCourses = localStorage.getItem('cams_courses_data') || localStorage.getItem('cams_courses')
       courses.value = localCourses ? JSON.parse(localCourses) : []
     }
   } catch (err) {
@@ -96,11 +103,15 @@ function calculateAnalyticsMetrics() {
   const bloom = { Remembering: 0, Understanding: 0, Application: 0, Analysis: 0 }
   const stcw = {}
 
-  questions.value.forEach(q => {
-    if (bloom[q.bloomLevel] !== undefined) bloom[q.bloomLevel]++
-    const std = q.stcwStandard || 'Table A-II/1'
-    stcw[std] = (stcw[std] || 0) + 1
-  })
+  if (Array.isArray(questions.value)) {
+    questions.value.forEach(q => {
+      if (q && q.bloomLevel && bloom[q.bloomLevel] !== undefined) {
+        bloom[q.bloomLevel]++
+      }
+      const std = (q && q.stcwStandard) ? q.stcwStandard : 'Table A-II/1'
+      stcw[std] = (stcw[std] || 0) + 1
+    })
+  }
 
   bloomStats.value = bloom
   stcwStats.value = stcw
@@ -113,14 +124,18 @@ onMounted(() => {
 // Unique Terms for Filtering
 const availableTerms = computed(() => {
   const terms = new Set(['Midterm', 'Final', 'Prelim'])
-  savedTests.value.forEach(t => {
-    if (t.term) terms.add(t.term)
-  })
+  if (Array.isArray(savedTests.value)) {
+    savedTests.value.forEach(t => {
+      if (t && t.term) terms.add(t.term)
+    })
+  }
   return Array.from(terms)
 })
 
-// STAGE 1: Real Built Exams derived from TestBuilder (AD-09 & AD-10)
+// STAGE 1: Built Exams derived from TestBuilder (AD-09 & AD-10)
 const builtExams = computed(() => {
+  if (!Array.isArray(savedTests.value)) return []
+
   return savedTests.value
     .map(test => {
       const courseCode = test.courseCode || test.subjectCode || (test.course ? test.course.code : 'NAV-101')
@@ -133,8 +148,8 @@ const builtExams = computed(() => {
       return {
         id: test.id || `EX-${test.code || '2026'}`,
         rawTest: test,
-        subjectCode: courseCode,
-        subjectTitle: courseTitle,
+        subjectCode: courseCode || 'NAV-101',
+        subjectTitle: courseTitle || 'General Assessment',
         term: test.term || 'Midterm',
         academicYear: test.academicYear || '2025-2026',
         totalItems: questionCount,
@@ -143,10 +158,11 @@ const builtExams = computed(() => {
       }
     })
     .filter(exam => {
-      const matchesSearch = !searchQuery.value || 
-        exam.subjectCode.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-        exam.subjectTitle.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-        String(exam.id).toLowerCase().includes(searchQuery.value.toLowerCase())
+      const q = searchQuery.value.toLowerCase().trim()
+      const matchesSearch = !q || 
+        (exam.subjectCode && exam.subjectCode.toLowerCase().includes(q)) ||
+        (exam.subjectTitle && exam.subjectTitle.toLowerCase().includes(q)) ||
+        String(exam.id).toLowerCase().includes(q)
 
       const matchesCourse = selectedCourse.value === 'All' || exam.subjectCode === selectedCourse.value
       const matchesTerm = selectedTerm.value === 'All' || exam.term === selectedTerm.value
@@ -155,42 +171,46 @@ const builtExams = computed(() => {
     })
 })
 
-// STAGE 2: Real Completed Pilots aggregated from Student Submissions (AD-11 & AD-18)
+// STAGE 2: Completed Pilots aggregated from Student Submissions (AD-11 & AD-18)
 const completedPilots = computed(() => {
   const pilotMap = new Map()
 
-  savedTests.value.forEach(test => {
-    const testId = String(test.id)
-    pilotMap.set(testId, {
-      id: `PL-${test.code || testId.slice(-6)}`,
-      testId: testId,
-      rawTest: test,
-      subjectCode: test.courseCode || test.subjectCode || 'NAV-101',
-      subjectTitle: test.courseTitle || test.subjectTitle || 'Navigation Watchkeeping',
-      term: test.term || 'Midterm',
-      submissions: []
-    })
-  })
-
-  examSubmissions.value.forEach(sub => {
-    const key = String(sub.test_id || sub.exam_id || sub.testId || '1')
-    if (!pilotMap.has(key)) {
-      pilotMap.set(key, {
-        id: `PL-${key.slice(-6)}`,
-        testId: key,
-        rawTest: null,
-        subjectCode: sub.course_code || sub.subjectCode || 'MAR-100',
-        subjectTitle: sub.course_title || sub.subjectTitle || 'Maritime Operational Pilot',
-        term: sub.term || 'Midterm',
+  if (Array.isArray(savedTests.value)) {
+    savedTests.value.forEach(test => {
+      const testId = String(test.id || test.code || '1')
+      pilotMap.set(testId, {
+        id: `PL-${test.code || testId.slice(-6)}`,
+        testId: testId,
+        rawTest: test,
+        subjectCode: test.courseCode || test.subjectCode || 'NAV-101',
+        subjectTitle: test.courseTitle || test.subjectTitle || 'Navigation Watchkeeping',
+        term: test.term || 'Midterm',
         submissions: []
       })
-    }
-    pilotMap.get(key).submissions.push(sub)
-  })
+    })
+  }
+
+  if (Array.isArray(examSubmissions.value)) {
+    examSubmissions.value.forEach(sub => {
+      const key = String(sub.test_id || sub.exam_id || sub.testId || '1')
+      if (!pilotMap.has(key)) {
+        pilotMap.set(key, {
+          id: `PL-${key.slice(-6)}`,
+          testId: key,
+          rawTest: null,
+          subjectCode: sub.course_code || sub.subjectCode || 'MAR-100',
+          subjectTitle: sub.course_title || sub.subjectTitle || 'Maritime Operational Pilot',
+          term: sub.term || 'Midterm',
+          submissions: []
+        })
+      }
+      pilotMap.get(key).submissions.push(sub)
+    })
+  }
 
   const result = []
   pilotMap.forEach((pilot) => {
-    const subs = pilot.submissions
+    const subs = pilot.submissions || []
     const sampleCount = subs.length
 
     let totalMinutes = 0
@@ -201,7 +221,7 @@ const completedPilots = computed(() => {
     const avgDuration = sampleCount > 0 ? Math.round(totalMinutes / sampleCount) : 0
 
     let poorCount = 0
-    if (pilot.rawTest && pilot.rawTest.questions) {
+    if (pilot.rawTest && Array.isArray(pilot.rawTest.questions)) {
       pilot.rawTest.questions.forEach(q => {
         if (q.status === 'Flagged' || q.status === 'Needs Review' || q.retained_ai === false) {
           poorCount++
@@ -226,10 +246,11 @@ const completedPilots = computed(() => {
   })
 
   return result.filter(pilot => {
-    const matchesSearch = !searchQuery.value || 
-      pilot.subjectCode.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      pilot.subjectTitle.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      String(pilot.id).toLowerCase().includes(searchQuery.value.toLowerCase())
+    const q = searchQuery.value.toLowerCase().trim()
+    const matchesSearch = !q || 
+      (pilot.subjectCode && pilot.subjectCode.toLowerCase().includes(q)) ||
+      (pilot.subjectTitle && pilot.subjectTitle.toLowerCase().includes(q)) ||
+      String(pilot.id).toLowerCase().includes(q)
 
     const matchesCourse = selectedCourse.value === 'All' || pilot.subjectCode === selectedCourse.value
     const matchesTerm = selectedTerm.value === 'All' || pilot.term === selectedTerm.value
@@ -238,7 +259,7 @@ const completedPilots = computed(() => {
   })
 })
 
-// Institutional Form Generators
+// Institutional Form Generator Handlers
 function generateAD09(exam) {
   alert(`[Form AD-09: Table of Specifications (T.O.S.)]\nGenerating official TOS document for ${exam.subjectCode} (${exam.term}).\nTotal Items: ${exam.totalItems} Qs.\nDistribution: Easy (30%), Average (50%), Difficult (20%).`)
 }
@@ -274,6 +295,7 @@ function generateAD18(pilot) {
         <button 
           @click="loadAllData" 
           :disabled="isLoading"
+          type="button"
           class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl transition cursor-pointer disabled:opacity-50"
           title="Refresh Data"
         >
@@ -290,9 +312,10 @@ function generateAD18(pilot) {
     <!-- Navigation Pills -->
     <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
       <button
-        @click="activeTab = 'analytics'"
+        type="button"
+        @click="setActiveTab('analytics')"
         :class="[
-          'px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2',
+          'px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 select-none',
           activeTab === 'analytics' 
             ? 'bg-emerald-600 text-white shadow-sm' 
             : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
@@ -302,9 +325,10 @@ function generateAD18(pilot) {
       </button>
 
       <button
-        @click="activeTab = 'exam-built'"
+        type="button"
+        @click="setActiveTab('exam-built')"
         :class="[
-          'px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2',
+          'px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 select-none',
           activeTab === 'exam-built' 
             ? 'bg-emerald-600 text-white shadow-sm' 
             : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
@@ -314,9 +338,10 @@ function generateAD18(pilot) {
       </button>
 
       <button
-        @click="activeTab = 'post-pilot'"
+        type="button"
+        @click="setActiveTab('post-pilot')"
         :class="[
-          'px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2',
+          'px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 select-none',
           activeTab === 'post-pilot' 
             ? 'bg-emerald-600 text-white shadow-sm' 
             : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
@@ -330,7 +355,7 @@ function generateAD18(pilot) {
     <div v-show="activeTab === 'analytics'" class="space-y-6">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Bloom's Taxonomy Balance -->
-        <div class="bg-white border rounded-2xl p-6 shadow-xs space-y-4">
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
           <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
             <PieChart class="text-emerald-600" :size="16" /> Bloom's Taxonomy Cognitive Balance
           </h2>
@@ -349,13 +374,13 @@ function generateAD18(pilot) {
         </div>
 
         <!-- STCW Standard Coverage -->
-        <div class="bg-white border rounded-2xl p-6 shadow-xs space-y-4">
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
           <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
             <ShieldCheck class="text-emerald-600" :size="16" /> STCW Competency Standard Coverage
           </h2>
 
           <div class="space-y-3 pt-2">
-            <div v-for="(count, std) in stcwStats" :key="std" class="p-3 border rounded-xl flex justify-between items-center bg-slate-50">
+            <div v-for="(count, std) in stcwStats" :key="std" class="p-3 border border-slate-200 rounded-xl flex justify-between items-center bg-slate-50">
               <div>
                 <span class="font-mono text-xs font-bold text-slate-900 block">{{ std }}</span>
                 <span class="text-[10px] text-slate-500">Compliant with STCW Code Section A</span>
@@ -375,24 +400,24 @@ function generateAD18(pilot) {
           v-model="searchQuery"
           type="text"
           placeholder="Search by subject code, title, or test ID..."
-          class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition"
+          class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition"
         />
       </div>
 
       <div class="flex items-center gap-2 w-full sm:w-auto">
         <select 
           v-model="selectedCourse"
-          class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500"
+          class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none cursor-pointer focus:ring-2 focus:ring-emerald-500"
         >
           <option value="All">All Courses</option>
-          <option v-for="c in courses" :key="c.id" :value="c.code">
-            {{ c.code }}
+          <option v-for="(c, idx) in courses" :key="c.id || c.code || idx" :value="c.code || c.subjectCode || c.id">
+            {{ c.code || c.subjectCode || c.title }}
           </option>
         </select>
 
         <select 
           v-model="selectedTerm"
-          class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500"
+          class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none cursor-pointer focus:ring-2 focus:ring-emerald-500"
         >
           <option value="All">All Terms</option>
           <option v-for="term in availableTerms" :key="term" :value="term">
@@ -447,12 +472,14 @@ function generateAD18(pilot) {
               <td class="p-3.5 text-slate-500">{{ exam.createdDate }}</td>
               <td class="p-3.5 text-right space-x-2">
                 <button 
+                  type="button"
                   @click="generateAD09(exam)"
                   class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition cursor-pointer"
                 >
                   <FileSpreadsheet class="w-3.5 h-3.5 inline mr-1" /> Form AD-09 (TOS)
                 </button>
                 <button 
+                  type="button"
                   @click="generateAD10(exam)"
                   class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition cursor-pointer"
                 >
@@ -526,12 +553,14 @@ function generateAD18(pilot) {
               </td>
               <td class="p-3.5 text-right space-x-2">
                 <button 
+                  type="button"
                   @click="generateAD11(pilot)"
                   class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition cursor-pointer"
                 >
                   <BarChart2 class="w-3.5 h-3.5 inline mr-1" /> Form AD-11 (Item Analysis)
                 </button>
                 <button 
+                  type="button"
                   @click="generateAD18(pilot)"
                   class="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition cursor-pointer"
                 >
