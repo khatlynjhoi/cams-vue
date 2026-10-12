@@ -126,4 +126,56 @@ function handleLogout() {
               v-for="acc in availableAccounts" 
               :key="acc.email"
               @click="switchAccount(acc)"
-              class="w-full flex items-
+              class="w-full flex items-center justify-between px-3 py-2 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg transition-colors cursor-pointer"
+            >
+              <div class="flex flex-col text-left">
+                <span class="font-bold text-xs">{{ acc.name }}</span>
+                <span class="text-[10px] text-slate-500 capitalize">{{ acc.role }}</span>
+              </div>
+              <Check v-if="currentUser.email === acc.email" :size="14" class="text-emerald-600" />
+            </button>
+
+            <div class="h-px bg-slate-100 my-2"></div>
+
+            <button 
+              @click="handleLogout" 
+              class="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 font-bold rounded-lg transition-colors cursor-pointer"
+            >
+              <LogOut :size="14" />
+              Log out
+            </button>
+          </div>
+        </div>
+
+        <!-- User Profile Button -->
+        <button 
+          @click="showUserMenu = !showUserMenu"
+          class="w-full flex items-center justify-between p-2 -m-2 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+        >
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-emerald-700 text-white font-bold flex items-center justify-center text-xs shadow-sm shrink-0">
+              {{ currentUser.initials }}
+            </div>
+            <div class="text-left overflow-hidden">
+              <p class="text-xs font-bold text-slate-800 truncate">{{ currentUser.name }}</p>
+              <p class="text-[10px] text-slate-400 truncate">{{ currentUser.email }}</p>
+            </div>
+          </div>
+          <MoreVertical :size="14" class="text-slate-400" />
+        </button>
+
+        <!-- Invisible overlay to close menu when clicking outside -->
+        <div 
+          v-if="showUserMenu" 
+          @click="showUserMenu = false" 
+          class="fixed inset-0 z-40"
+        ></div>
+      </div>
+    </aside>
+
+    <!-- Main View Content Area -->
+    <main class="flex-1 pl-64 min-h-screen">
+      <router-view />
+    </main>
+  </div>
+</template>
