@@ -8,7 +8,8 @@ import {
   Award, 
   RotateCcw,
   AlertTriangle,
-  Send
+  Send,
+  Edit3
 } from 'lucide-vue-next'
 
 const examActive = ref(false)
@@ -34,19 +35,14 @@ let timerInterval = null
 
 const scoreResults = ref({ score: 0, total: 0, percentage: 0, breakdown: {} })
 
-// Resilient multi-port fetch helper
+// Multi-port API fetching with local offline fallback
 async function fetchFromEndpoints(path, options) {
   const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://127.0.0.1:8080/api', 'http://localhost:8000/api']
   for (const baseUrl of ports) {
     try {
-      const url = `${baseUrl}${path}`
-      const res = await fetch(url, options)
-      if (res.ok) {
-        return await res.json()
-      }
-    } catch (e) {
-      // Try next port
-    }
+      const res = await fetch(`${baseUrl}${path}`, options)
+      if (res.ok) return await res.json()
+    } catch (e) {}
   }
   throw new Error('All backend ports unreachable')
 }
@@ -75,7 +71,6 @@ async function startExam() {
       examItems.value = generateFallbackExam(courseCodeInput.value)
     }
   } catch (err) {
-    // Offline / Connection Failed: Load local question bank fallback
     examItems.value = generateFallbackExam(courseCodeInput.value)
   }
 
@@ -87,7 +82,6 @@ async function startExam() {
   }
 }
 
-// Generates fallback test questions from localStorage or default bank
 function generateFallbackExam(courseCode) {
   const localBank = JSON.parse(localStorage.getItem('cams_questions_data') || localStorage.getItem('cams_questions') || '[]')
   
@@ -100,35 +94,34 @@ function generateFallbackExam(courseCode) {
     matched = localBank.slice(0, 10)
   }
 
-  // Default hardcoded items if local storage is also empty
   if (matched.length === 0) {
     matched = [
       {
         id: 101,
         code: `${courseCode}-Q1`,
-        text: 'Which computer component acts as the primary processor executing instructions for the maritime navigation system?',
+        text: 'Which topology provides multiple possible communication paths between devices and can provide high redundancy?',
         type: 'multiple_choice',
-        options: ['Central Processing Unit (CPU)', 'Random Access Memory (RAM)', 'Solid State Drive (SSD)', 'Graphics Processing Unit (GPU)'],
-        correctAnswer: 0,
-        bloomLevel: 'Remembering'
+        options: ['Bus', 'Mesh', 'Ring', 'Star'],
+        correctAnswer: 'B', // Index 1 or Letter B
+        bloomLevel: 'Understanding'
       },
       {
         id: 102,
         code: `${courseCode}-Q2`,
-        text: 'ECDIS electronic chart data must be periodically updated to maintain compliance with IHO standards.',
-        type: 'true_false',
-        options: ['True', 'False'],
-        correctAnswer: 0,
+        text: 'Why are strong passwords and proper user access control important in protecting shipboard systems?',
+        type: 'short_answer',
+        options: [],
+        correctAnswer: 'To prevent unauthorized access and maintain cybersecurity integrity.',
         bloomLevel: 'Understanding'
       },
       {
         id: 103,
         code: `${courseCode}-Q3`,
-        text: 'What protocol is standard for transmitting GPS NMEA position data across shipboard local area networks?',
-        type: 'multiple_choice',
-        options: ['UDP/IP Unicast or Multicast', 'SMTP', 'FTP', 'HTTP/2'],
-        correctAnswer: 0,
-        bloomLevel: 'Application'
+        text: 'Why can cybersecurity incidents affect the continuity of maritime operations?',
+        type: 'short_answer',
+        options: [],
+        correctAnswer: 'Disrupts navigation systems, communication networks, and vessel safety control.',
+        bloomLevel: 'Applying'
       }
     ]
   }
@@ -137,9 +130,9 @@ function generateFallbackExam(courseCode) {
     id: q.id || idx + 1,
     code: q.code || `${courseCode}-Q${idx + 1}`,
     text: q.text || q.question_text,
-    type: q.type || (q.options?.length === 2 ? 'true_false' : 'multiple_choice'),
+    type: q.type || (q.options?.length > 0 ? 'multiple_choice' : 'short_answer'),
     image_url: q.image_url,
-    options: q.options || ['Option A', 'Option B', 'Option C', 'Option D'],
+    options: q.options || [],
     correctAnswer: q.correct_answer ?? q.correctAnswer ?? 0,
     bloomLevel: q.bloom_level || q.bloomLevel || 'Understanding'
   }))
@@ -162,7 +155,12 @@ const formattedTime = computed(() => {
 })
 
 const currentQuestion = computed(() => examItems.value[currentQuestionIndex.value] || {})
-const answeredCount = computed(() => Object.keys(studentAnswers.value).length)
+
+// Answered count includes typed short answers
+const answeredCount = computed(() => {
+  return Object.values(studentAnswers.value).filter(val => val !== undefined && val !== null && String(val).trim() !== '').length
+})
+
 const unansweredCount = computed(() => examItems.value.length - answeredCount.value)
 const flaggedCount = computed(() => Object.keys(flaggedQuestions.value).filter(k => flaggedQuestions.value[k]).length)
 
@@ -172,6 +170,56 @@ function toggleFlag(index) {
 
 function promptSubmission() {
   showConfirmModal.value = true
+}
+
+/**
+ * Universal evaluation logic handling index, letter code, and text string matching
+ */
+function evaluateQuestionAnswer(item, studentAns) {
+  if (studentAns === undefined || studentAns === null || String(studentAns).trim() === '') {
+    return false
+  }
+
+  const rawCorrect = item.correctAnswer
+  if (rawCorrect === undefined || rawCorrect === null) return false
+
+  // Short Answer / Essay Evaluation
+  if (['short_answer', 'essay', 'open_ended'].includes(item.type) || !item.options || item.options.length === 0) {
+    const text = String(studentAns).trim().toLowerCase()
+    if (text.length > 3) return true // Grants credit for completed short answer response
+    return false
+  }
+
+  // Multiple Choice / True-False Evaluation
+  const options = item.options || []
+  const studentIdx = Number(studentAns)
+  const studentOptText = options[studentIdx] 
+    ? (typeof options[studentIdx] === 'object' ? options[studentIdx].text : options[studentIdx]) 
+    : String(studentAns)
+
+  const letterMap = { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'a': 0, 'b': 1, 'c': 2, 'd': 3 }
+
+  // 1. Check if raw correct answer is a letter ('A', 'B', 'C', 'D')
+  if (typeof rawCorrect === 'string' && letterMap[rawCorrect.trim()] !== undefined) {
+    if (studentIdx === letterMap[rawCorrect.trim()]) return true
+  }
+
+  // 2. Check numeric index match (0-based vs 1-based)
+  if (!isNaN(Number(rawCorrect))) {
+    const num = Number(rawCorrect)
+    if (studentIdx === num || studentIdx === (num - 1)) return true
+  }
+
+  // 3. String value match (e.g., "Star" === "Star")
+  const correctStr = String(rawCorrect).trim().toLowerCase()
+  const studentStr = String(studentOptText).trim().toLowerCase()
+  if (correctStr === studentStr) return true
+
+  // 4. Choice letter string match
+  const studentLetter = String.fromCharCode(65 + studentIdx).toLowerCase()
+  if (studentLetter === correctStr) return true
+
+  return false
 }
 
 async function executeSubmission() {
@@ -184,15 +232,7 @@ async function executeSubmission() {
 
   examItems.value.forEach((item) => {
     const studentAns = studentAnswers.value[item.id]
-    let isCorrect = false
-
-    if (item.type === 'multiple_choice' || !item.type) {
-      isCorrect = Array.isArray(item.correctAnswer) 
-        ? item.correctAnswer.includes(studentAns) 
-        : Number(studentAns) === Number(item.correctAnswer) || String(studentAns) === String(item.correctAnswer)
-    } else if (item.type === 'true_false') {
-      isCorrect = Number(studentAns) === Number(item.correctAnswer) || String(studentAns).toLowerCase() === String(item.correctAnswer).toLowerCase()
-    }
+    const isCorrect = evaluateQuestionAnswer(item, studentAns)
 
     if (isCorrect) totalScore++
 
@@ -231,7 +271,6 @@ async function executeSubmission() {
       body: JSON.stringify(payload)
     })
   } catch (err) {
-    // Offline local storage record for Stage 2 reports
     const localSubs = JSON.parse(localStorage.getItem('cams_exam_submissions') || '[]')
     localSubs.push(payload)
     localStorage.setItem('cams_exam_submissions', JSON.stringify(localSubs))
@@ -298,7 +337,7 @@ onUnmounted(() => {
     <!-- ACTIVE TEST VIEW -->
     <div v-if="examActive" class="space-y-6">
       
-      <!-- Top Sticky Timer & Student Bar -->
+      <!-- Top Sticky Bar -->
       <div class="bg-slate-900 text-white rounded-2xl p-4 shadow-md flex justify-between items-center sticky top-4 z-20">
         <div>
           <h2 class="text-sm font-bold text-white">{{ studentName }} <span class="text-xs font-normal text-slate-400">({{ cadetId }})</span></h2>
@@ -313,8 +352,8 @@ onUnmounted(() => {
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <!-- Main Item Container -->
-        <div class="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-col justify-between space-y-6">
+        <!-- Main Question Container -->
+        <div class="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-col justify-between space-y-6 min-h-[380px]">
           <div class="space-y-4">
             
             <div class="flex justify-between items-center pb-3 border-b border-slate-100">
@@ -345,7 +384,7 @@ onUnmounted(() => {
             </div>
 
             <!-- Multiple Choice Options -->
-            <div v-if="currentQuestion.type === 'multiple_choice' || !currentQuestion.type" class="space-y-2.5 pt-2">
+            <div v-if="currentQuestion.type === 'multiple_choice' && currentQuestion.options && currentQuestion.options.length > 0" class="space-y-2.5 pt-2">
               <button
                 v-for="(opt, optIdx) in currentQuestion.options"
                 :key="optIdx"
@@ -382,6 +421,19 @@ onUnmounted(() => {
               >
                 False
               </button>
+            </div>
+
+            <!-- Short Answer / Essay Textarea Renderer -->
+            <div v-else class="space-y-2 pt-2">
+              <div class="flex items-center gap-1.5 text-xs text-slate-500 font-medium mb-1">
+                <Edit3 :size="14" /> Type your written answer below:
+              </div>
+              <textarea
+                v-model="studentAnswers[currentQuestion.id]"
+                rows="4"
+                placeholder="Provide a detailed explanation or answer..."
+                class="w-full p-3.5 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs sm:text-sm text-slate-800 outline-none transition-all"
+              ></textarea>
             </div>
           </div>
 
@@ -428,7 +480,7 @@ onUnmounted(() => {
               :class="[
                 'h-10 rounded-xl text-xs font-bold border flex items-center justify-center relative transition-all cursor-pointer',
                 currentQuestionIndex === idx ? 'ring-2 ring-emerald-500 ring-offset-1' : '',
-                studentAnswers[q.id] !== undefined ? 'bg-emerald-100 border-emerald-300 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-600'
+                studentAnswers[q.id] !== undefined && studentAnswers[q.id] !== '' ? 'bg-emerald-100 border-emerald-300 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-600'
               ]"
             >
               {{ idx + 1 }}
