@@ -197,7 +197,7 @@ const password = ref('')
 const errorMessage = ref('')
 const isLoading = ref(false)
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api'
+const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
 const handleLogin = async () => {
   if (isLoading.value) return
@@ -214,17 +214,17 @@ const handleLogin = async () => {
   isLoading.value = true
 
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: {
+    const response = await fetch(`${API_BASE_URL}/login`, {
+    method: 'POST',
+    headers: {
         'Content-Type': 'application/json',
-        Accept: 'application/json'
-      },
-      body: JSON.stringify({
-        email: normalizedEmail,
+        'Accept': 'application/json'
+    },
+    body: JSON.stringify({
+        email: email.value.trim().toLowerCase(),
         password: password.value
-      })
     })
+});
 
     const data = await response.json().catch(() => ({}))
 
