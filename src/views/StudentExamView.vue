@@ -7,11 +7,8 @@ import {
   AlertCircle, 
   Award, 
   RotateCcw,
-  CheckCircle2,
-  XCircle,
   AlertTriangle,
-  Send,
-  HelpCircle
+  Send
 } from 'lucide-vue-next'
 
 const examActive = ref(false)
@@ -20,9 +17,9 @@ const isSubmitting = ref(false)
 const showConfirmModal = ref(false)
 
 // Student & Exam Metadata
-const courseCodeInput = ref('NAV-101')
-const studentName = ref('Cadet Alex Vance')
-const cadetId = ref('CDT-2026-0814')
+const courseCodeInput = ref('ICT-1172')
+const studentName = ref('Peter Ramon Olaguivel')
+const cadetId = ref('21001')
 const totalItemsInput = ref(10)
 
 const examItems = ref([])
@@ -30,41 +27,122 @@ const currentQuestionIndex = ref(0)
 const studentAnswers = ref({})
 const flaggedQuestions = ref({})
 
-// Timer Configuration (Default 60 mins = 3600 seconds)
+// Timer Configuration (60 mins = 3600 seconds)
 const initialTime = 3600
 const timeRemaining = ref(initialTime)
 let timerInterval = null
 
 const scoreResults = ref({ score: 0, total: 0, percentage: 0, breakdown: {} })
 
-function startExam() {
+// Resilient multi-port fetch helper
+async function fetchFromEndpoints(path, options) {
+  const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://127.0.0.1:8080/api', 'http://localhost:8000/api']
+  for (const baseUrl of ports) {
+    try {
+      const url = `${baseUrl}${path}`
+      const res = await fetch(url, options)
+      if (res.ok) {
+        return await res.json()
+      }
+    } catch (e) {
+      // Try next port
+    }
+  }
+  throw new Error('All backend ports unreachable')
+}
+
+async function startExam() {
   if (!studentName.value.trim() || !courseCodeInput.value.trim()) {
     alert('Please provide your full name and assessment code.')
     return
   }
 
-  fetch('http://127.0.0.1:8080/api/exams/generate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
-      courseId: courseCodeInput.value, 
-      totalItems: totalItemsInput.value 
+  const payload = { 
+    courseId: courseCodeInput.value, 
+    totalItems: totalItemsInput.value 
+  }
+
+  try {
+    const data = await fetchFromEndpoints('/exams/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     })
+
+    if (data.success && Array.isArray(data.exam) && data.exam.length > 0) {
+      examItems.value = data.exam
+    } else {
+      examItems.value = generateFallbackExam(courseCodeInput.value)
+    }
+  } catch (err) {
+    // Offline / Connection Failed: Load local question bank fallback
+    examItems.value = generateFallbackExam(courseCodeInput.value)
+  }
+
+  if (examItems.value.length > 0) {
+    examActive.value = true
+    startTimer()
+  } else {
+    alert('No assessment questions found for code ' + courseCodeInput.value)
+  }
+}
+
+// Generates fallback test questions from localStorage or default bank
+function generateFallbackExam(courseCode) {
+  const localBank = JSON.parse(localStorage.getItem('cams_questions_data') || localStorage.getItem('cams_questions') || '[]')
+  
+  let matched = localBank.filter(q => {
+    const c = String(q.course_id || q.courseCode || q.code || '').toLowerCase()
+    return c.includes(courseCode.toLowerCase())
   })
-    .then(r => r.json())
-    .then(data => {
-      if (data.success && data.exam && data.exam.length > 0) {
-        examItems.value = data.exam
-        examActive.value = true
-        startTimer()
-      } else {
-        alert('No questions available for the specified course assessment code.')
+
+  if (matched.length === 0 && localBank.length > 0) {
+    matched = localBank.slice(0, 10)
+  }
+
+  // Default hardcoded items if local storage is also empty
+  if (matched.length === 0) {
+    matched = [
+      {
+        id: 101,
+        code: `${courseCode}-Q1`,
+        text: 'Which computer component acts as the primary processor executing instructions for the maritime navigation system?',
+        type: 'multiple_choice',
+        options: ['Central Processing Unit (CPU)', 'Random Access Memory (RAM)', 'Solid State Drive (SSD)', 'Graphics Processing Unit (GPU)'],
+        correctAnswer: 0,
+        bloomLevel: 'Remembering'
+      },
+      {
+        id: 102,
+        code: `${courseCode}-Q2`,
+        text: 'ECDIS electronic chart data must be periodically updated to maintain compliance with IHO standards.',
+        type: 'true_false',
+        options: ['True', 'False'],
+        correctAnswer: 0,
+        bloomLevel: 'Understanding'
+      },
+      {
+        id: 103,
+        code: `${courseCode}-Q3`,
+        text: 'What protocol is standard for transmitting GPS NMEA position data across shipboard local area networks?',
+        type: 'multiple_choice',
+        options: ['UDP/IP Unicast or Multicast', 'SMTP', 'FTP', 'HTTP/2'],
+        correctAnswer: 0,
+        bloomLevel: 'Application'
       }
-    })
-    .catch(err => {
-      console.error('Failed to load exam:', err)
-      alert('Unable to connect to exam server (Port 8080).')
-    })
+    ]
+  }
+
+  return matched.map((q, idx) => ({
+    id: q.id || idx + 1,
+    code: q.code || `${courseCode}-Q${idx + 1}`,
+    text: q.text || q.question_text,
+    type: q.type || (q.options?.length === 2 ? 'true_false' : 'multiple_choice'),
+    image_url: q.image_url,
+    options: q.options || ['Option A', 'Option B', 'Option C', 'Option D'],
+    correctAnswer: q.correct_answer ?? q.correctAnswer ?? 0,
+    bloomLevel: q.bloom_level || q.bloomLevel || 'Understanding'
+  }))
 }
 
 function startTimer() {
@@ -135,7 +213,6 @@ async function executeSubmission() {
     breakdown
   }
 
-  // Persist submission record to Laravel Backend for Stage 2 Institutional Reports
   const payload = {
     cadet_id: cadetId.value,
     cadet_name: studentName.value,
@@ -148,13 +225,16 @@ async function executeSubmission() {
   }
 
   try {
-    await fetch('http://127.0.0.1:8080/api/exam-submissions', {
+    await fetchFromEndpoints('/exam-submissions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
   } catch (err) {
-    console.warn('Backend submission sync failed. Local score generated.', err)
+    // Offline local storage record for Stage 2 reports
+    const localSubs = JSON.parse(localStorage.getItem('cams_exam_submissions') || '[]')
+    localSubs.push(payload)
+    localStorage.setItem('cams_exam_submissions', JSON.stringify(localSubs))
   } finally {
     isSubmitting.value = false
     examActive.value = false
@@ -260,7 +340,6 @@ onUnmounted(() => {
               {{ currentQuestion.text }}
             </p>
 
-            <!-- Optional Question Diagram / Image -->
             <div v-if="currentQuestion.image_url" class="my-3">
               <img :src="currentQuestion.image_url" alt="Question Diagram" class="max-h-60 rounded-xl border border-slate-200 object-contain mx-auto" />
             </div>
@@ -378,7 +457,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- PRE-SUBMISSION CONFIRMATION MODAL -->
+    <!-- CONFIRMATION MODAL -->
     <div v-if="showConfirmModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
       <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4 text-center border border-slate-200">
         <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
@@ -387,9 +466,7 @@ onUnmounted(() => {
 
         <div>
           <h3 class="text-base font-bold text-slate-900">Confirm Exam Submission</h3>
-          <p class="text-xs text-slate-500 mt-1">
-            Are you sure you want to submit your examination paper now?
-          </p>
+          <p class="text-xs text-slate-500 mt-1">Are you sure you want to submit your examination paper now?</p>
         </div>
 
         <div v-if="unansweredCount > 0 || flaggedCount > 0" class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-left text-xs text-amber-900 space-y-1">
