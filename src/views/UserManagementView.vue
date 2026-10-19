@@ -1,221 +1,501 @@
 <script setup>
-import { ref, reactive, computed } from 'vue'
-import { Plus, Search, Shield, Mail, Trash2, X, Save } from 'lucide-vue-next'
+import { ref, computed, onMounted } from 'vue'
+import { 
+  Users, 
+  UserPlus, 
+  Search, 
+  Edit3, 
+  Trash2, 
+  ShieldCheck, 
+  Key, 
+  CheckCircle2, 
+  XCircle, 
+  RefreshCw,
+  X,
+  AlertTriangle
+} from 'lucide-vue-next'
 
+const users = ref([])
+const isLoading = ref(false)
 const searchQuery = ref('')
-const roleFilter = ref('All')
+const selectedRoleFilter = ref('All')
 
-// Mock initial data based on "UserManagementView.txt"[cite: 28]
-const users = ref([
-  { id: 1, name: 'Capt. Eduardo Ramirez', email: 'e.ramirez@bma.edu.ph', role: 'Instructor', status: 'Active', department: 'Navigation' },
-  { id: 2, name: 'Chief Engr. Marco Santos', email: 'm.santos@bma.edu.ph', role: 'Assessment Officer', status: 'Active', department: 'Marine Engineering' },
-  { id: 3, name: 'Cadet Juan Dela Cruz', email: 'j.delacruz@student.bma.edu.ph', role: 'Cadet', status: 'Active', department: 'Deck Class A' },
-  { id: 4, name: 'Cadet Maria Clara', email: 'm.clara@student.bma.edu.ph', role: 'Cadet', status: 'Inactive', department: 'Engine Class B' }
-])
+// Current logged in user context
+const currentUser = ref({ role: 'Admin' })
 
-const availableRoles = ['Admin', 'Assessment Officer', 'Instructor', 'Cadet']
+// Modal States
+const showAddModal = ref(false)
+const showEditModal = ref(false)
+const showDeleteModal = ref(false)
+const selectedUser = ref(null)
 
-// Modal State
-const isAddModalOpen = ref(false)
-const newUser = reactive({
+// Form States
+const form = ref({
+  id: null,
   name: '',
   email: '',
+  password: '',
   role: 'Instructor',
-  department: '',
-  password: ''
+  department: 'BSMT',
+  status: 'Active'
 })
 
-// Computed Filters[cite: 28]
+const rolesList = ['Admin', 'Assessment Officer', 'Instructor', 'Cadet']
+const departmentList = ['BSMT', 'BSMARE', 'General Education', 'Assessment & Quality', 'ICT']
+
+onMounted(() => {
+  try {
+    const stored = JSON.parse(localStorage.getItem('user') || '{}')
+    if (stored.role) currentUser.value = stored
+  } catch (e) {}
+  loadUsers()
+})
+
+async function loadUsers() {
+  isLoading.value = true
+  try {
+    const res = await fetch('http://127.0.0.1:8080/api/users', {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Role': currentUser.value.role || 'Admin'
+      }
+    })
+    const data = await res.json()
+    if (data.success && Array.isArray(data.data)) {
+      users.value = data.data
+    } else {
+      // Local fallback dataset if backend database is offline
+      users.value = getFallbackUsers()
+    }
+  } catch (e) {
+    users.value = getFallbackUsers()
+  } finally {
+    isLoading.value = false
+  }
+}
+
+function getFallbackUsers() {
+  const local = localStorage.getItem('cams_users_list')
+  if (local) return JSON.parse(local)
+  const defaults = [
+    { id: 1, name: 'BMA Administrator', email: 'admin@bma.edu.ph', role: 'Admin', department: 'ICT', status: 'Active' },
+    { id: 2, name: 'Capt. Eduardo Ramirez', email: 'e.ramirez@bma.edu.ph', role: 'Instructor', department: 'BSMT', status: 'Active' },
+    { id: 3, name: 'Chief Engr. Santos', email: 'm.santos@bma.edu.ph', role: 'Assessment Officer', department: 'BSMARE', status: 'Active' },
+    { id: 4, name: 'Cadet Juan Dela Cruz', email: 'j.delacruz@student.bma.edu.ph', role: 'Cadet', department: 'BSMT', status: 'Active' }
+  ]
+  localStorage.setItem('cams_users_list', JSON.stringify(defaults))
+  return defaults
+}
+
+function saveLocalUsers() {
+  localStorage.setItem('cams_users_list', JSON.stringify(users.value))
+}
+
 const filteredUsers = computed(() => {
   return users.value.filter(u => {
-    const matchesSearch = u.name.toLowerCase().includes(searchQuery.value.toLowerCase()) || 
-                          u.email.toLowerCase().includes(searchQuery.value.toLowerCase())
-    const matchesRole = roleFilter.value === 'All' || u.role === roleFilter.value
-    return matchesSearch && matchesRole
+    const q = searchQuery.value.toLowerCase().trim()
+    const matchesQuery = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.department.toLowerCase().includes(q)
+    const matchesRole = selectedRoleFilter.value === 'All' || u.role === selectedRoleFilter.value
+    return matchesQuery && matchesRole
   })
 })
 
-// Actions
 function openAddModal() {
-  newUser.name = ''
-  newUser.email = ''
-  newUser.role = 'Instructor'
-  newUser.department = ''
-  newUser.password = ''
-  isAddModalOpen.value = true
+  form.value = { id: null, name: '', email: '', password: '', role: 'Instructor', department: 'BSMT', status: 'Active' }
+  showAddModal.value = true
 }
 
-function closeAddModal() {
-  isAddModalOpen.value = false
+function openEditModal(user) {
+  selectedUser.value = user
+  form.value = { ...user, password: '' }
+  showEditModal.value = true
 }
 
-function createUser() {
-  if (!newUser.name || !newUser.email || !newUser.role) return
-  
-  users.value.push({
-    id: Date.now(),
-    name: newUser.name,
-    email: newUser.email,
-    role: newUser.role,
-    department: newUser.department || 'N/A',
-    status: 'Active'
-  })
-  closeAddModal()
+function openDeleteModal(user) {
+  selectedUser.value = user
+  showDeleteModal.value = true
 }
 
-function deleteUser(id) {
-  if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-    users.value = users.value.filter(u => u.id !== id)
+async function handleCreateUser() {
+  if (!form.value.name || !form.value.email || !form.value.password) {
+    alert('Please fill in all required fields.')
+    return
   }
+
+  try {
+    const res = await fetch('http://127.0.0.1:8080/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUser.value.role },
+      body: JSON.stringify(form.value)
+    })
+    const data = await res.json()
+    if (data.success && data.data) {
+      users.value.push(data.data)
+    } else {
+      const newUser = { ...form.value, id: Date.now() }
+      delete newUser.password
+      users.value.push(newUser)
+      saveLocalUsers()
+    }
+    showAddModal.value = false
+  } catch (e) {
+    const newUser = { ...form.value, id: Date.now() }
+    delete newUser.password
+    users.value.push(newUser)
+    saveLocalUsers()
+    showAddModal.value = false
+  }
+}
+
+async function handleUpdateUser() {
+  if (!form.value.name || !form.value.email) {
+    alert('Name and Email are required.')
+    return
+  }
+
+  try {
+    const res = await fetch(`http://127.0.0.1:8080/api/users/${form.value.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUser.value.role },
+      body: JSON.stringify(form.value)
+    })
+    const data = await res.json()
+    if (data.success && data.data) {
+      const idx = users.value.findIndex(u => u.id === form.value.id)
+      if (idx !== -1) users.value[idx] = data.data
+    } else {
+      updateLocalUser()
+    }
+  } catch (e) {
+    updateLocalUser()
+  } finally {
+    showEditModal.value = false
+  }
+}
+
+function updateLocalUser() {
+  const idx = users.value.findIndex(u => u.id === form.value.id)
+  if (idx !== -1) {
+    users.value[idx] = { ...users.value[idx], ...form.value }
+    delete users.value[idx].password
+    saveLocalUsers()
+  }
+}
+
+async function toggleUserAccess(user) {
+  const newStatus = user.status === 'Active' ? 'Inactive' : 'Active'
+  user.status = newStatus
+
+  try {
+    await fetch(`http://127.0.0.1:8080/api/users/${user.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUser.value.role },
+      body: JSON.stringify({ status: newStatus })
+    })
+  } catch (e) {}
+  saveLocalUsers()
+}
+
+async function handleDeleteUser() {
+  if (!selectedUser.value) return
+
+  try {
+    await fetch(`http://127.0.0.1:8080/api/users/${selectedUser.value.id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUser.value.role }
+    })
+  } catch (e) {}
+
+  users.value = users.value.filter(u => u.id !== selectedUser.value.id)
+  saveLocalUsers()
+  showDeleteModal.value = false
+  selectedUser.value = null
 }
 </script>
 
 <template>
-  <div class="p-6 max-w-7xl mx-auto space-y-6">
-    <!-- Header[cite: 28] -->
+  <div class="p-6 max-w-7xl mx-auto space-y-6 font-sans">
+    
+    <!-- Top Header -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
       <div>
-        <h1 class="text-3xl font-bold text-gray-900">User Management</h1>
-        <p class="text-gray-500 mt-1">Manage instructor accounts, assessment officer privileges, and cadet rosters.</p>
+        <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+          <Users class="text-emerald-600" :size="24" /> User Access & Authorization
+        </h1>
+        <p class="text-xs text-slate-500 mt-1">
+          Manage system privileges, edit accounts, and grant or revoke access rights across BMA departments.
+        </p>
       </div>
 
-      <button 
-        @click="openAddModal"
-        class="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm cursor-pointer"
-      >
-        <Plus :size="16" />
-        Add New User
-      </button>
+      <div class="flex items-center gap-2 shrink-0">
+        <button 
+          @click="loadUsers"
+          class="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl transition cursor-pointer"
+          title="Refresh User List"
+        >
+          <RefreshCw :class="['w-4 h-4', { 'animate-spin': isLoading }]" />
+        </button>
+
+        <button 
+          @click="openAddModal"
+          class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
+        >
+          <UserPlus :size="16" /> Add New Account
+        </button>
+      </div>
     </div>
 
-    <!-- Filters[cite: 28] -->
-    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 justify-between items-center">
-      <div class="relative w-full md:w-96">
-        <Search :size="18" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+    <!-- Filter & Search Toolbar -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center gap-3">
+      <div class="relative flex-1 w-full">
+        <Search class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
         <input 
-          v-model="searchQuery" 
-          type="text" 
-          placeholder="Search by name or email..." 
-          class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+          v-model="searchQuery"
+          type="text"
+          placeholder="Search by name, email, or department..."
+          class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
         />
       </div>
 
-      <div class="flex items-center gap-2 w-full md:w-auto">
-        <span class="text-xs font-semibold text-gray-500">Role:</span>
-        <select 
-          v-model="roleFilter" 
-          class="border border-gray-300 rounded-lg text-sm px-3 py-2 bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"
-        >
-          <option value="All">All Roles</option>
-          <option v-for="role in availableRoles" :key="role" :value="role">{{ role }}</option>
-        </select>
-      </div>
+      <select v-model="selectedRoleFilter" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none cursor-pointer">
+        <option value="All">All Roles</option>
+        <option v-for="r in rolesList" :key="r" :value="r">{{ r }}</option>
+      </select>
     </div>
 
-    <!-- Users Table[cite: 28] -->
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <table class="w-full text-left text-sm">
-        <thead class="bg-gray-50 text-gray-600 border-b border-gray-200">
-          <tr>
-            <th class="px-6 py-3 font-semibold">User</th>
-            <th class="px-6 py-3 font-semibold">Role</th>
-            <th class="px-6 py-3 font-semibold">Department / Class</th>
-            <th class="px-6 py-3 font-semibold">Status</th>
-            <th class="px-6 py-3 font-semibold text-right">Actions</th>
+    <!-- User Data Table -->
+    <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+      <table class="w-full text-left border-collapse">
+        <thead>
+          <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
+            <th class="p-3.5">User Details</th>
+            <th class="p-3.5">Assigned Role</th>
+            <th class="p-3.5">Department</th>
+            <th class="p-3.5">System Access</th>
+            <th class="p-3.5 text-right">Actions</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">
-          <tr v-for="u in filteredUsers" :key="u.id" class="hover:bg-gray-50 transition-colors">
-            <td class="px-6 py-4">
-              <div class="font-bold text-gray-900">{{ u.name }}</div>
-              <div class="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                <Mail :size="12" /> {{ u.email }}
-              </div>
+        <tbody class="divide-y divide-slate-100 text-xs text-slate-700">
+          <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-slate-50/80 transition-colors">
+            
+            <!-- Details -->
+            <td class="p-3.5">
+              <div class="font-bold text-slate-900">{{ user.name }}</div>
+              <div class="text-[11px] text-slate-400">{{ user.email }}</div>
             </td>
 
-            <td class="px-6 py-4">
-              <span class="inline-flex items-center gap-1 text-xs font-semibold bg-slate-100 text-slate-800 px-2.5 py-1 rounded border border-slate-200">
-                <Shield :size="12" /> {{ u.role }}
+            <!-- Role Badge -->
+            <td class="p-3.5">
+              <span :class="[
+                'px-2.5 py-1 rounded-full text-[11px] font-bold border',
+                user.role === 'Admin' ? 'bg-purple-50 text-purple-800 border-purple-200' :
+                user.role === 'Assessment Officer' ? 'bg-blue-50 text-blue-800 border-blue-200' :
+                user.role === 'Instructor' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                'bg-slate-100 text-slate-700 border-slate-200'
+              ]">
+                {{ user.role }}
               </span>
             </td>
 
-            <td class="px-6 py-4 text-xs font-medium text-gray-700">
-              {{ u.department }}
-            </td>
+            <!-- Department -->
+            <td class="p-3.5 font-medium text-slate-800">{{ user.department || 'N/A' }}</td>
 
-            <td class="px-6 py-4">
-              <span 
-                :class="[
-                  'px-2.5 py-1 rounded-full text-xs font-semibold',
-                  u.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
-                ]"
-              >
-                {{ u.status }}
-              </span>
-            </td>
-
-            <td class="px-6 py-4 text-right">
+            <!-- System Access Toggle Status -->
+            <td class="p-3.5">
               <button 
-                @click="deleteUser(u.id)"
-                class="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                title="Delete User"
+                @click="toggleUserAccess(user)"
+                :class="[
+                  'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold transition cursor-pointer border',
+                  user.status === 'Active' 
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200' 
+                    : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                ]"
+                title="Click to toggle system access permission"
               >
-                <Trash2 :size="16" />
+                <CheckCircle2 v-if="user.status === 'Active'" :size="12" />
+                <XCircle v-else :size="12" />
+                {{ user.status === 'Active' ? 'Access Granted' : 'Access Revoked' }}
               </button>
+            </td>
+
+            <!-- Action Buttons -->
+            <td class="p-3.5 text-right space-x-2">
+              <button 
+                @click="openEditModal(user)"
+                class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer"
+              >
+                <Edit3 :size="14" class="inline mr-1" /> Edit
+              </button>
+
+              <button 
+                @click="openDeleteModal(user)"
+                class="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold transition cursor-pointer"
+              >
+                <Trash2 :size="14" class="inline mr-1" /> Remove
+              </button>
+            </td>
+          </tr>
+
+          <tr v-if="filteredUsers.length === 0">
+            <td colspan="5" class="p-8 text-center text-slate-400 font-medium text-xs">
+              No matching user accounts found.
             </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Create User Modal -->
-    <div v-if="isAddModalOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden">
-        <div class="flex justify-between items-center p-4 border-b border-gray-100 bg-slate-50">
-          <h2 class="text-lg font-bold text-gray-900">Add New User</h2>
-          <button @click="closeAddModal" class="text-gray-400 hover:text-gray-600 cursor-pointer">
-            <X :size="20" />
+    <!-- ADD USER MODAL -->
+    <div v-if="showAddModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 border border-slate-200">
+        <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <UserPlus class="text-emerald-600" :size="18" /> Create New System Account
+          </h3>
+          <button @click="showAddModal = false" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+            <X :size="18" />
           </button>
         </div>
 
-        <form @submit.prevent="createUser" class="p-6 space-y-4">
+        <div class="space-y-3 text-xs">
           <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1">Full Name</label>
-            <input v-model="newUser.name" type="text" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. John Doe">
+            <label class="block font-bold text-slate-700 mb-1">Full Name</label>
+            <input v-model="form.name" placeholder="e.g. Capt. Eduardo Ramirez" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1">Email Address</label>
-            <input v-model="newUser.email" type="email" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="john@example.com">
+            <label class="block font-bold text-slate-700 mb-1">Email Address (Login Username)</label>
+            <input v-model="form.email" type="email" placeholder="e.g. e.ramirez@bma.edu.ph" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1">Role</label>
-            <select v-model="newUser.role" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
-              <option v-for="role in availableRoles" :key="role" :value="role">{{ role }}</option>
+            <label class="block font-bold text-slate-700 mb-1">Initial Password</label>
+            <input v-model="form.password" type="password" placeholder="••••••••" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">System Role</label>
+              <select v-model="form.role" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800">
+                <option v-for="r in rolesList" :key="r" :value="r">{{ r }}</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Department</label>
+              <select v-model="form.department" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800">
+                <option v-for="d in departmentList" :key="d" :value="d">{{ d }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Access Authorization Status</label>
+            <select v-model="form.status" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800">
+              <option value="Active">Active (System Access Granted)</option>
+              <option value="Inactive">Inactive (System Access Revoked)</option>
             </select>
           </div>
+        </div>
 
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1">Department / Class</label>
-            <input v-model="newUser.department" type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. Deck Class A">
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1">Temporary Password</label>
-            <input v-model="newUser.password" type="password" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="••••••••">
-          </div>
-
-          <div class="pt-4 flex gap-3">
-            <button type="button" @click="closeAddModal" class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition cursor-pointer">
-              Cancel
-            </button>
-            <button type="submit" class="flex-1 px-4 py-2 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition flex items-center justify-center gap-2 cursor-pointer">
-              <Save :size="16" /> Save User
-            </button>
-          </div>
-        </form>
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button @click="showAddModal = false" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer">
+            Cancel
+          </button>
+          <button @click="handleCreateUser" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer">
+            Create & Grant Access
+          </button>
+        </div>
       </div>
     </div>
+
+    <!-- EDIT USER MODAL -->
+    <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 border border-slate-200">
+        <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <Edit3 class="text-emerald-600" :size="18" /> Edit User Account & Access
+          </h3>
+          <button @click="showEditModal = false" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+            <X :size="18" />
+          </button>
+        </div>
+
+        <div class="space-y-3 text-xs">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Full Name</label>
+            <input v-model="form.name" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Email Address</label>
+            <input v-model="form.email" type="email" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Reset Password (Leave blank to keep unchanged)</label>
+            <input v-model="form.password" type="password" placeholder="New Password" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">System Role</label>
+              <select v-model="form.role" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800">
+                <option v-for="r in rolesList" :key="r" :value="r">{{ r }}</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Department</label>
+              <select v-model="form.department" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800">
+                <option v-for="d in departmentList" :key="d" :value="d">{{ d }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Access Authorization Status</label>
+            <select v-model="form.status" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800">
+              <option value="Active">Active (System Access Granted)</option>
+              <option value="Inactive">Inactive (System Access Revoked)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button @click="showEditModal = false" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer">
+            Cancel
+          </button>
+          <button @click="handleUpdateUser" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer">
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- REMOVE USER CONFIRMATION MODAL -->
+    <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4 text-center border border-slate-200">
+        <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+          <AlertTriangle :size="24" />
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-slate-900">Remove User Account</h3>
+          <p class="text-xs text-slate-500 mt-1">
+            Are you sure you want to delete <strong class="text-slate-800">{{ selectedUser?.name }}</strong>? This action will permanently revoke their credentials.
+          </p>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button @click="showDeleteModal = false" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer">
+            Cancel
+          </button>
+          <button @click="handleDeleteUser" class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer">
+            Confirm Removal
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
