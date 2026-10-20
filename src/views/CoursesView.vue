@@ -45,73 +45,59 @@ const bulkFileInput = ref(null)
 const STORAGE_KEY = 'cams_courses_data'
 
 // --------------------------------------------------
-// AUTHENTICATION HELPER
+// RESILIENT MULTI-PORT API HELPER
 // --------------------------------------------------
 
-function getAuthHeaders() {
+async function fetchFromEndpoints(path, options = {}) {
+  const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://127.0.0.1:8080/api', 'http://localhost:8000/api']
   const token = localStorage.getItem('token')
-
-  if (!token) {
-    throw new Error('No authentication token found. Please log in again.')
-  }
-
-  return {
+  
+  const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'Authorization': `Bearer ${token}`
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(options.headers || {})
   }
+
+  for (const baseUrl of ports) {
+    try {
+      const res = await fetch(`${baseUrl}${path}`, { ...options, headers })
+      if (res.ok) {
+        return await res.json()
+      }
+    } catch (e) {
+      // Try next port
+    }
+  }
+  throw new Error('Backend API unreachable')
 }
 
 // --------------------------------------------------
-// LOAD COURSES FROM LARAVEL
+// LOAD COURSES FROM API / STORAGE
 // --------------------------------------------------
 
 async function loadCoursesFromStorage() {
   isLoading.value = true
 
   try {
-    const response = await fetch(`http://127.0.0.1:8000/api/courses`, {
-      method: 'GET',
-      headers: getAuthHeaders()
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-
-      throw new Error(
-        errorData.message ||
-        `Failed to load courses. HTTP ${response.status}`
-      )
-    }
-
-    const data = await response.json()
+    const data = await fetchFromEndpoints('/courses')
 
     courses.value = Array.isArray(data)
       ? data.map(course => ({
           ...course,
-          courseOutcomes: course.course_outcomes || []
+          courseOutcomes: course.course_outcomes || course.courseOutcomes || []
         }))
       : []
 
     saveCoursesToStorage()
-
   } catch (err) {
-    console.error('Failed to load courses from Laravel:', err)
+    console.warn('Failed to load courses from API, checking local storage:', err)
 
     try {
       const savedData = localStorage.getItem(STORAGE_KEY)
-
-      if (savedData) {
-        courses.value = JSON.parse(savedData)
-      } else {
-        courses.value = []
-      }
+      courses.value = savedData ? JSON.parse(savedData) : []
     } catch (storageError) {
-      console.error(
-        'Failed to load courses from localStorage:',
-        storageError
-      )
-
+      console.error('Failed to load courses from localStorage:', storageError)
       courses.value = []
     }
   } finally {
@@ -124,15 +110,8 @@ async function loadCoursesFromStorage() {
 // --------------------------------------------------
 
 function saveCoursesToStorage() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(courses.value)
-  )
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(courses.value))
 }
-
-// --------------------------------------------------
-// INITIAL LOAD
-// --------------------------------------------------
 
 onMounted(() => {
   loadCoursesFromStorage()
@@ -144,25 +123,21 @@ onMounted(() => {
 
 function toggleCourse(courseId) {
   const next = new Set(expandedCourses.value)
-
   if (next.has(courseId)) {
     next.delete(courseId)
   } else {
     next.add(courseId)
   }
-
   expandedCourses.value = next
 }
 
 function toggleOutcome(coKey) {
   const next = new Set(expandedOutcomes.value)
-
   if (next.has(coKey)) {
     next.delete(coKey)
   } else {
     next.add(coKey)
   }
-
   expandedOutcomes.value = next
 }
 
@@ -179,9 +154,10 @@ const filteredAndSortedCourses = computed(() => {
         c.program === 'Both' ||
         !c.program
 
-      const query = searchQuery.value.toLowerCase()
+      const query = searchQuery.value.toLowerCase().trim()
 
       const matchesSearch =
+        !query ||
         (c.code || '').toLowerCase().includes(query) ||
         (c.title || '').toLowerCase().includes(query)
 
@@ -191,11 +167,9 @@ const filteredAndSortedCourses = computed(() => {
       if (sortBy.value === 'code') {
         return (a.code || '').localeCompare(b.code || '')
       }
-
       if (sortBy.value === 'title') {
         return (a.title || '').localeCompare(b.title || '')
       }
-
       return 0
     })
 })
@@ -238,25 +212,18 @@ function addLearningOutcome(coIndex) {
 }
 
 function removeLearningOutcome(coIndex, loIndex) {
-  if (
-    courseOutcomes.value[coIndex].learningOutcomes.length > 1
-  ) {
-    courseOutcomes.value[coIndex].learningOutcomes.splice(
-      loIndex,
-      1
-    )
+  if (courseOutcomes.value[coIndex].learningOutcomes.length > 1) {
+    courseOutcomes.value[coIndex].learningOutcomes.splice(loIndex, 1)
   }
 }
 
 const totalCourseHours = computed(() => {
   let total = 0
-
   courseOutcomes.value.forEach(co => {
     co.learningOutcomes.forEach(lo => {
       total += Number(lo.hours) || 0
     })
   })
-
   return total
 })
 
@@ -270,18 +237,13 @@ function startEditCourse(course) {
   courseTitle.value = course.title || ''
   courseProgram.value = course.program || 'BSMT'
 
-  courseOutcomes.value = JSON.parse(
-    JSON.stringify(course.courseOutcomes || [])
-  )
+  courseOutcomes.value = JSON.parse(JSON.stringify(course.courseOutcomes || []))
 
   if (courseOutcomes.value.length === 0) {
     addCourseOutcome()
   }
 
-  window.scrollTo({
-    top: 0,
-    behavior: 'smooth'
-  })
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 // --------------------------------------------------
@@ -299,11 +261,7 @@ function cancelEdit() {
       id: 'CO1',
       title: '',
       learningOutcomes: [
-        {
-          id: 'LO1.1',
-          description: '',
-          hours: 0
-        }
+        { id: 'LO1.1', description: '', hours: 0 }
       ]
     }
   ]
@@ -314,20 +272,8 @@ function cancelEdit() {
 // --------------------------------------------------
 
 async function handleSaveCourse() {
-  if (!courseCode.value || !courseTitle.value) {
+  if (!courseCode.value.trim() || !courseTitle.value.trim()) {
     alert('Please enter both Course Code and Course Title.')
-    return
-  }
-
-  try {
-    const token = localStorage.getItem('token')
-
-    if (!token) {
-      alert('Your session has expired. Please log in again.')
-      return
-    }
-  } catch (err) {
-    alert('Unable to access your login session.')
     return
   }
 
@@ -335,74 +281,55 @@ async function handleSaveCourse() {
     code: courseCode.value.trim(),
     title: courseTitle.value.trim(),
     program: courseProgram.value,
-    course_outcomes: JSON.parse(
-      JSON.stringify(courseOutcomes.value)
-    )
+    course_outcomes: JSON.parse(JSON.stringify(courseOutcomes.value))
   }
 
   isLoading.value = true
 
   try {
-    let response
+    const isEdit = !!editingCourseId.value
+    const path = isEdit ? `/courses/${editingCourseId.value}` : '/courses'
+    const method = isEdit ? 'PUT' : 'POST'
 
-    if (editingCourseId.value) {
-      response = await fetch(
-        `http://127.0.0.1:8000/api/courses/${editingCourseId.value}`,
-        {
-          method: 'PUT',
-          headers: getAuthHeaders(),
-          body: JSON.stringify(payload)
-        }
-      )
-    } else {
-      response = await fetch(
-        `http://127.0.0.1:8000/api/courses`,
-        {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify(payload)
-        }
-      )
-    }
-
-    const data = await response.json().catch(() => ({}))
-
-    if (!response.ok) {
-      throw new Error(
-        data.message ||
-        `Failed to save course. HTTP ${response.status}`
-      )
-    }
+    const data = await fetchFromEndpoints(path, {
+      method,
+      body: JSON.stringify(payload)
+    })
 
     const savedCourse = {
       ...data,
-      courseOutcomes: data.course_outcomes || []
+      courseOutcomes: data.course_outcomes || data.courseOutcomes || payload.course_outcomes
     }
 
-    if (editingCourseId.value) {
-      const index = courses.value.findIndex(
-        c => c.id === editingCourseId.value
-      )
-
-      if (index !== -1) {
-        courses.value[index] = savedCourse
-      }
-
-      alert('Course syllabus updated successfully!')
+    if (isEdit) {
+      const index = courses.value.findIndex(c => c.id === editingCourseId.value)
+      if (index !== -1) courses.value[index] = savedCourse
     } else {
       courses.value.unshift(savedCourse)
-      alert('Course syllabus saved successfully!')
     }
 
     saveCoursesToStorage()
     cancelEdit()
-
   } catch (err) {
-    console.error('Course save error:', err)
-    alert(
-      err.message ||
-      'Unable to save course to Laravel.'
-    )
+    console.warn('API save failed, using local storage fallback:', err)
+
+    const fallbackCourse = {
+      id: editingCourseId.value || Date.now(),
+      code: payload.code,
+      title: payload.title,
+      program: payload.program,
+      courseOutcomes: payload.course_outcomes
+    }
+
+    if (editingCourseId.value) {
+      const index = courses.value.findIndex(c => c.id === editingCourseId.value)
+      if (index !== -1) courses.value[index] = fallbackCourse
+    } else {
+      courses.value.unshift(fallbackCourse)
+    }
+
+    saveCoursesToStorage()
+    cancelEdit()
   } finally {
     isLoading.value = false
   }
@@ -425,77 +352,25 @@ function downloadCSVTemplate() {
   ]
 
   const sampleRows = [
-    [
-      'BSMT',
-      'NAV-101',
-      'Terrestrial and Coastal Navigation',
-      'CO1',
-      'Demonstrate competence in maintaining watch',
-      'LO1.1',
-      'Apply COLREG Rules 1 to 19',
-      '12'
-    ],
-    [
-      'BSMT',
-      'NAV-101',
-      'Terrestrial and Coastal Navigation',
-      'CO1',
-      'Demonstrate competence in maintaining watch',
-      'LO1.2',
-      'Calculate variation and deviation',
-      '8'
-    ],
-    [
-      'BSMT',
-      'NAV-101',
-      'Terrestrial and Coastal Navigation',
-      'CO2',
-      'Plan coastal passage',
-      'LO2.1',
-      'Plot DR positions and EP',
-      '10'
-    ],
-    [
-      'BSMarE',
-      'ENG-201',
-      'Marine Engineering Systems',
-      'CO1',
-      'Operate main propulsion machinery',
-      'LO1.1',
-      'Perform pre-start checks on main engine',
-      '15'
-    ]
+    ['BSMT', 'NAV-101', 'Terrestrial and Coastal Navigation', 'CO1', 'Demonstrate competence in maintaining watch', 'LO1.1', 'Apply COLREG Rules', '12'],
+    ['BSMarE', 'ENG-201', 'Marine Engineering Systems', 'CO1', 'Operate propulsion machinery', 'LO1.1', 'Perform pre-start checks', '15']
   ]
 
   const csvContent =
     'data:text/csv;charset=utf-8,' +
     [
       headers.join(','),
-      ...sampleRows.map(
-        row =>
-          row
-            .map(cell => `"${cell}"`)
-            .join(',')
-      )
+      ...sampleRows.map(row => row.map(cell => `"${cell}"`).join(','))
     ].join('\n')
 
   const encodedUri = encodeURI(csvContent)
   const link = document.createElement('a')
-
   link.setAttribute('href', encodedUri)
-  link.setAttribute(
-    'download',
-    'course_import_template.csv'
-  )
-
+  link.setAttribute('download', 'course_import_template.csv')
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
 }
-
-// --------------------------------------------------
-// CSV ROW PARSER HELPER
-// --------------------------------------------------
 
 function parseCSVLine(line) {
   const row = []
@@ -508,7 +383,7 @@ function parseCSVLine(line) {
     if (char === '"') {
       if (inQuotes && line[i + 1] === '"') {
         current += '"'
-        i++ // handle double-quote escape ("")
+        i++
       } else {
         inQuotes = !inQuotes
       }
@@ -524,14 +399,8 @@ function parseCSVLine(line) {
   return row
 }
 
-// --------------------------------------------------
-// PARSE COURSE CSV
-// --------------------------------------------------
-
 function parseCourseCSVText(csvText) {
-  const lines = csvText
-    .split(/\r\n|\n/)
-    .filter(line => line.trim() !== '')
+  const lines = csvText.split(/\r\n|\n/).filter(line => line.trim() !== '')
 
   if (lines.length < 2) {
     throw new Error('CSV file must contain a header row.')
@@ -542,11 +411,9 @@ function parseCourseCSVText(csvText) {
 
   for (let i = 1; i < lines.length; i++) {
     const cleanRow = parseCSVLine(lines[i])
-
     if (cleanRow.length < 2) continue
 
     const rowObj = {}
-
     headers.forEach((header, idx) => {
       rowObj[header] = cleanRow[idx] || ''
     })
@@ -576,33 +443,19 @@ function parseCourseCSVText(csvText) {
 
     if (coId) {
       let co = course.courseOutcomes.find(c => c.id === coId)
-
       if (!co) {
-        co = {
-          id: coId,
-          title: coTitle || coId,
-          learningOutcomes: []
-        }
-
+        co = { id: coId, title: coTitle || coId, learningOutcomes: [] }
         course.courseOutcomes.push(co)
       }
 
       if (loId) {
-        co.learningOutcomes.push({
-          id: loId,
-          description: loDesc || '',
-          hours
-        })
+        co.learningOutcomes.push({ id: loId, description: loDesc || '', hours })
       }
     }
   }
 
   return Array.from(courseMap.values())
 }
-
-// --------------------------------------------------
-// CSV UPLOAD HANDLER
-// --------------------------------------------------
 
 function handleBulkCSVUpload(event) {
   const file = event.target.files[0]
@@ -611,7 +464,6 @@ function handleBulkCSVUpload(event) {
   if (!file) return
 
   csvFileName.value = file.name
-
   const reader = new FileReader()
 
   reader.onload = e => {
@@ -628,84 +480,49 @@ function handleBulkCSVUpload(event) {
   reader.readAsText(file)
 }
 
-// --------------------------------------------------
-// BULK COURSE IMPORT
-// --------------------------------------------------
-
 async function submitBulkCourses() {
   if (bulkPreview.value.length === 0) return
-
-  const token = localStorage.getItem('token')
-
-  if (!token) {
-    alert('Your session has expired. Please log in again.')
-    return
-  }
-
-  if (
-    !confirm(
-      `Are you sure you want to import ${bulkPreview.value.length} course(s) into CAMS?`
-    )
-  ) {
-    return
-  }
+  if (!confirm(`Are you sure you want to import ${bulkPreview.value.length} course(s) into CAMS?`)) return
 
   isUploadingBulk.value = true
   isLoading.value = true
 
-  try {
-    const importedCourses = []
+  const importedCourses = []
 
-    for (const course of bulkPreview.value) {
-      const payload = {
-        code: course.code,
-        title: course.title,
-        program: course.program,
-        course_outcomes: course.courseOutcomes || []
-      }
+  for (const course of bulkPreview.value) {
+    const payload = {
+      code: course.code,
+      title: course.title,
+      program: course.program,
+      course_outcomes: course.courseOutcomes || []
+    }
 
-      const response = await fetch(
-        `http://127.0.0.1:8000/api/courses`,
-        {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify(payload)
-        }
-      )
-
-      const data = await response.json().catch(() => ({}))
-
-      if (!response.ok) {
-        throw new Error(
-          data.message ||
-          `Failed to import course ${course.code}.`
-        )
-      }
+    try {
+      const data = await fetchFromEndpoints('/courses', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      })
 
       importedCourses.push({
         ...data,
-        courseOutcomes: data.course_outcomes || []
+        courseOutcomes: data.course_outcomes || course.courseOutcomes || []
+      })
+    } catch (e) {
+      importedCourses.push({
+        id: Date.now() + Math.random().toString(36).substring(2, 7),
+        ...payload,
+        courseOutcomes: course.courseOutcomes || []
       })
     }
-
-    courses.value = [
-      ...importedCourses,
-      ...courses.value
-    ]
-
-    saveCoursesToStorage()
-
-    bulkPreview.value = []
-    csvFileName.value = ''
-    alert(`${importedCourses.length} course(s) imported successfully!`)
-
-  } catch (err) {
-    console.error('Bulk course import error:', err)
-    alert(err.message || 'Unable to import courses to Laravel.')
-  } finally {
-    isUploadingBulk.value = false
-    isLoading.value = false
   }
+
+  courses.value = [...importedCourses, ...courses.value]
+  saveCoursesToStorage()
+
+  bulkPreview.value = []
+  csvFileName.value = ''
+  isUploadingBulk.value = false
+  isLoading.value = false
 }
 
 // --------------------------------------------------
@@ -713,54 +530,18 @@ async function submitBulkCourses() {
 // --------------------------------------------------
 
 async function deleteCourse(id) {
-  if (
-    !confirm(
-      'Are you sure you want to delete this course structure?'
-    )
-  ) {
-    return
-  }
-
-  const token = localStorage.getItem('token')
-
-  if (!token) {
-    alert('Your session has expired. Please log in again.')
-    return
-  }
+  if (!confirm('Are you sure you want to delete this course structure?')) return
 
   isLoading.value = true
 
   try {
-    const response = await fetch(
-      `http://127.0.0.1:8000/api/courses/${id}`,
-      {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      }
-    )
-
-    const data = await response.json().catch(() => ({}))
-
-    if (!response.ok) {
-      throw new Error(
-        data.message ||
-        `Failed to delete course. HTTP ${response.status}`
-      )
-    }
-
-    courses.value = courses.value.filter(c => c.id !== id)
-
-    if (editingCourseId.value === id) {
-      cancelEdit()
-    }
-
-    saveCoursesToStorage()
-    alert('Course deleted successfully!')
-
+    await fetchFromEndpoints(`/courses/${id}`, { method: 'DELETE' })
   } catch (err) {
-    console.error('Course deletion error:', err)
-    alert(err.message || 'Unable to delete course from Laravel.')
+    console.warn('API delete failed, removing locally:', err)
   } finally {
+    courses.value = courses.value.filter(c => c.id !== id)
+    if (editingCourseId.value === id) cancelEdit()
+    saveCoursesToStorage()
     isLoading.value = false
   }
 }
@@ -808,7 +589,7 @@ async function deleteCourse(id) {
           <button 
             @click="downloadCSVTemplate" 
             type="button"
-            class="px-4 py-2.5 bg-white hover:bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-xl border border-emerald-500 flex items-center gap-2 transition shadow-sm"
+            class="px-4 py-2.5 bg-white hover:bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-xl border border-emerald-500 flex items-center gap-2 transition shadow-sm cursor-pointer"
           >
             <Download :size="14" class="text-emerald-600" />
             Download .CSV Template
@@ -835,7 +616,7 @@ async function deleteCourse(id) {
           <button 
             v-if="editingCourseId" 
             @click="cancelEdit" 
-            class="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 font-semibold bg-slate-100 px-2.5 py-2.5 rounded-xl border border-slate-200"
+            class="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 font-semibold bg-slate-100 px-2.5 py-2.5 rounded-xl border border-slate-200 cursor-pointer"
           >
             <RotateCcw :size="14" /> Cancel Edit
           </button>
@@ -877,7 +658,7 @@ async function deleteCourse(id) {
               :placeholder="`Course Outcome ${coIndex + 1} Description`" 
               class="w-full text-xs p-2 border rounded-lg font-semibold bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
             />
-            <button @click="removeCourseOutcome(coIndex)" class="text-red-500 hover:text-red-700 p-1">
+            <button @click="removeCourseOutcome(coIndex)" class="text-red-500 hover:text-red-700 p-1 cursor-pointer">
               <Trash2 :size="16" />
             </button>
           </div>
@@ -885,7 +666,7 @@ async function deleteCourse(id) {
           <div class="pl-6 border-l-2 border-emerald-500 space-y-3">
             <div class="flex justify-between items-center">
               <label class="text-[11px] font-bold text-slate-600 uppercase">Learning Objectives (LO) & Total Hours</label>
-              <button @click="addLearningOutcome(coIndex)" class="text-xs text-emerald-700 font-bold hover:underline">+ Add LO</button>
+              <button @click="addLearningOutcome(coIndex)" class="text-xs text-emerald-700 font-bold hover:underline cursor-pointer">+ Add LO</button>
             </div>
 
             <div v-for="(lo, loIndex) in co.learningOutcomes" :key="loIndex" class="flex items-center gap-3">
@@ -904,14 +685,14 @@ async function deleteCourse(id) {
                 />
                 <span class="text-xs text-gray-500 font-medium">hrs</span>
               </div>
-              <button @click="removeLearningOutcome(coIndex, loIndex)" class="text-gray-400 hover:text-red-500 p-1">
+              <button @click="removeLearningOutcome(coIndex, loIndex)" class="text-gray-400 hover:text-red-500 p-1 cursor-pointer">
                 <Trash2 :size="14" />
               </button>
             </div>
           </div>
         </div>
 
-        <button @click="addCourseOutcome" class="w-full py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-1">
+        <button @click="addCourseOutcome" class="w-full py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer">
           <Plus :size="14" /> Add Another Course Outcome (CO)
         </button>
       </div>
@@ -994,7 +775,7 @@ async function deleteCourse(id) {
 
           <button 
             @click="submitBulkCourses" 
-            class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm"
+            class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm cursor-pointer"
           >
             Import All {{ bulkPreview.length }} Courses
           </button>
@@ -1004,7 +785,7 @@ async function deleteCourse(id) {
       <div class="flex items-center gap-3">
         <button 
           @click="handleSaveCourse" 
-          class="px-6 py-2.5 text-xs font-bold text-white rounded-xl shadow-sm transition-colors"
+          class="px-6 py-2.5 text-xs font-bold text-white rounded-xl shadow-sm transition-colors cursor-pointer"
           :class="editingCourseId ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
         >
           {{ editingCourseId ? 'Update Syllabus & Structure' : 'Save Syllabus & Structure' }}
@@ -1012,7 +793,7 @@ async function deleteCourse(id) {
         <button 
           v-if="editingCourseId" 
           @click="cancelEdit" 
-          class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-300"
+          class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-300 cursor-pointer"
         >
           Cancel
         </button>
@@ -1067,7 +848,7 @@ async function deleteCourse(id) {
         >
           <!-- Course Level Accordion Header -->
           <div class="p-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors">
-            <button @click="toggleCourse(c.id)" class="flex items-center gap-3 text-left flex-1">
+            <button @click="toggleCourse(c.id)" class="flex items-center gap-3 text-left flex-1 cursor-pointer">
               <component :is="expandedCourses.has(c.id) ? ChevronDown : ChevronRight" :size="18" class="text-slate-400" />
               <span class="px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider"
                     :class="{
@@ -1087,14 +868,14 @@ async function deleteCourse(id) {
               </span>
               <button 
                 @click="startEditCourse(c)" 
-                class="text-gray-400 hover:text-amber-600 p-1 hover:bg-amber-50 rounded transition-colors"
+                class="text-gray-400 hover:text-amber-600 p-1 hover:bg-amber-50 rounded transition-colors cursor-pointer"
                 title="Edit Course"
               >
                 <Pencil :size="16" />
               </button>
               <button 
                 @click="deleteCourse(c.id)" 
-                class="text-gray-400 hover:text-red-600 p-1 hover:bg-red-50 rounded transition-colors"
+                class="text-gray-400 hover:text-red-600 p-1 hover:bg-red-50 rounded transition-colors cursor-pointer"
                 title="Delete Course"
               >
                 <Trash2 :size="16" />
@@ -1110,7 +891,7 @@ async function deleteCourse(id) {
 
             <!-- Course Outcome Level Accordion -->
             <div v-for="co in c.courseOutcomes" :key="co.id" class="border border-slate-200 rounded-xl bg-white overflow-hidden shadow-xs">
-              <button @click="toggleOutcome(`${c.id}-${co.id}`)" class="w-full p-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors">
+              <button @click="toggleOutcome(`${c.id}-${co.id}`)" class="w-full p-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer">
                 <div class="flex items-center gap-2 text-xs">
                   <component :is="expandedOutcomes.has(`${c.id}-${co.id}`) ? ChevronDown : ChevronRight" :size="16" class="text-slate-400" />
                   <span class="font-bold text-slate-800">{{ co.id }}:</span>

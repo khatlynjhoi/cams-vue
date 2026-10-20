@@ -1,37 +1,32 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
-  Sparkles, 
   Sliders, 
   Trash2, 
   Plus, 
   Search, 
   X, 
   BookOpen, 
-  Layers, 
   List, 
   FileText, 
   Eye, 
   Calendar, 
   RotateCcw, 
-  CheckCircle2, 
   Users, 
-  Clock, 
   ShieldAlert, 
   Play, 
   Pause, 
   Key,
-  ChevronRight
+  RefreshCw
 } from 'lucide-vue-next'
 
 const router = useRouter()
 
-// Registry of Saved Tests (built in TestBuilderView)
+// Registries
 const savedTests = ref([])
-
-// Pilot Sessions Registry
 const pilotSessions = ref([])
+const isLoading = ref(false)
 
 // UI & Modal States
 const isScheduleModalOpen = ref(false)
@@ -58,59 +53,55 @@ const sessionForm = ref({
   scheduledDate: new Date().toISOString().slice(0, 10)
 })
 
-// Safe LocalStorage Parser
-function safeParseStorage(key) {
-  try {
-    const val = localStorage.getItem(key)
-    return val && val.trim() ? JSON.parse(val) : null
-  } catch (e) {
-    console.error(`Failed to parse localStorage key "${key}":`, e)
-    return null
+// Unified API Helper
+async function fetchFromEndpoints(path, options = {}) {
+  const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://127.0.0.1:8080/api', 'http://localhost:8000/api']
+  const token = localStorage.getItem('token')
+  
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(options.headers || {})
   }
-}
 
-// Load Saved Tests built from TestBuilderView
-function loadSavedTests() {
-  const loaded = safeParseStorage('cams_saved_tests')
-  if (loaded && Array.isArray(loaded)) {
-    savedTests.value = loaded
-  } else {
-    savedTests.value = []
-  }
-}
-
-// Load Pilot Sessions from LocalStorage (or default initial dataset)
-function loadPilotSessions() {
-  const loaded = safeParseStorage('cams_pilot_sessions')
-  if (loaded && Array.isArray(loaded)) {
-    pilotSessions.value = loaded
-  } else {
-    // Initial sample session
-    pilotSessions.value = [
-      {
-        id: Date.now(),
-        title: 'NAV-101 Midterm Examination',
-        courseCode: 'NAV-101',
-        program: 'BSMT',
-        accessCode: 'NAV-8842',
-        linkedTestId: null,
-        linkedTestTitle: 'NAV-101 Midterm Examination Blueprint',
-        expectedCandidates: 24,
-        activeCandidates: 22,
-        durationMinutes: 60,
-        passingScorePercent: 75,
-        totalItems: 30,
-        totalPoints: 30,
-        status: 'Active',
-        flaggedAlerts: 1,
-        createdAt: new Date().toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        })
+  for (const baseUrl of ports) {
+    try {
+      const res = await fetch(`${baseUrl}${path}`, { ...options, headers })
+      if (res.ok) {
+        const json = await res.json()
+        return json?.data ?? json
       }
-    ]
+    } catch (e) {
+      // Try next port
+    }
+  }
+  throw new Error(`Endpoint ${path} unreachable`)
+}
+
+// Load Saved Test Blueprints from TestBuilder
+async function loadSavedTests() {
+  try {
+    const data = await fetchFromEndpoints('/saved-tests')
+    savedTests.value = Array.isArray(data) ? data : []
+  } catch (err) {
+    const local = localStorage.getItem('cams_saved_tests') || localStorage.getItem('saved_tests')
+    savedTests.value = local ? JSON.parse(local) : []
+  }
+}
+
+// Load Active & Scheduled Pilot Sessions
+async function loadPilotSessions() {
+  isLoading.value = true
+  try {
+    const data = await fetchFromEndpoints('/pilot-sessions')
+    pilotSessions.value = Array.isArray(data) ? data : []
     saveSessionsToStorage()
+  } catch (err) {
+    const local = localStorage.getItem('cams_pilot_sessions') || localStorage.getItem('pilot_sessions')
+    pilotSessions.value = local ? JSON.parse(local) : []
+  } finally {
+    isLoading.value = false
   }
 }
 
@@ -118,14 +109,13 @@ function saveSessionsToStorage() {
   localStorage.setItem('cams_pilot_sessions', JSON.stringify(pilotSessions.value))
 }
 
-// Auto Generate Random Access Code
+// Dynamic Access Code Generator
 function generateAccessCode(course = 'PLT') {
-  const prefix = course ? course.split(' ')[0].toUpperCase() : 'PLT'
+  const prefix = course ? course.split(' ')[0].replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : 'PLT'
   const randomNum = Math.floor(1000 + Math.random() * 9000)
   return `${prefix}-${randomNum}`
 }
 
-// Handle Test Selection from TestBuilder Saved Tests Dropdown
 function onTestSelectionChange() {
   if (!selectedTestId.value) {
     sessionForm.value.linkedTestId = null
@@ -135,23 +125,22 @@ function onTestSelectionChange() {
   const foundTest = savedTests.value.find(t => String(t.id) === String(selectedTestId.value))
   if (foundTest) {
     sessionForm.value.linkedTestId = foundTest.id
-    sessionForm.value.title = foundTest.title || `${foundTest.course} Pilot Session`
-    sessionForm.value.courseCode = foundTest.course || ''
-    sessionForm.value.program = foundTest.program || ''
-    sessionForm.value.durationMinutes = foundTest.durationMinutes || 60
+    sessionForm.value.title = foundTest.title || `${foundTest.course || foundTest.subjectCode || 'Course'} Pilot Session`
+    sessionForm.value.courseCode = foundTest.course || foundTest.subjectCode || foundTest.code || ''
+    sessionForm.value.program = foundTest.program || 'BSMT'
+    sessionForm.value.durationMinutes = foundTest.durationMinutes || foundTest.duration_minutes || 60
     sessionForm.value.passingScorePercent = foundTest.passingScorePercent || 75
-    sessionForm.value.accessCode = generateAccessCode(foundTest.course)
+    sessionForm.value.accessCode = generateAccessCode(sessionForm.value.courseCode)
   }
 }
 
-// Reset Modal Form
 function resetScheduleForm() {
   selectedTestId.value = ''
   sessionForm.value = {
     title: '',
     courseCode: '',
     program: '',
-    accessCode: generateAccessCode('NAV'),
+    accessCode: generateAccessCode('PLT'),
     linkedTestId: null,
     expectedCandidates: 20,
     durationMinutes: 60,
@@ -166,8 +155,8 @@ function openScheduleModal() {
   isScheduleModalOpen.value = true
 }
 
-// Schedule / Launch New Session
-function launchSession() {
+// Schedule & Persist New Pilot Session
+async function launchSession() {
   if (!sessionForm.value.title.trim() || !sessionForm.value.courseCode.trim()) {
     alert('Please enter a Session Title and Course Code.')
     return
@@ -177,17 +166,17 @@ function launchSession() {
 
   const newSession = {
     id: Date.now(),
-    title: sessionForm.value.title,
-    courseCode: sessionForm.value.courseCode,
+    title: sessionForm.value.title.trim(),
+    courseCode: sessionForm.value.courseCode.trim(),
     program: sessionForm.value.program || (linkedTest ? linkedTest.program : 'BSMT'),
     accessCode: sessionForm.value.accessCode || generateAccessCode(sessionForm.value.courseCode),
     linkedTestId: linkedTest ? linkedTest.id : null,
-    linkedTestTitle: linkedTest ? linkedTest.title : 'Direct Session (No Linked Paper)',
+    linkedTestTitle: linkedTest ? linkedTest.title : 'Direct Session',
     expectedCandidates: Number(sessionForm.value.expectedCandidates) || 0,
     activeCandidates: 0,
     durationMinutes: Number(sessionForm.value.durationMinutes) || 60,
     passingScorePercent: Number(sessionForm.value.passingScorePercent) || 75,
-    totalItems: linkedTest ? (linkedTest.totalItems || (linkedTest.items ? linkedTest.items.length : 0)) : 0,
+    totalItems: linkedTest ? (linkedTest.totalItems || (linkedTest.questions ? linkedTest.questions.length : 0)) : 0,
     totalPoints: linkedTest ? (linkedTest.totalPoints || 0) : 0,
     status: 'Scheduled',
     flaggedAlerts: 0,
@@ -198,26 +187,47 @@ function launchSession() {
     })
   }
 
-  pilotSessions.value.unshift(newSession)
-  saveSessionsToStorage()
-  isScheduleModalOpen.value = false
-  alert(`Pilot Examination Session "${newSession.title}" scheduled successfully!`)
+  try {
+    const data = await fetchFromEndpoints('/pilot-sessions', {
+      method: 'POST',
+      body: JSON.stringify(newSession)
+    })
+    pilotSessions.value.unshift(data.id ? data : newSession)
+  } catch (err) {
+    pilotSessions.value.unshift(newSession)
+  } finally {
+    saveSessionsToStorage()
+    isScheduleModalOpen.value = false
+  }
 }
 
-// Toggle Session Status (Scheduled -> Active -> Suspended / Completed)
-function updateSessionStatus(session, newStatus) {
+// Update Session State (Active / Suspended / Completed)
+async function updateSessionStatus(session, newStatus) {
   session.status = newStatus
   if (newStatus === 'Active' && session.activeCandidates === 0) {
     session.activeCandidates = session.expectedCandidates
   }
+
+  try {
+    await fetchFromEndpoints(`/pilot-sessions/${session.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: newStatus, activeCandidates: session.activeCandidates })
+    })
+  } catch (err) {}
+
   saveSessionsToStorage()
 }
 
-function deleteSession(id) {
-  if (confirm('Are you sure you want to delete this pilot administration session?')) {
-    pilotSessions.value = pilotSessions.value.filter(s => s.id !== id)
-    saveSessionsToStorage()
-  }
+// Delete Session
+async function deleteSession(id) {
+  if (!confirm('Are you sure you want to delete this pilot administration session?')) return
+
+  try {
+    await fetchFromEndpoints(`/pilot-sessions/${id}`, { method: 'DELETE' })
+  } catch (err) {}
+
+  pilotSessions.value = pilotSessions.value.filter(s => s.id !== id)
+  saveSessionsToStorage()
 }
 
 function openTelemetryModal(session) {
@@ -225,14 +235,14 @@ function openTelemetryModal(session) {
   isTelemetryModalOpen.value = true
 }
 
-// Computed Statistics
+// Computed Dashboard Telemetry
 const activeSessionsCount = computed(() => pilotSessions.value.filter(s => s.status === 'Active').length)
 const totalCandidatesEnrolled = computed(() => pilotSessions.value.reduce((sum, s) => sum + (Number(s.expectedCandidates) || 0), 0))
 const totalFlaggedAlerts = computed(() => pilotSessions.value.reduce((sum, s) => sum + (Number(s.flaggedAlerts) || 0), 0))
 
 const uniqueCourses = computed(() => [...new Set(pilotSessions.value.map(s => s.courseCode).filter(Boolean))].sort())
 
-// Filtered Pilot Sessions List
+// Filtered Session Catalog
 const filteredSessions = computed(() => {
   let result = [...pilotSessions.value]
 
@@ -279,8 +289,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="p-6 md:p-8 space-y-6 min-h-screen bg-[#f4f6f9] text-slate-800">
-    <!-- Header Banner - Standardized Theme matching TestBuilderView -->
+  <div class="p-6 md:p-8 space-y-6 min-h-screen bg-[#f4f6f9] text-slate-800 font-sans">
+    
+    <!-- Header Banner -->
     <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-sm">
       <div class="space-y-1">
         <h1 class="text-xl font-bold flex items-center gap-2 text-white tracking-tight">
@@ -293,6 +304,15 @@ onMounted(() => {
 
       <div class="flex items-center gap-2 shrink-0">
         <button 
+          @click="loadPilotSessions"
+          :disabled="isLoading"
+          class="p-2.5 bg-emerald-900/50 hover:bg-emerald-800 text-white border border-emerald-700/50 rounded-xl transition cursor-pointer disabled:opacity-50"
+          title="Refresh Session Data"
+        >
+          <RefreshCw :class="['w-4 h-4', { 'animate-spin': isLoading }]" />
+        </button>
+
+        <button 
           @click="openScheduleModal"
           class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl flex items-center gap-2 transition shadow-sm cursor-pointer"
         >
@@ -304,7 +324,7 @@ onMounted(() => {
 
     <!-- Analytics / Telemetry Overview Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2">
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-2">
         <div class="flex justify-between items-center text-slate-500">
           <span class="text-xs font-bold uppercase tracking-wider">Active Pilot Sessions</span>
           <div class="p-2 bg-emerald-50 rounded-xl text-emerald-700">
@@ -317,7 +337,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2">
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-2">
         <div class="flex justify-between items-center text-slate-500">
           <span class="text-xs font-bold uppercase tracking-wider">Total Cadets Enrolled</span>
           <div class="p-2 bg-blue-50 rounded-xl text-blue-700">
@@ -330,7 +350,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2">
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-2">
         <div class="flex justify-between items-center text-slate-500">
           <span class="text-xs font-bold uppercase tracking-wider">Flagged Security Alerts</span>
           <div class="p-2 bg-amber-50 rounded-xl text-amber-700">
@@ -345,7 +365,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2">
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-2">
         <div class="flex justify-between items-center text-slate-500">
           <span class="text-xs font-bold uppercase tracking-wider">Available Test Papers</span>
           <div class="p-2 bg-indigo-50 rounded-xl text-indigo-700">
@@ -360,7 +380,7 @@ onMounted(() => {
     </div>
 
     <!-- Search, Filter & Controls Bar -->
-    <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+    <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
         <div class="relative lg:col-span-2">
           <Search :size="14" class="absolute left-3 top-3 text-slate-400" />
@@ -424,7 +444,7 @@ onMounted(() => {
     </div>
 
     <!-- Empty State -->
-    <div v-if="filteredSessions.length === 0" class="bg-white border border-slate-200 rounded-2xl p-12 text-center space-y-3 shadow-sm">
+    <div v-if="filteredSessions.length === 0" class="bg-white border border-slate-200 rounded-2xl p-12 text-center space-y-3 shadow-xs">
       <div class="p-3 bg-slate-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto text-slate-400">
         <List :size="24" />
       </div>
@@ -445,7 +465,7 @@ onMounted(() => {
       <div 
         v-for="session in filteredSessions" 
         :key="session.id"
-        class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+        class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
       >
         <div class="space-y-1.5 flex-1">
           <div class="flex items-center gap-2 flex-wrap">
@@ -577,7 +597,6 @@ onMounted(() => {
         <!-- Form Body -->
         <div class="p-6 space-y-4 text-xs">
           
-          <!-- LINK TEST PAPER DROPDOWN (Primary Selector) -->
           <div>
             <label class="block font-bold text-slate-800 mb-1">
               Select Examination Paper (Built in Test Builder)
@@ -589,12 +608,9 @@ onMounted(() => {
             >
               <option value="">-- Direct Creation (No Linked Paper) --</option>
               <option v-for="test in savedTests" :key="test.id" :value="test.id">
-                {{ test.title }} ({{ test.course }} - {{ test.totalItems || 0 }} Items)
+                {{ test.title }} ({{ test.course || test.subjectCode || 'General' }} - {{ test.totalItems || 0 }} Items)
               </option>
             </select>
-            <p class="text-[11px] text-slate-500 mt-1">
-              Selecting a test paper automatically populates session title, course code, duration, and passing marks.
-            </p>
           </div>
 
           <!-- Session Title -->
@@ -603,7 +619,7 @@ onMounted(() => {
             <input 
               v-model="sessionForm.title"
               type="text"
-              placeholder="e.g. NAV-101 Midterm Examination"
+              placeholder="e.g. Midterm Pilot Session"
               class="w-full text-xs p-2.5 border border-slate-300 rounded-xl font-semibold outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
@@ -675,7 +691,7 @@ onMounted(() => {
           </button>
           <button 
             @click="launchSession"
-            class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition cursor-pointer flex items-center gap-1.5"
+            class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
           >
             <Play :size="14" />
             <span>Launch Session</span>
@@ -720,8 +736,8 @@ onMounted(() => {
 
           <div class="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
             <h4 class="font-bold text-slate-800 flex items-center gap-1.5">
-              <Clock :size="14" class="text-emerald-700" />
-              Recent Candidate Audit Events
+              <Calendar :size="14" class="text-emerald-700" />
+              Candidate Security Log
             </h4>
 
             <div v-if="selectedSessionTelemetry.flaggedAlerts === 0" class="p-4 text-center text-slate-400 italic">
@@ -732,9 +748,9 @@ onMounted(() => {
               <div class="p-2.5 bg-amber-50 border border-amber-200 rounded-lg flex justify-between items-center">
                 <div class="space-y-0.5">
                   <span class="font-bold text-amber-900 block">Focus Loss / Tab Switch Detected</span>
-                  <span class="text-[11px] text-amber-700">Cadet #2024-0019 (BSMT) switched focus for 4 seconds</span>
+                  <span class="text-[11px] text-amber-700">Candidate focus loss event recorded</span>
                 </div>
-                <span class="text-[10px] font-mono text-amber-600 font-bold">10:14:02 AM</span>
+                <span class="text-[10px] font-mono text-amber-600 font-bold">Active Stream</span>
               </div>
             </div>
           </div>
@@ -751,5 +767,6 @@ onMounted(() => {
 
       </div>
     </div>
+
   </div>
 </template>

@@ -38,22 +38,30 @@ const form = ref({
 const rolesList = ['Admin', 'Assessment Officer', 'Instructor', 'Cadet']
 const departmentList = ['BSMT', 'BSMARE', 'General Education', 'Assessment & Quality', 'ICT']
 
+// Multi-port API fetching with authorization headers & role context
 async function fetchFromEndpoints(path, options = {}) {
   const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://127.0.0.1:8080/api', 'http://localhost:8000/api']
+  const token = localStorage.getItem('token') || ''
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'X-User-Role': currentUser.value.role || 'Admin',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(options.headers || {})
+  }
+
   for (const baseUrl of ports) {
     try {
-      const res = await fetch(`${baseUrl}${path}`, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Role': currentUser.value.role || 'Admin',
-          ...(options.headers || {})
-        }
-      })
-      if (res.ok) return await res.json()
-    } catch (e) {}
+      const res = await fetch(`${baseUrl}${path}`, { ...options, headers })
+      if (res.ok) {
+        return await res.json()
+      }
+    } catch (e) {
+      // Try next port endpoint
+    }
   }
-  throw new Error('All backend ports unreachable')
+  throw new Error(`Endpoint ${path} unreachable`)
 }
 
 onMounted(() => {
@@ -66,20 +74,20 @@ onMounted(() => {
 
 async function loadUsers() {
   isLoading.value = true
-  
-  // Read local storage saved accounts first
   const localSaved = JSON.parse(localStorage.getItem('cams_users_list') || '[]')
 
   try {
     const data = await fetchFromEndpoints('/users')
-    if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-      const apiUsers = data.data.map(u => ({
+    const rawList = Array.isArray(data) ? data : (data.data || data.users || [])
+
+    if (Array.isArray(rawList) && rawList.length > 0) {
+      const apiUsers = rawList.map(u => ({
         ...u,
         department: u.department || 'ICT',
         status: u.status || 'Active'
       }))
 
-      // Merge local created items not yet in API
+      // Merge local created items not yet present in backend list
       localSaved.forEach(localItem => {
         if (!apiUsers.some(a => String(a.id) === String(localItem.id) || a.email === localItem.email)) {
           apiUsers.push(localItem)
@@ -118,7 +126,11 @@ function saveLocalUsers() {
 const filteredUsers = computed(() => {
   return users.value.filter(u => {
     const q = searchQuery.value.toLowerCase().trim()
-    const matchesQuery = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.department && u.department.toLowerCase().includes(q))
+    const matchesQuery = !q || 
+      u.name.toLowerCase().includes(q) || 
+      u.email.toLowerCase().includes(q) || 
+      (u.department && u.department.toLowerCase().includes(q))
+    
     const matchesRole = selectedRoleFilter.value === 'All' || u.role === selectedRoleFilter.value
     return matchesQuery && matchesRole
   })
@@ -153,11 +165,12 @@ async function handleCreateUser() {
       method: 'POST',
       body: JSON.stringify(payload)
     })
-    if (data.success && data.data) {
+    const resData = data.data || data
+    if (data.success || resData.id) {
       const created = {
-        ...data.data,
-        department: data.data.department || payload.department || 'ICT',
-        status: data.data.status || payload.status || 'Active'
+        ...resData,
+        department: resData.department || payload.department || 'ICT',
+        status: resData.status || payload.status || 'Active'
       }
       users.value.push(created)
     } else {
@@ -193,13 +206,14 @@ async function handleUpdateUser() {
       method: 'PUT',
       body: JSON.stringify(form.value)
     })
-    if (data.success && data.data) {
+    const resData = data.data || data
+    if (data.success || resData.id) {
       const idx = users.value.findIndex(u => u.id === form.value.id)
       if (idx !== -1) {
         users.value[idx] = {
-          ...data.data,
-          department: data.data.department || form.value.department || 'ICT',
-          status: data.data.status || form.value.status || 'Active'
+          ...resData,
+          department: resData.department || form.value.department || 'ICT',
+          status: resData.status || form.value.status || 'Active'
         }
       }
     } else {
@@ -252,7 +266,7 @@ async function handleDeleteUser() {
 </script>
 
 <template>
-  <div class="p-6 max-w-7xl mx-auto space-y-6 font-sans">
+  <div class="p-6 max-w-7xl mx-auto space-y-6 font-sans text-slate-800">
     
     <!-- Top Header -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -318,7 +332,7 @@ async function handleDeleteUser() {
             
             <td class="p-3.5">
               <div class="font-bold text-slate-900">{{ user.name }}</div>
-              <div class="text-[11px] text-slate-400">{{ user.email }}</div>
+              <div class="text-[11px] text-slate-400 font-mono">{{ user.email }}</div>
             </td>
 
             <td class="p-3.5">
@@ -333,10 +347,8 @@ async function handleDeleteUser() {
               </span>
             </td>
 
-            <!-- Department Fallback Guard -->
             <td class="p-3.5 font-medium text-slate-800">{{ user.department || 'ICT' }}</td>
 
-            <!-- Status Access Fallback Guard -->
             <td class="p-3.5">
               <button 
                 @click="toggleUserAccess(user)"
@@ -411,14 +423,14 @@ async function handleDeleteUser() {
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block font-bold text-slate-700 mb-1">System Role</label>
-              <select v-model="form.role" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800">
+              <select v-model="form.role" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800 cursor-pointer">
                 <option v-for="r in rolesList" :key="r" :value="r">{{ r }}</option>
               </select>
             </div>
 
             <div>
               <label class="block font-bold text-slate-700 mb-1">Department</label>
-              <select v-model="form.department" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800">
+              <select v-model="form.department" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800 cursor-pointer">
                 <option v-for="d in departmentList" :key="d" :value="d">{{ d }}</option>
               </select>
             </div>
@@ -426,7 +438,7 @@ async function handleDeleteUser() {
 
           <div>
             <label class="block font-bold text-slate-700 mb-1">Access Authorization Status</label>
-            <select v-model="form.status" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800">
+            <select v-model="form.status" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800 cursor-pointer">
               <option value="Active">Active (System Access Granted)</option>
               <option value="Inactive">Inactive (System Access Revoked)</option>
             </select>
@@ -475,14 +487,14 @@ async function handleDeleteUser() {
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block font-bold text-slate-700 mb-1">System Role</label>
-              <select v-model="form.role" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800">
+              <select v-model="form.role" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800 cursor-pointer">
                 <option v-for="r in rolesList" :key="r" :value="r">{{ r }}</option>
               </select>
             </div>
 
             <div>
               <label class="block font-bold text-slate-700 mb-1">Department</label>
-              <select v-model="form.department" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800">
+              <select v-model="form.department" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800 cursor-pointer">
                 <option v-for="d in departmentList" :key="d" :value="d">{{ d }}</option>
               </select>
             </div>
@@ -490,7 +502,7 @@ async function handleDeleteUser() {
 
           <div>
             <label class="block font-bold text-slate-700 mb-1">Access Authorization Status</label>
-            <select v-model="form.status" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800">
+            <select v-model="form.status" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800 cursor-pointer">
               <option value="Active">Active (System Access Granted)</option>
               <option value="Inactive">Inactive (System Access Revoked)</option>
             </select>

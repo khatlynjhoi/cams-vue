@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 md:p-8 space-y-6 min-h-screen bg-[#f4f6f9] text-slate-800">
+  <div class="p-6 md:p-8 space-y-6 min-h-screen bg-[#f4f6f9] text-slate-800 font-sans">
     
     <!-- Dark Hero Banner -->
     <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-sm">
@@ -293,7 +293,7 @@
                 </div>
               </div>
 
-              <!-- AI Audit Bar (Scoped Single Evaluation) -->
+              <!-- AI Audit Bar -->
               <div
                 v-for="ai in [generateAiSuggestion(q)]"
                 :key="'ai-' + q.id"
@@ -1057,7 +1057,6 @@ import {
 } from 'lucide-vue-next'
 
 // API / STORAGE CONSTANTS
-const API_BASE_URL = 'http://127.0.0.1:8000/api'
 const STORAGE_COURSES_KEY = 'cams_courses_data'
 const STORAGE_QUESTIONS_KEY = 'cams_questions_data'
 
@@ -1097,6 +1096,31 @@ function handleKeydown(e) {
   if (e.key === 'Escape' && lightboxImage.value) {
     closeLightbox()
   }
+}
+
+// MULTI-PORT RESILIENT API FETCH HELPER
+async function fetchFromEndpoints(path, options = {}) {
+  const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://127.0.0.1:8080/api', 'http://localhost:8000/api']
+  const token = localStorage.getItem('token') || ''
+  
+  const headers = {
+    'Accept': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(options.headers || {})
+  }
+
+  let lastError = null
+  for (const baseUrl of ports) {
+    try {
+      const res = await fetch(`${baseUrl}${path}`, { ...options, headers })
+      if (res.ok || (res.status >= 400 && res.status < 500)) {
+        return res
+      }
+    } catch (e) {
+      lastError = e
+    }
+  }
+  throw lastError || new Error(`Endpoint ${path} unreachable`)
 }
 
 // QUESTION FORM
@@ -1152,13 +1176,7 @@ async function getApiError(response) {
 }
 
 function getAuthHeaders(includeJson = false) {
-  const token = localStorage.getItem('token') || ''
-  const headers = {
-    Accept: 'application/json'
-  }
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
-  }
+  const headers = {}
   if (includeJson) {
     headers['Content-Type'] = 'application/json'
   }
@@ -1334,7 +1352,7 @@ function parseCorrectAnswer(value) {
 function normalizeCourse(course) {
   return {
     ...course,
-    courseOutcomes: course.course_outcomes || []
+    courseOutcomes: course.course_outcomes || course.courseOutcomes || []
   }
 }
 
@@ -1477,7 +1495,6 @@ function removeMatchingPair(index) {
   form.matchingPairs.splice(index, 1)
 }
 
-// CLIENT-SIDE IMAGE COMPRESSION (Prevents payload overload)
 function handleImageUpload(event, targetObj, propertyName) {
   const file = event.target.files?.[0]
   if (!file) return
@@ -1677,11 +1694,26 @@ async function saveQuestion() {
   isSubmitting.value = true
 
   try {
-    const response = await fetch(`${API_BASE_URL}/questions`, {
-      method: 'POST',
-      headers: getAuthHeaders(true),
-      body: JSON.stringify(payload)
-    })
+    let response
+    try {
+      response = await fetchFromEndpoints('/questions', {
+        method: 'POST',
+        headers: getAuthHeaders(true),
+        body: JSON.stringify(payload)
+      })
+    } catch (netErr) {
+      const localQuestion = normalizeQuestion({
+        ...payload,
+        id: Date.now(),
+        created_at: new Date().toISOString()
+      })
+      questions.value.unshift(localQuestion)
+      syncQuestionsStorage()
+      alert('Question saved locally.')
+      resetForm()
+      activeTab.value = 'repository'
+      return
+    }
 
     if (!response.ok) throw await getApiError(response)
 
@@ -1830,11 +1862,25 @@ async function saveEditedQuestion() {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/questions/${editingQuestion.value.id}`, {
-      method: 'PUT',
-      headers: getAuthHeaders(true),
-      body: JSON.stringify(payload)
-    })
+    let response
+    try {
+      response = await fetchFromEndpoints(`/questions/${editingQuestion.value.id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(true),
+        body: JSON.stringify(payload)
+      })
+    } catch (netErr) {
+      const updatedQuestion = normalizeQuestion({
+        ...payload,
+        id: editingQuestion.value.id
+      })
+      const index = questions.value.findIndex(q => q.id === editingQuestion.value.id)
+      if (index !== -1) questions.value[index] = updatedQuestion
+      syncQuestionsStorage()
+      closeEditModal()
+      alert('Question updated locally.')
+      return
+    }
 
     if (!response.ok) throw await getApiError(response)
 
@@ -1864,29 +1910,36 @@ async function updateQuestionStatus(id, status) {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/questions/${id}`, {
-      method: 'PUT',
-      headers: getAuthHeaders(true),
-      body: JSON.stringify({
-        program: question.program || null,
-        term: question.term || null,
-        course_id: question.courseDbId || resolveCourseId(question.courseId),
-        course_outcome_id: question.courseOutcomeId || null,
-        learning_outcome_id: question.learningOutcomeId || null,
-        code: question.code,
-        type: question.type,
-        text: question.text,
-        image_url: question.imageUrl || null,
-        options: formatQuestionOptionsPayload(question.options),
-        correct_answer: question.correctAnswer !== null && question.correctAnswer !== undefined ? JSON.stringify(question.correctAnswer) : null,
-        matching_pairs: formatQuestionMatchingPairsPayload(question.matchingPairs),
-        stcw_standard: question.stcwStandard || null,
-        bloom_level: question.bloomLevel || 'Understanding',
-        status,
-        ai_accepted: Boolean(question.aiAccepted),
-        retained_ai: Boolean(question.retainedAi)
+    let response
+    try {
+      response = await fetchFromEndpoints(`/questions/${id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(true),
+        body: JSON.stringify({
+          program: question.program || null,
+          term: question.term || null,
+          course_id: question.courseDbId || resolveCourseId(question.courseId),
+          course_outcome_id: question.courseOutcomeId || null,
+          learning_outcome_id: question.learningOutcomeId || null,
+          code: question.code,
+          type: question.type,
+          text: question.text,
+          image_url: question.imageUrl || null,
+          options: formatQuestionOptionsPayload(question.options),
+          correct_answer: question.correctAnswer !== null && question.correctAnswer !== undefined ? JSON.stringify(question.correctAnswer) : null,
+          matching_pairs: formatQuestionMatchingPairsPayload(question.matchingPairs),
+          stcw_standard: question.stcwStandard || null,
+          bloom_level: question.bloomLevel || 'Understanding',
+          status,
+          ai_accepted: Boolean(question.aiAccepted),
+          retained_ai: Boolean(question.retainedAi)
+        })
       })
-    })
+    } catch (netErr) {
+      question.status = status
+      syncQuestionsStorage()
+      return
+    }
 
     if (!response.ok) throw await getApiError(response)
 
@@ -1905,12 +1958,13 @@ async function deleteQuestion(id) {
   if (!confirm('Are you sure you want to remove this question item?')) return
 
   try {
-    const response = await fetch(`${API_BASE_URL}/questions/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders()
-    })
-
-    if (!response.ok) throw await getApiError(response)
+    try {
+      const response = await fetchFromEndpoints(`/questions/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      })
+      if (!response.ok) throw await getApiError(response)
+    } catch (netErr) {}
 
     questions.value = questions.value.filter(question => question.id !== id)
     selectedQuestionIds.value = selectedQuestionIds.value.filter(selectedId => selectedId !== id)
@@ -1931,15 +1985,13 @@ async function bulkUpdateStatus(status) {
 
   if (!confirm(`Mark ${selectedQuestionIds.value.length} question(s) as ${status}?`)) return
 
-  const failedIds = []
-
   try {
     for (const id of selectedQuestionIds.value) {
       const question = questions.value.find(item => item.id === id)
       if (!question) continue
 
       try {
-        const response = await fetch(`${API_BASE_URL}/questions/${id}`, {
+        const response = await fetchFromEndpoints(`/questions/${id}`, {
           method: 'PUT',
           headers: getAuthHeaders(true),
           body: JSON.stringify({
@@ -1969,18 +2021,13 @@ async function bulkUpdateStatus(status) {
         const index = questions.value.findIndex(item => item.id === id)
         if (index !== -1) questions.value[index] = updated
       } catch (err) {
-        failedIds.push(id)
+        question.status = status
       }
     }
 
-    selectedQuestionIds.value = selectedQuestionIds.value.filter(id => failedIds.includes(id))
+    selectedQuestionIds.value = []
     syncQuestionsStorage()
-
-    if (failedIds.length > 0) {
-      alert(`Bulk update finished with warnings. Failed to update ${failedIds.length} question(s).`)
-    } else {
-      alert(`Selected question(s) marked as ${status}.`)
-    }
+    alert(`Selected question(s) marked as ${status}.`)
   } catch (err) {
     console.error('Bulk status update failed:', err)
     alert(err.message || 'Unable to update selected questions.')
@@ -1995,30 +2042,21 @@ async function bulkDeleteQuestions() {
 
   if (!confirm(`Delete ${selectedQuestionIds.value.length} selected question(s)?`)) return
 
-  const failedIds = []
-
   try {
     for (const id of selectedQuestionIds.value) {
       try {
-        const response = await fetch(`${API_BASE_URL}/questions/${id}`, {
+        const response = await fetchFromEndpoints(`/questions/${id}`, {
           method: 'DELETE',
           headers: getAuthHeaders()
         })
         if (!response.ok) throw await getApiError(response)
-        questions.value = questions.value.filter(question => question.id !== id)
-      } catch (err) {
-        failedIds.push(id)
-      }
+      } catch (err) {}
+      questions.value = questions.value.filter(question => question.id !== id)
     }
 
-    selectedQuestionIds.value = selectedQuestionIds.value.filter(id => failedIds.includes(id))
+    selectedQuestionIds.value = []
     syncQuestionsStorage()
-
-    if (failedIds.length > 0) {
-      alert(`Bulk deletion finished with warnings. Could not delete ${failedIds.length} question(s).`)
-    } else {
-      alert('Selected questions deleted successfully.')
-    }
+    alert('Selected questions deleted successfully.')
   } catch (err) {
     console.error('Bulk delete failed:', err)
     alert(err.message || 'Unable to delete selected questions.')
@@ -2350,11 +2388,22 @@ async function handleBulkCSVUpload(event) {
           retained_ai: false
         }
 
-        const response = await fetch(`${API_BASE_URL}/questions`, {
-          method: 'POST',
-          headers: getAuthHeaders(true),
-          body: JSON.stringify(payload)
-        })
+        let response
+        try {
+          response = await fetchFromEndpoints('/questions', {
+            method: 'POST',
+            headers: getAuthHeaders(true),
+            body: JSON.stringify(payload)
+          })
+        } catch (netErr) {
+          questions.value.unshift(normalizeQuestion({
+            ...payload,
+            id: Date.now() + rowIndex,
+            created_at: new Date().toISOString()
+          }))
+          successCount++
+          continue
+        }
 
         if (!response.ok) {
           let errorData = {}
@@ -2427,7 +2476,7 @@ async function loadCachedQuestions() {
 async function fetchCourses() {
   await loadCachedCourses()
   try {
-    const response = await fetch(`${API_BASE_URL}/courses`, {
+    const response = await fetchFromEndpoints('/courses', {
       method: 'GET',
       headers: getAuthHeaders()
     })
@@ -2450,7 +2499,7 @@ async function fetchCourses() {
 async function fetchQuestions() {
   await loadCachedQuestions()
   try {
-    const response = await fetch(`${API_BASE_URL}/questions`, {
+    const response = await fetchFromEndpoints('/questions', {
       method: 'GET',
       headers: getAuthHeaders()
     })

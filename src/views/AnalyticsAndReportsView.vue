@@ -5,8 +5,6 @@ import {
   BarChart3, 
   PieChart, 
   ShieldCheck, 
-  FileText, 
-  Download, 
   CheckCircle2, 
   Printer, 
   Search, 
@@ -52,82 +50,93 @@ const searchQuery = ref('')
 const selectedCourse = ref('All')
 const selectedTerm = ref('All')
 
-// Registries loaded from TestBuilder, Pilot System, & Master Courses
+// Master Registries
 const savedTests = ref([])
 const pilotSessions = ref([])
 const examSubmissions = ref([])
 const courses = ref([])
 
-// Attribute Extractors
+// Resilient API Fetch Helper across standard server ports
+async function fetchApi(endpoint) {
+  const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://127.0.0.1:8080/api', 'http://localhost:8000/api']
+  for (const baseUrl of ports) {
+    try {
+      const res = await fetch(`${baseUrl}${endpoint}`)
+      if (res.ok) {
+        const json = await res.json()
+        return json?.data ?? json
+      }
+    } catch (e) {
+      // Try next port
+    }
+  }
+  throw new Error(`Endpoint ${endpoint} unreachable`)
+}
+
+// Dynamic Attribute Extractors
 function getCourseCode(item) {
-  if (!item) return 'NAV-101'
+  if (!item) return 'N/A'
   if (typeof item.course === 'string' && item.course.trim()) return item.course.trim()
   if (item.course && typeof item.course === 'object' && item.course.code) return item.course.code
-  return item.course_code || item.courseCode || item.subject_code || item.subjectCode || item.subject || 'NAV-101'
+  return item.course_code || item.courseCode || item.subject_code || item.subjectCode || item.subject || 'N/A'
 }
 
 function getCourseTitle(item) {
-  if (!item) return 'General Assessment'
+  if (!item) return 'Unassigned Course'
   if (item.course && typeof item.course === 'object' && item.course.title) return item.course.title
-  return item.course_title || item.courseTitle || item.subject_title || item.subjectTitle || item.title || item.linkedPaper || item.name || 'General Assessment'
-}
-
-async function fetchJson(url) {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
-  return await res.json()
+  return item.course_title || item.courseTitle || item.subject_title || item.subjectTitle || item.title || item.linkedPaper || item.name || 'Unassigned Course'
 }
 
 async function loadAllData() {
   isLoading.value = true
   try {
-    // 1. Questions Bank Data
+    // 1. Question Bank
     try {
-      const qData = await fetchJson('http://127.0.0.1:8000/api/questions')
-      questions.value = Array.isArray(qData?.data) ? qData.data : (Array.isArray(qData) ? qData : [])
+      const qData = await fetchApi('/questions')
+      questions.value = Array.isArray(qData) ? qData : []
     } catch {
-      const localQs = localStorage.getItem('cams_questions_data') || localStorage.getItem('cams_questions')
-      questions.value = localQs ? JSON.parse(localQs) : []
+      const local = localStorage.getItem('cams_questions_data') || localStorage.getItem('cams_questions')
+      questions.value = local ? JSON.parse(local) : []
     }
     calculateAnalyticsMetrics()
 
-    // 2. Saved Tests Data (TestBuilder)
+    // 2. Saved Test Blueprints
     try {
-      const testsData = await fetchJson('/api/saved-tests')
+      const testsData = await fetchApi('/saved-tests')
       savedTests.value = Array.isArray(testsData) ? testsData : []
     } catch {
-      const localTests = localStorage.getItem('cams_saved_tests') || localStorage.getItem('saved_tests')
-      savedTests.value = localTests ? JSON.parse(localTests) : []
+      const local = localStorage.getItem('cams_saved_tests') || localStorage.getItem('saved_tests')
+      savedTests.value = local ? JSON.parse(local) : []
     }
 
-    // 3. Pilot Sessions Data (Pilot Admin)
+    // 3. Pilot Administration Sessions
     try {
-      const pilotData = await fetchJson('/api/pilot-sessions')
+      const pilotData = await fetchApi('/pilot-sessions')
       pilotSessions.value = Array.isArray(pilotData) ? pilotData : []
     } catch {
-      const localPilots = localStorage.getItem('cams_pilot_sessions') || localStorage.getItem('pilot_sessions')
-      pilotSessions.value = localPilots ? JSON.parse(localPilots) : []
+      const local = localStorage.getItem('cams_pilot_sessions') || localStorage.getItem('pilot_sessions')
+      pilotSessions.value = local ? JSON.parse(local) : []
     }
 
-    // 4. Exam Submissions Data
+    // 4. Exam Submissions
     try {
-      const subData = await fetchJson('/api/exam-submissions')
+      const subData = await fetchApi('/exam-submissions')
       examSubmissions.value = Array.isArray(subData) ? subData : []
     } catch {
-      const localSubs = localStorage.getItem('cams_exam_submissions') || localStorage.getItem('exam_submissions')
-      examSubmissions.value = localSubs ? JSON.parse(localSubs) : []
+      const local = localStorage.getItem('cams_exam_submissions') || localStorage.getItem('exam_submissions')
+      examSubmissions.value = local ? JSON.parse(local) : []
     }
 
-    // 5. Master Courses Data
+    // 5. Courses Catalog
     try {
-      const courseData = await fetchJson('/api/courses')
+      const courseData = await fetchApi('/courses')
       courses.value = Array.isArray(courseData) ? courseData : []
     } catch {
-      const localCourses = localStorage.getItem('cams_courses_data') || localStorage.getItem('cams_courses')
-      courses.value = localCourses ? JSON.parse(localCourses) : []
+      const local = localStorage.getItem('cams_courses_data') || localStorage.getItem('cams_courses')
+      courses.value = local ? JSON.parse(local) : []
     }
   } catch (err) {
-    console.error('Error loading Institutional Analytics & Reports data:', err)
+    console.error('Error loading institutional metrics:', err)
   } finally {
     isLoading.value = false
   }
@@ -139,11 +148,14 @@ function calculateAnalyticsMetrics() {
 
   if (Array.isArray(questions.value)) {
     questions.value.forEach(q => {
-      if (q && (q.bloomLevel || q.bloom_level) && bloom[q.bloomLevel || q.bloom_level] !== undefined) {
-        bloom[q.bloomLevel || q.bloom_level]++
+      const level = q?.bloomLevel || q?.bloom_level
+      if (level && bloom[level] !== undefined) {
+        bloom[level]++
       }
-      const std = (q && (q.stcwStandard || q.stcw_standard)) ? (q.stcwStandard || q.stcw_standard) : 'Table A-II/1'
-      stcw[std] = (stcw[std] || 0) + 1
+      const std = q?.stcwStandard || q?.stcw_standard
+      if (std) {
+        stcw[std] = (stcw[std] || 0) + 1
+      }
     })
   }
 
@@ -155,8 +167,9 @@ onMounted(() => {
   loadAllData()
 })
 
+// Dynamic Term List extracted directly from records
 const availableTerms = computed(() => {
-  const terms = new Set(['Midterm', 'Final', 'Prelim'])
+  const terms = new Set()
   if (Array.isArray(savedTests.value)) {
     savedTests.value.forEach(t => { if (t?.term) terms.add(t.term) })
   }
@@ -166,33 +179,32 @@ const availableTerms = computed(() => {
   return Array.from(terms)
 })
 
-// STAGE 1: Built Exams strictly derived from TestBuilder blueprints (AD-09 & AD-10)
+// STAGE 1: Built Exams derived from TestBuilder blueprints
 const builtExams = computed(() => {
   if (!Array.isArray(savedTests.value) || savedTests.value.length === 0) return []
 
-  // Map saved test blueprints
   const mapped = savedTests.value.map(test => {
     const code = getCourseCode(test)
     const title = getCourseTitle(test)
-    const questionCount = test.questions ? test.questions.length : (test.totalItems || test.total_items || test.itemCount || 41)
+    const questionCount = test.questions ? test.questions.length : (test.totalItems || test.total_items || test.itemCount || 0)
     const dateString = test.createdAt 
       ? new Date(test.createdAt).toISOString().split('T')[0] 
-      : (test.createdDate || test.created_at || new Date().toISOString().split('T')[0])
+      : (test.createdDate || test.created_at || 'N/A')
 
     return {
-      id: test.id || test.code || `EX-${test.accessCode || '2026'}`,
+      id: test.id || test.code || `EX-${test.accessCode || '001'}`,
       rawTest: test,
       subjectCode: code,
       subjectTitle: title,
-      term: test.term || 'Midterm',
-      academicYear: test.academicYear || test.academic_year || '2026-2027',
+      term: test.term || 'Unassigned Term',
+      academicYear: test.academicYear || test.academic_year || 'N/A',
       totalItems: questionCount,
       createdDate: dateString,
-      status: test.status || 'Ready for Pilot'
+      status: test.status || 'Draft'
     }
   })
 
-  // Deduplicate blueprints by Subject Code + Term (keeping the latest blueprint)
+  // Keep latest unique blueprint per subject code & term
   const uniqueMap = new Map()
   mapped.forEach(exam => {
     const key = `${exam.subjectCode}-${exam.term}`
@@ -215,11 +227,10 @@ const builtExams = computed(() => {
   })
 })
 
-// STAGE 2: Completed Pilots aggregated from Pilot Sessions & Submissions (AD-11 & AD-18)
+// STAGE 2: Completed Pilots aggregated from Pilot Sessions & Submissions
 const completedPilots = computed(() => {
   const pilotMap = new Map()
 
-  // 1. Read Pilot Admin Sessions
   if (Array.isArray(pilotSessions.value)) {
     pilotSessions.value.forEach(session => {
       const sessId = String(session.id || session.accessCode || '1')
@@ -229,29 +240,12 @@ const completedPilots = computed(() => {
         rawTest: session,
         subjectCode: getCourseCode(session),
         subjectTitle: getCourseTitle(session),
-        term: session.term || 'Midterm',
+        term: session.term || 'Unassigned Term',
         submissions: []
       })
     })
   }
 
-  // 2. Read Saved Tests Fallback if no pilot sessions exist
-  if (pilotMap.size === 0 && Array.isArray(savedTests.value)) {
-    savedTests.value.forEach(test => {
-      const testId = String(test.id || test.code || '1')
-      pilotMap.set(testId, {
-        id: `PL-${test.code || testId.slice(-6)}`,
-        testId: testId,
-        rawTest: test,
-        subjectCode: getCourseCode(test),
-        subjectTitle: getCourseTitle(test),
-        term: test.term || 'Midterm',
-        submissions: []
-      })
-    })
-  }
-
-  // 3. Aggregate Student Exam Submissions
   if (Array.isArray(examSubmissions.value)) {
     examSubmissions.value.forEach(sub => {
       const key = String(sub.test_id || sub.exam_id || sub.testId || '1')
@@ -262,7 +256,7 @@ const completedPilots = computed(() => {
           rawTest: null,
           subjectCode: getCourseCode(sub),
           subjectTitle: getCourseTitle(sub),
-          term: sub.term || 'Midterm',
+          term: sub.term || 'Unassigned Term',
           submissions: []
         })
       }
@@ -277,9 +271,9 @@ const completedPilots = computed(() => {
 
     let totalMinutes = 0
     subs.forEach(s => {
-      totalMinutes += Number(s.durationMinutes || s.duration_minutes || (s.time_spent ? Math.round(s.time_spent / 60) : 45))
+      totalMinutes += Number(s.durationMinutes || s.duration_minutes || (s.time_spent ? Math.round(s.time_spent / 60) : 0))
     })
-    const avgDuration = sampleCount > 0 ? Math.round(totalMinutes / sampleCount) : 45
+    const avgDuration = sampleCount > 0 ? Math.round(totalMinutes / sampleCount) : 0
 
     let poorCount = 0
     if (pilot.rawTest && Array.isArray(pilot.rawTest.questions)) {
@@ -316,20 +310,21 @@ const completedPilots = computed(() => {
   })
 })
 
-function generateAD09(exam) {
-  alert(`[Form AD-09: Table of Specifications (T.O.S.)]\nGenerating TOS for ${exam.subjectCode} - ${exam.subjectTitle}\nTotal Items: ${exam.totalItems} Qs`)
+// Official Form Export Trigger Handlers
+function generateFormAD09(exam) {
+  console.log('Generating Form AD-09 (TOS) for:', exam)
 }
 
-function generateAD10(exam) {
-  alert(`[Form AD-10: Examination Questionnaire]\nExporting Questionnaire for ${exam.subjectCode} - ${exam.subjectTitle}`)
+function generateFormAD10(exam) {
+  console.log('Generating Form AD-10 (Questionnaire) for:', exam)
 }
 
-function generateAD11(pilot) {
-  alert(`[Form AD-11: Item Analysis Result]\nGenerating analysis for ${pilot.subjectCode} - ${pilot.subjectTitle}\nCohort: ${pilot.sampleCount} Cadets`)
+function generateFormAD11(pilot) {
+  console.log('Generating Form AD-11 (Item Analysis) for:', pilot)
 }
 
-function generateAD18(pilot) {
-  alert(`[Form AD-18: Validation Checklist]\nValidation checklist for ${pilot.subjectCode} - ${pilot.subjectTitle}\nStatus: ${pilot.reliabilityStatus}`)
+function generateFormAD18(pilot) {
+  console.log('Generating Form AD-18 (Validation Checklist) for:', pilot)
 }
 </script>
 
@@ -353,6 +348,7 @@ function generateAD18(pilot) {
           :disabled="isLoading"
           type="button"
           class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl transition cursor-pointer disabled:opacity-50"
+          title="Reload Data"
         >
           <RefreshCw :class="['w-4 h-4', { 'animate-spin': isLoading }]" />
         </button>
@@ -431,10 +427,13 @@ function generateAD18(pilot) {
             <ShieldCheck class="text-emerald-600" :size="16" /> STCW Competency Standard Coverage
           </h2>
           <div class="space-y-3 pt-2">
-            <div v-for="(count, std) in stcwStats" :key="std" class="p-3 border border-slate-200 rounded-xl flex justify-between items-center bg-slate-50">
+            <div v-if="Object.keys(stcwStats).length === 0" class="text-xs text-slate-400 italic p-4 text-center">
+              No STCW competency standards mapped yet.
+            </div>
+            <div v-else v-for="(count, std) in stcwStats" :key="std" class="p-3 border border-slate-200 rounded-xl flex justify-between items-center bg-slate-50">
               <div>
                 <span class="font-mono text-xs font-bold text-slate-900 block">{{ std }}</span>
-                <span class="text-[10px] text-slate-500">Compliant with STCW Code Section A</span>
+                <span class="text-[10px] text-slate-500">STCW Standard Reference</span>
               </div>
               <span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-bold text-xs rounded-lg">{{ count }} Items</span>
             </div>
@@ -489,7 +488,7 @@ function generateAD18(pilot) {
 
       <div v-if="builtExams.length === 0" class="bg-white p-12 text-center rounded-2xl border border-slate-200 text-slate-400 space-y-2">
         <BookOpen class="w-10 h-10 mx-auto text-slate-300" />
-        <p class="text-xs font-bold text-slate-600">No built tests found</p>
+        <p class="text-xs font-bold text-slate-600">No built test blueprints found</p>
       </div>
 
       <div v-else class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
@@ -515,10 +514,10 @@ function generateAD18(pilot) {
               <td class="p-3.5 font-medium">{{ exam.totalItems }} Qs</td>
               <td class="p-3.5 text-slate-500">{{ exam.createdDate }}</td>
               <td class="p-3.5 text-right space-x-2">
-                <button @click="generateAD09(exam)" type="button" class="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 cursor-pointer">
+                <button @click="generateFormAD09(exam)" type="button" class="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 cursor-pointer">
                   <FileSpreadsheet class="w-3.5 h-3.5 inline mr-1" /> Form AD-09 (TOS)
                 </button>
-                <button @click="generateAD10(exam)" type="button" class="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-900 cursor-pointer">
+                <button @click="generateFormAD10(exam)" type="button" class="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-900 cursor-pointer">
                   <Printer class="w-3.5 h-3.5 inline mr-1" /> Form AD-10 (Exam)
                 </button>
               </td>
@@ -545,7 +544,7 @@ function generateAD18(pilot) {
 
       <div v-if="completedPilots.length === 0" class="bg-white p-12 text-center rounded-2xl border border-slate-200 text-slate-400 space-y-2">
         <BarChart2 class="w-10 h-10 mx-auto text-slate-300" />
-        <p class="text-xs font-bold text-slate-600">No pilot submissions found</p>
+        <p class="text-xs font-bold text-slate-600">No pilot submissions recorded</p>
       </div>
 
       <div v-else class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
@@ -578,10 +577,10 @@ function generateAD18(pilot) {
                 </span>
               </td>
               <td class="p-3.5 text-right space-x-2">
-                <button @click="generateAD11(pilot)" type="button" class="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold hover:bg-blue-100 cursor-pointer">
+                <button @click="generateFormAD11(pilot)" type="button" class="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold hover:bg-blue-100 cursor-pointer">
                   <BarChart2 class="w-3.5 h-3.5 inline mr-1" /> Form AD-11 (Item Analysis)
                 </button>
-                <button @click="generateAD18(pilot)" type="button" class="px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold hover:bg-purple-100 cursor-pointer">
+                <button @click="generateFormAD18(pilot)" type="button" class="px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold hover:bg-purple-100 cursor-pointer">
                   <ClipboardCheck class="w-3.5 h-3.5 inline mr-1" /> Form AD-18 (Checklist)
                 </button>
               </td>

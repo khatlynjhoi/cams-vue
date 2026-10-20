@@ -3,8 +3,8 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { 
   LayoutDashboard, 
-  HelpCircle, 
   BookOpen, 
+  HelpCircle, 
   Wrench, 
   SlidersHorizontal, 
   BarChart3, 
@@ -27,10 +27,11 @@ const showUserMenu = ref(false)
 // Determine if current page is login to hide navigation wrapper entirely
 const isLoginPage = computed(() => route.path === '/login')
 
+// Exact Navigation Order Alignment
 const navigationItems = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { name: 'Question Bank', path: '/questions', icon: HelpCircle },
   { name: 'Courses', path: '/courses', icon: BookOpen },
+  { name: 'Question Bank', path: '/questions', icon: HelpCircle },
   { name: 'Test Builder', path: '/test-builder', icon: Wrench },
   { name: 'Pilot Administration', path: '/pilot-admin', icon: SlidersHorizontal },
   { name: 'Reports & Analysis', path: '/reports', icon: BarChart3 },
@@ -45,7 +46,7 @@ const currentUser = ref({
   initials: 'BMA' 
 })
 
-// Mock accounts for switching
+// Mock accounts for quick role switching
 const availableAccounts = [
   { name: 'Admin User', email: 'admin@bma.edu.ph', role: 'admin' },
   { name: 'Capt. Ramirez', email: 'e.ramirez@bma.edu.ph', role: 'instructor' },
@@ -101,12 +102,12 @@ function handleLogout() {
         <!-- System Logo & Title + Close Button -->
         <div class="flex items-start justify-between">
           <div class="flex items-center gap-3">
-            <div class="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center font-black text-white text-lg tracking-wider shadow-md">
-              B
+            <div class="w-9 h-9 bg-[#123524] rounded-xl flex items-center justify-center font-black text-white text-lg tracking-wider shadow-md">
+              C
             </div>
             <div>
-              <h1 class="font-bold text-slate-900 leading-tight">BMA Pilot System</h1>
-              <p class="text-[10px] text-slate-400 font-medium tracking-wide">STCW Exam Engine v2.4</p>
+              <h1 class="font-bold text-slate-900 leading-tight">CAMS Portal</h1>
+              <p class="text-[10px] text-emerald-700 font-semibold tracking-wide">STCW Exam Engine v2.4</p>
             </div>
           </div>
           <button 
@@ -127,7 +128,7 @@ function handleLogout() {
             :class="[
               'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all group',
               route.path === item.path 
-                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/50 shadow-sm' 
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/60 shadow-xs' 
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
             ]"
           >
@@ -147,7 +148,7 @@ function handleLogout() {
       <!-- User Profile Card & Account Switcher -->
       <div class="relative mt-auto border-t border-slate-100 bg-slate-50 p-4">
         
-        <!-- Popup Menu -->
+        <!-- Account Switcher Popup Menu -->
         <transition
           enter-active-class="transition ease-out duration-200"
           enter-from-class="transform opacity-0 translate-y-2"
@@ -197,7 +198,7 @@ function handleLogout() {
           class="w-full flex items-center justify-between p-2.5 -m-1 hover:bg-white border border-transparent hover:border-slate-200 hover:shadow-sm rounded-xl transition-all cursor-pointer group"
         >
           <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-full bg-emerald-700 text-white font-bold flex items-center justify-center text-xs shadow-sm shrink-0 group-hover:scale-105 transition-transform">
+            <div class="w-9 h-9 rounded-full bg-[#123524] text-white font-bold flex items-center justify-center text-xs shadow-xs shrink-0 group-hover:scale-105 transition-transform">
               {{ currentUser.initials }}
             </div>
             <div class="text-left overflow-hidden">
@@ -208,7 +209,7 @@ function handleLogout() {
           <MoreVertical :size="16" class="text-slate-400 group-hover:text-slate-700 transition-colors" />
         </button>
 
-        <!-- Invisible overlay to close menu when clicking outside -->
+        <!-- Overlay to close user menu when clicking outside -->
         <div 
           v-if="showUserMenu" 
           @click="showUserMenu = false" 
@@ -217,14 +218,14 @@ function handleLogout() {
       </div>
     </aside>
 
-    <!-- Overlay for mobile when sidebar is open -->
+    <!-- Overlay for mobile screens when sidebar is open -->
     <div 
       v-if="!isLoginPage && isSidebarOpen" 
       @click="isSidebarOpen = false"
       class="fixed inset-0 bg-slate-900/20 z-40 lg:hidden"
     ></div>
 
-    <!-- Main View Content Area -->
+    <!-- Main View Area -->
     <main 
       :class="[
         'flex-1 min-h-screen transition-all duration-300 ease-in-out',
@@ -237,7 +238,6 @@ function handleLogout() {
 </template>
 
 <style scoped>
-/* Optional: Custom scrollbar for the sidebar */
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }

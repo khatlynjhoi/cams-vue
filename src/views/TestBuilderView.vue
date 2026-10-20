@@ -101,7 +101,33 @@ const selectedItems = ref([])
 const totalPoints = computed(() => selectedItems.value.reduce((sum, item) => sum + Number(item.points || 0), 0))
 const totalItemsCount = computed(() => selectedItems.value.length)
 
-// Image URL Resolver for Backend Storage / API relative paths
+// Unified API Helper with Multi-port Fallbacks
+async function fetchFromEndpoints(path, options = {}) {
+  const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://127.0.0.1:8080/api', 'http://localhost:8000/api']
+  const token = localStorage.getItem('token') || ''
+  
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(options.headers || {})
+  }
+
+  for (const baseUrl of ports) {
+    try {
+      const res = await fetch(`${baseUrl}${path}`, { ...options, headers })
+      if (res.ok) {
+        const json = await res.json()
+        return json?.data ?? json
+      }
+    } catch (e) {
+      // Try next port
+    }
+  }
+  throw new Error(`Endpoint ${path} unreachable`)
+}
+
+// Image URL Resolver for Backend Storage / Relative Paths
 function resolveImageUrl(path) {
   if (!path || typeof path !== 'string') return null
   const clean = path.trim()
@@ -110,7 +136,7 @@ function resolveImageUrl(path) {
     return clean
   }
   const relativePath = clean.startsWith('/') ? clean.substring(1) : clean
-  return `http://127.0.0.1:8000/${relativePath}`
+  return `${window.location.origin}/${relativePath}`
 }
 
 // Question Main Image Resolution Helper
@@ -236,7 +262,7 @@ function isOptionCorrect(item, optIdx) {
   return false
 }
 
-// Correct Answer Display Helper (Maps Indices [0,1,2] -> Option Texts "A. Star | B. Bus | C. Ring")
+// Correct Answer Display Helper
 function getCorrectAnswer(item) {
   if (!item) return 'N/A'
 
@@ -297,18 +323,6 @@ function getCorrectAnswer(item) {
   return 'N/A'
 }
 
-// Safe JSON Parsing Helpers
-async function safeFetchJson(url, options) {
-  try {
-    const res = await fetch(url, options)
-    if (!res.ok) return null
-    const text = await res.text()
-    return text && text.trim() ? JSON.parse(text) : null
-  } catch (e) {
-    return null
-  }
-}
-
 function safeParseStorage(key) {
   try {
     const val = localStorage.getItem(key)
@@ -321,33 +335,19 @@ function safeParseStorage(key) {
 // Load Master Outcomes Registries safely
 async function loadOutcomeMasters() {
   try {
-    const token = localStorage.getItem('token')
-    const headers = token ? {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Authorization': `Bearer ${token}`
-    } : {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    }
-
-    const coData = await safeFetchJson('http://127.0.0.1:8000/api/course-outcomes', { headers })
-    if (coData) {
-      masterCourseOutcomes.value = Array.isArray(coData) ? coData : (coData.data || [])
-    } else {
-      const saved = safeParseStorage('cams_course_outcomes') || safeParseStorage('cams_cos_data')
-      if (saved) masterCourseOutcomes.value = Array.isArray(saved) ? saved : (saved.data || [])
-    }
-
-    const loData = await safeFetchJson('http://127.0.0.1:8000/api/learning-outcomes', { headers })
-    if (loData) {
-      masterLearningOutcomes.value = Array.isArray(loData) ? loData : (loData.data || [])
-    } else {
-      const saved = safeParseStorage('cams_learning_outcomes') || safeParseStorage('cams_los_data')
-      if (saved) masterLearningOutcomes.value = Array.isArray(saved) ? saved : (saved.data || [])
-    }
+    const coData = await fetchFromEndpoints('/course-outcomes')
+    masterCourseOutcomes.value = Array.isArray(coData) ? coData : (coData?.data || [])
   } catch (e) {
-    console.warn('Error loading outcome master registries:', e)
+    const saved = safeParseStorage('cams_course_outcomes') || safeParseStorage('cams_cos_data')
+    masterCourseOutcomes.value = saved ? (Array.isArray(saved) ? saved : (saved.data || [])) : []
+  }
+
+  try {
+    const loData = await fetchFromEndpoints('/learning-outcomes')
+    masterLearningOutcomes.value = Array.isArray(loData) ? loData : (loData?.data || [])
+  } catch (e) {
+    const saved = safeParseStorage('cams_learning_outcomes') || safeParseStorage('cams_los_data')
+    masterLearningOutcomes.value = saved ? (Array.isArray(saved) ? saved : (saved.data || [])) : []
   }
 }
 
@@ -672,24 +672,10 @@ async function loadQuestionsForCourse(courseCode) {
   let rawQuestions = []
 
   try {
-    const token = localStorage.getItem('token')
-    const headers = token ? {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Authorization': `Bearer ${token}`
-    } : { 'Content-Type': 'application/json', 'Accept': 'application/json' }
-
     const programParam = examConfig.value.program ? `&program=${encodeURIComponent(examConfig.value.program)}` : ''
-    const url = `http://127.0.0.1:8000/api/questions?course=${encodeURIComponent(courseCode)}&status=Approved${programParam}`
-    
-    const data = await safeFetchJson(url, { headers })
-    if (data) {
-      rawQuestions = Array.isArray(data) ? data : (data.data || [])
-    } else {
-      throw new Error('API return was null or non-JSON')
-    }
+    const data = await fetchFromEndpoints(`/questions?course=${encodeURIComponent(courseCode)}&status=Approved${programParam}`)
+    rawQuestions = Array.isArray(data) ? data : (data?.data || [])
   } catch (err) {
-    console.warn('API fetch failed, reading local storage fallback:', err)
     const savedBank = safeParseStorage('cams_question_bank_data') || safeParseStorage('cams_questions_data')
     if (savedBank) {
       const parsed = Array.isArray(savedBank) ? savedBank : (savedBank.data || [])
@@ -718,22 +704,11 @@ function onCourseChange() {
 async function loadCourses() {
   isLoadingCourses.value = true
   try {
-    const token = localStorage.getItem('token')
-    const headers = token ? {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Authorization': `Bearer ${token}`
-    } : { 'Content-Type': 'application/json', 'Accept': 'application/json' }
-
-    const data = await safeFetchJson('http://127.0.0.1:8000/api/courses', { headers })
-    if (data) {
-      courses.value = Array.isArray(data) ? data : (data.data || [])
-    } else {
-      const saved = safeParseStorage('cams_courses_data')
-      if (saved) courses.value = Array.isArray(saved) ? saved : (saved.data || [])
-    }
+    const data = await fetchFromEndpoints('/courses')
+    courses.value = Array.isArray(data) ? data : (data?.data || [])
   } catch (err) {
-    console.warn('API fetch failed for courses, fallback applied')
+    const saved = safeParseStorage('cams_courses_data')
+    courses.value = saved ? (Array.isArray(saved) ? saved : (saved.data || [])) : []
   } finally {
     isLoadingCourses.value = false
   }
@@ -874,7 +849,7 @@ function viewSavedTestDetails(test) {
 </script>
 
 <template>
-  <div class="p-6 md:p-8 space-y-6 min-h-screen bg-[#f4f6f9] text-slate-800">
+  <div class="p-6 md:p-8 space-y-6 min-h-screen bg-[#f4f6f9] text-slate-800 font-sans">
     <!-- Header Banner -->
     <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-sm">
       <div class="space-y-1">

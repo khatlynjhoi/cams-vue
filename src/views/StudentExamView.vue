@@ -35,14 +35,25 @@ let timerInterval = null
 
 const scoreResults = ref({ score: 0, total: 0, percentage: 0, breakdown: {} })
 
-// Multi-port API fetching with local offline fallback
-async function fetchFromEndpoints(path, options) {
+// Multi-port API fetching with authorization headers & offline fallback
+async function fetchFromEndpoints(path, options = {}) {
   const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://127.0.0.1:8080/api', 'http://localhost:8000/api']
+  const token = localStorage.getItem('token') || ''
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(options.headers || {})
+  }
+
   for (const baseUrl of ports) {
     try {
-      const res = await fetch(`${baseUrl}${path}`, options)
+      const res = await fetch(`${baseUrl}${path}`, { ...options, headers })
       if (res.ok) return await res.json()
-    } catch (e) {}
+    } catch (e) {
+      // Try next endpoint port
+    }
   }
   throw new Error('All backend ports unreachable')
 }
@@ -61,7 +72,6 @@ async function startExam() {
   try {
     const data = await fetchFromEndpoints('/exams/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
 
@@ -83,7 +93,11 @@ async function startExam() {
 }
 
 function generateFallbackExam(courseCode) {
-  const localBank = JSON.parse(localStorage.getItem('cams_questions_data') || localStorage.getItem('cams_questions') || '[]')
+  const localBank = JSON.parse(
+    localStorage.getItem('cams_questions_data') || 
+    localStorage.getItem('cams_questions') || 
+    '[]'
+  )
   
   let matched = localBank.filter(q => {
     const c = String(q.course_id || q.courseCode || q.code || '').toLowerCase()
@@ -131,7 +145,7 @@ function generateFallbackExam(courseCode) {
     code: q.code || `${courseCode}-Q${idx + 1}`,
     text: q.text || q.question_text,
     type: q.type || (q.options?.length > 0 ? 'multiple_choice' : 'short_answer'),
-    image_url: q.image_url,
+    image_url: q.image_url || q.imageUrl,
     options: q.options || [],
     correctAnswer: q.correct_answer ?? q.correctAnswer ?? 0,
     bloomLevel: q.bloom_level || q.bloomLevel || 'Understanding'
@@ -267,7 +281,6 @@ async function executeSubmission() {
   try {
     await fetchFromEndpoints('/exam-submissions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
   } catch (err) {
@@ -296,7 +309,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="p-6 max-w-5xl mx-auto space-y-6 font-sans">
+  <div class="p-6 max-w-5xl mx-auto space-y-6 font-sans text-slate-800">
     
     <!-- ENTRANCE PORTAL -->
     <div v-if="!examActive && !examSubmitted" class="bg-white border border-slate-200 rounded-2xl p-8 shadow-xs space-y-6 max-w-md mx-auto text-center">
