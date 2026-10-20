@@ -6,8 +6,6 @@ import {
   Search, 
   Edit3, 
   Trash2, 
-  ShieldCheck, 
-  Key, 
   CheckCircle2, 
   XCircle, 
   RefreshCw,
@@ -43,6 +41,25 @@ const form = ref({
 const rolesList = ['Admin', 'Assessment Officer', 'Instructor', 'Cadet']
 const departmentList = ['BSMT', 'BSMARE', 'General Education', 'Assessment & Quality', 'ICT']
 
+// Multi-port API fetching helper with local fallback
+async function fetchFromEndpoints(path, options = {}) {
+  const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://127.0.0.1:8080/api', 'http://localhost:8000/api']
+  for (const baseUrl of ports) {
+    try {
+      const res = await fetch(`${baseUrl}${path}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Role': currentUser.value.role || 'Admin',
+          ...(options.headers || {})
+        }
+      })
+      if (res.ok) return await res.json()
+    } catch (e) {}
+  }
+  throw new Error('All backend ports unreachable')
+}
+
 onMounted(() => {
   try {
     const stored = JSON.parse(localStorage.getItem('user') || '{}')
@@ -54,37 +71,34 @@ onMounted(() => {
 async function loadUsers() {
   isLoading.value = true
   try {
-    const res = await fetch('http://127.0.0.1:8080/api/users', {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Role': currentUser.value.role || 'Admin'
-      }
-    })
-    const data = await res.json()
-    if (data.success && Array.isArray(data.data)) {
+    const data = await fetchFromEndpoints('/users')
+    if (data.success && Array.isArray(data.data) && data.data.length > 0) {
       users.value = data.data
+      saveLocalUsers() // Sync database state to local storage
     } else {
-      // Local fallback dataset if backend database is offline
-      users.value = getFallbackUsers()
+      loadFallbackUsers()
     }
   } catch (e) {
-    users.value = getFallbackUsers()
+    loadFallbackUsers()
   } finally {
     isLoading.value = false
   }
 }
 
-function getFallbackUsers() {
+function loadFallbackUsers() {
   const local = localStorage.getItem('cams_users_list')
-  if (local) return JSON.parse(local)
-  const defaults = [
-    { id: 1, name: 'BMA Administrator', email: 'admin@bma.edu.ph', role: 'Admin', department: 'ICT', status: 'Active' },
-    { id: 2, name: 'Capt. Eduardo Ramirez', email: 'e.ramirez@bma.edu.ph', role: 'Instructor', department: 'BSMT', status: 'Active' },
-    { id: 3, name: 'Chief Engr. Santos', email: 'm.santos@bma.edu.ph', role: 'Assessment Officer', department: 'BSMARE', status: 'Active' },
-    { id: 4, name: 'Cadet Juan Dela Cruz', email: 'j.delacruz@student.bma.edu.ph', role: 'Cadet', department: 'BSMT', status: 'Active' }
-  ]
-  localStorage.setItem('cams_users_list', JSON.stringify(defaults))
-  return defaults
+  if (local) {
+    users.value = JSON.parse(local)
+  } else {
+    const defaults = [
+      { id: 1, name: 'BMA Administrator', email: 'admin@bma.edu.ph', role: 'Admin', department: 'ICT', status: 'Active' },
+      { id: 2, name: 'Capt. Eduardo Ramirez', email: 'e.ramirez@bma.edu.ph', role: 'Instructor', department: 'BSMT', status: 'Active' },
+      { id: 3, name: 'Chief Engr. Santos', email: 'm.santos@bma.edu.ph', role: 'Assessment Officer', department: 'BSMARE', status: 'Active' },
+      { id: 4, name: 'Cadet Juan Dela Cruz', email: 'j.delacruz@student.bma.edu.ph', role: 'Cadet', department: 'BSMT', status: 'Active' }
+    ]
+    users.value = defaults
+    saveLocalUsers()
+  }
 }
 
 function saveLocalUsers() {
@@ -94,7 +108,7 @@ function saveLocalUsers() {
 const filteredUsers = computed(() => {
   return users.value.filter(u => {
     const q = searchQuery.value.toLowerCase().trim()
-    const matchesQuery = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.department.toLowerCase().includes(q)
+    const matchesQuery = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.department && u.department.toLowerCase().includes(q))
     const matchesRole = selectedRoleFilter.value === 'All' || u.role === selectedRoleFilter.value
     return matchesQuery && matchesRole
   })
@@ -122,29 +136,30 @@ async function handleCreateUser() {
     return
   }
 
+  const payload = { ...form.value }
+
   try {
-    const res = await fetch('http://127.0.0.1:8080/api/users', {
+    const data = await fetchFromEndpoints('/users', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUser.value.role },
-      body: JSON.stringify(form.value)
+      body: JSON.stringify(payload)
     })
-    const data = await res.json()
     if (data.success && data.data) {
       users.value.push(data.data)
     } else {
-      const newUser = { ...form.value, id: Date.now() }
-      delete newUser.password
-      users.value.push(newUser)
-      saveLocalUsers()
+      addLocalUser(payload)
     }
-    showAddModal.value = false
   } catch (e) {
-    const newUser = { ...form.value, id: Date.now() }
-    delete newUser.password
-    users.value.push(newUser)
+    addLocalUser(payload)
+  } finally {
     saveLocalUsers()
     showAddModal.value = false
   }
+}
+
+function addLocalUser(payload) {
+  const newUser = { ...payload, id: Date.now() }
+  delete newUser.password
+  users.value.push(newUser)
 }
 
 async function handleUpdateUser() {
@@ -154,12 +169,10 @@ async function handleUpdateUser() {
   }
 
   try {
-    const res = await fetch(`http://127.0.0.1:8080/api/users/${form.value.id}`, {
+    const data = await fetchFromEndpoints(`/users/${form.value.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUser.value.role },
       body: JSON.stringify(form.value)
     })
-    const data = await res.json()
     if (data.success && data.data) {
       const idx = users.value.findIndex(u => u.id === form.value.id)
       if (idx !== -1) users.value[idx] = data.data
@@ -169,6 +182,7 @@ async function handleUpdateUser() {
   } catch (e) {
     updateLocalUser()
   } finally {
+    saveLocalUsers()
     showEditModal.value = false
   }
 }
@@ -178,7 +192,6 @@ function updateLocalUser() {
   if (idx !== -1) {
     users.value[idx] = { ...users.value[idx], ...form.value }
     delete users.value[idx].password
-    saveLocalUsers()
   }
 }
 
@@ -187,12 +200,12 @@ async function toggleUserAccess(user) {
   user.status = newStatus
 
   try {
-    await fetch(`http://127.0.0.1:8080/api/users/${user.id}`, {
+    await fetchFromEndpoints(`/users/${user.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUser.value.role },
       body: JSON.stringify({ status: newStatus })
     })
   } catch (e) {}
+
   saveLocalUsers()
 }
 
@@ -200,9 +213,8 @@ async function handleDeleteUser() {
   if (!selectedUser.value) return
 
   try {
-    await fetch(`http://127.0.0.1:8080/api/users/${selectedUser.value.id}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUser.value.role }
+    await fetchFromEndpoints(`/users/${selectedUser.value.id}`, {
+      method: 'DELETE'
     })
   } catch (e) {}
 
@@ -278,13 +290,11 @@ async function handleDeleteUser() {
         <tbody class="divide-y divide-slate-100 text-xs text-slate-700">
           <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-slate-50/80 transition-colors">
             
-            <!-- Details -->
             <td class="p-3.5">
               <div class="font-bold text-slate-900">{{ user.name }}</div>
               <div class="text-[11px] text-slate-400">{{ user.email }}</div>
             </td>
 
-            <!-- Role Badge -->
             <td class="p-3.5">
               <span :class="[
                 'px-2.5 py-1 rounded-full text-[11px] font-bold border',
@@ -297,10 +307,8 @@ async function handleDeleteUser() {
               </span>
             </td>
 
-            <!-- Department -->
             <td class="p-3.5 font-medium text-slate-800">{{ user.department || 'N/A' }}</td>
 
-            <!-- System Access Toggle Status -->
             <td class="p-3.5">
               <button 
                 @click="toggleUserAccess(user)"
@@ -318,7 +326,6 @@ async function handleDeleteUser() {
               </button>
             </td>
 
-            <!-- Action Buttons -->
             <td class="p-3.5 text-right space-x-2">
               <button 
                 @click="openEditModal(user)"
