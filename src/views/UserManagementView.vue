@@ -18,16 +18,13 @@ const isLoading = ref(false)
 const searchQuery = ref('')
 const selectedRoleFilter = ref('All')
 
-// Current logged in user context
 const currentUser = ref({ role: 'Admin' })
 
-// Modal States
 const showAddModal = ref(false)
 const showEditModal = ref(false)
 const showDeleteModal = ref(false)
 const selectedUser = ref(null)
 
-// Form States
 const form = ref({
   id: null,
   name: '',
@@ -41,7 +38,6 @@ const form = ref({
 const rolesList = ['Admin', 'Assessment Officer', 'Instructor', 'Cadet']
 const departmentList = ['BSMT', 'BSMARE', 'General Education', 'Assessment & Quality', 'ICT']
 
-// Multi-port API fetching helper with local fallback
 async function fetchFromEndpoints(path, options = {}) {
   const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://127.0.0.1:8080/api', 'http://localhost:8000/api']
   for (const baseUrl of ports) {
@@ -70,31 +66,45 @@ onMounted(() => {
 
 async function loadUsers() {
   isLoading.value = true
+  
+  // Read local storage saved accounts first
+  const localSaved = JSON.parse(localStorage.getItem('cams_users_list') || '[]')
+
   try {
     const data = await fetchFromEndpoints('/users')
     if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-      users.value = data.data
-      saveLocalUsers() // Sync database state to local storage
+      const apiUsers = data.data.map(u => ({
+        ...u,
+        department: u.department || 'ICT',
+        status: u.status || 'Active'
+      }))
+
+      // Merge local created items not yet in API
+      localSaved.forEach(localItem => {
+        if (!apiUsers.some(a => String(a.id) === String(localItem.id) || a.email === localItem.email)) {
+          apiUsers.push(localItem)
+        }
+      })
+
+      users.value = apiUsers
+      saveLocalUsers()
     } else {
-      loadFallbackUsers()
+      loadFallbackUsers(localSaved)
     }
   } catch (e) {
-    loadFallbackUsers()
+    loadFallbackUsers(localSaved)
   } finally {
     isLoading.value = false
   }
 }
 
-function loadFallbackUsers() {
-  const local = localStorage.getItem('cams_users_list')
-  if (local) {
-    users.value = JSON.parse(local)
+function loadFallbackUsers(localSaved = []) {
+  if (localSaved.length > 0) {
+    users.value = localSaved
   } else {
     const defaults = [
-      { id: 1, name: 'BMA Administrator', email: 'admin@bma.edu.ph', role: 'Admin', department: 'ICT', status: 'Active' },
-      { id: 2, name: 'Capt. Eduardo Ramirez', email: 'e.ramirez@bma.edu.ph', role: 'Instructor', department: 'BSMT', status: 'Active' },
-      { id: 3, name: 'Chief Engr. Santos', email: 'm.santos@bma.edu.ph', role: 'Assessment Officer', department: 'BSMARE', status: 'Active' },
-      { id: 4, name: 'Cadet Juan Dela Cruz', email: 'j.delacruz@student.bma.edu.ph', role: 'Cadet', department: 'BSMT', status: 'Active' }
+      { id: 1, name: 'IT Administrator', email: 'it@bma.edu.ph', role: 'Admin', department: 'ICT', status: 'Active' },
+      { id: 2, name: 'Percival Banting', email: 'p.banting@bma.edu.ph', role: 'Admin', department: 'ICT', status: 'Active' }
     ]
     users.value = defaults
     saveLocalUsers()
@@ -144,7 +154,12 @@ async function handleCreateUser() {
       body: JSON.stringify(payload)
     })
     if (data.success && data.data) {
-      users.value.push(data.data)
+      const created = {
+        ...data.data,
+        department: data.data.department || payload.department || 'ICT',
+        status: data.data.status || payload.status || 'Active'
+      }
+      users.value.push(created)
     } else {
       addLocalUser(payload)
     }
@@ -157,7 +172,12 @@ async function handleCreateUser() {
 }
 
 function addLocalUser(payload) {
-  const newUser = { ...payload, id: Date.now() }
+  const newUser = { 
+    ...payload, 
+    id: Date.now(),
+    department: payload.department || 'ICT',
+    status: payload.status || 'Active'
+  }
   delete newUser.password
   users.value.push(newUser)
 }
@@ -175,7 +195,13 @@ async function handleUpdateUser() {
     })
     if (data.success && data.data) {
       const idx = users.value.findIndex(u => u.id === form.value.id)
-      if (idx !== -1) users.value[idx] = data.data
+      if (idx !== -1) {
+        users.value[idx] = {
+          ...data.data,
+          department: data.data.department || form.value.department || 'ICT',
+          status: data.data.status || form.value.status || 'Active'
+        }
+      }
     } else {
       updateLocalUser()
     }
@@ -257,7 +283,7 @@ async function handleDeleteUser() {
       </div>
     </div>
 
-    <!-- Filter & Search Toolbar -->
+    <!-- Filter Toolbar -->
     <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center gap-3">
       <div class="relative flex-1 w-full">
         <Search class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -307,22 +333,24 @@ async function handleDeleteUser() {
               </span>
             </td>
 
-            <td class="p-3.5 font-medium text-slate-800">{{ user.department || 'N/A' }}</td>
+            <!-- Department Fallback Guard -->
+            <td class="p-3.5 font-medium text-slate-800">{{ user.department || 'ICT' }}</td>
 
+            <!-- Status Access Fallback Guard -->
             <td class="p-3.5">
               <button 
                 @click="toggleUserAccess(user)"
                 :class="[
                   'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold transition cursor-pointer border',
-                  user.status === 'Active' 
+                  (user.status || 'Active') === 'Active' 
                     ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200' 
                     : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
                 ]"
                 title="Click to toggle system access permission"
               >
-                <CheckCircle2 v-if="user.status === 'Active'" :size="12" />
+                <CheckCircle2 v-if="(user.status || 'Active') === 'Active'" :size="12" />
                 <XCircle v-else :size="12" />
-                {{ user.status === 'Active' ? 'Access Granted' : 'Access Revoked' }}
+                {{ (user.status || 'Active') === 'Active' ? 'Access Granted' : 'Access Revoked' }}
               </button>
             </td>
 
@@ -367,12 +395,12 @@ async function handleDeleteUser() {
         <div class="space-y-3 text-xs">
           <div>
             <label class="block font-bold text-slate-700 mb-1">Full Name</label>
-            <input v-model="form.name" placeholder="e.g. Capt. Eduardo Ramirez" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
+            <input v-model="form.name" placeholder="e.g. Percival Banting" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
 
           <div>
-            <label class="block font-bold text-slate-700 mb-1">Email Address (Login Username)</label>
-            <input v-model="form.email" type="email" placeholder="e.g. e.ramirez@bma.edu.ph" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
+            <label class="block font-bold text-slate-700 mb-1">Email Address</label>
+            <input v-model="form.email" type="email" placeholder="e.g. p.banting@bma.edu.ph" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
 
           <div>
@@ -421,7 +449,7 @@ async function handleDeleteUser() {
       <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 border border-slate-200">
         <div class="flex justify-between items-center pb-2 border-b border-slate-100">
           <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-            <Edit3 class="text-emerald-600" :size="18" /> Edit User Account & Access
+            <Edit3 class="text-emerald-600" :size="18" /> Edit User Account
           </h3>
           <button @click="showEditModal = false" class="text-slate-400 hover:text-slate-600 cursor-pointer">
             <X :size="18" />
@@ -440,7 +468,7 @@ async function handleDeleteUser() {
           </div>
 
           <div>
-            <label class="block font-bold text-slate-700 mb-1">Reset Password (Leave blank to keep unchanged)</label>
+            <label class="block font-bold text-slate-700 mb-1">Reset Password</label>
             <input v-model="form.password" type="password" placeholder="New Password" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
 
@@ -480,7 +508,7 @@ async function handleDeleteUser() {
       </div>
     </div>
 
-    <!-- REMOVE USER CONFIRMATION MODAL -->
+    <!-- DELETE USER MODAL -->
     <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
       <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4 text-center border border-slate-200">
         <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
@@ -489,7 +517,7 @@ async function handleDeleteUser() {
         <div>
           <h3 class="text-base font-bold text-slate-900">Remove User Account</h3>
           <p class="text-xs text-slate-500 mt-1">
-            Are you sure you want to delete <strong class="text-slate-800">{{ selectedUser?.name }}</strong>? This action will permanently revoke their credentials.
+            Are you sure you want to delete <strong class="text-slate-800">{{ selectedUser?.name }}</strong>?
           </p>
         </div>
 
