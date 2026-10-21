@@ -10,22 +10,27 @@ import {
   XCircle, 
   RefreshCw,
   X,
-  AlertTriangle
+  AlertTriangle,
+  Mail,
+  User,
+  Shield
 } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
+const auth = useAuthStore()
+
+// State
 const users = ref([])
 const isLoading = ref(false)
 const searchQuery = ref('')
 const selectedRoleFilter = ref('All')
-
-const currentUser = ref({ role: 'Admin' })
 
 const showAddModal = ref(false)
 const showEditModal = ref(false)
 const showDeleteModal = ref(false)
 const selectedUser = ref(null)
 
-const form = ref({
+const initialFormState = {
   id: null,
   name: '',
   email: '',
@@ -33,20 +38,25 @@ const form = ref({
   role: 'Instructor',
   department: 'BSMT',
   status: 'Active'
-})
+}
+
+const form = ref({ ...initialFormState })
+const formErrors = ref({})
 
 const rolesList = ['Admin', 'Assessment Officer', 'Instructor', 'Cadet']
 const departmentList = ['BSMT', 'BSMARE', 'General Education', 'Assessment & Quality', 'ICT']
 
-// Multi-port API fetching with authorization headers & role context
+/**
+ * Standard API Fetch helper supporting token authorization & role headers
+ */
 async function fetchFromEndpoints(path, options = {}) {
-  const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://127.0.0.1:8080/api', 'http://localhost:8000/api']
-  const token = localStorage.getItem('token') || ''
+  const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://localhost:8000/api']
+  const token = auth.token || localStorage.getItem('cams_token') || localStorage.getItem('token') || ''
 
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'X-User-Role': currentUser.value.role || 'Admin',
+    'X-User-Role': auth.user?.role || 'Admin',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...(options.headers || {})
   }
@@ -58,17 +68,13 @@ async function fetchFromEndpoints(path, options = {}) {
         return await res.json()
       }
     } catch (e) {
-      // Try next port endpoint
+      // Try next available endpoint
     }
   }
   throw new Error(`Endpoint ${path} unreachable`)
 }
 
 onMounted(() => {
-  try {
-    const stored = JSON.parse(localStorage.getItem('user') || '{}')
-    if (stored.role) currentUser.value = stored
-  } catch (e) {}
   loadUsers()
 })
 
@@ -87,7 +93,7 @@ async function loadUsers() {
         status: u.status || 'Active'
       }))
 
-      // Merge local created items not yet present in backend list
+      // Merge local created items not present in remote backend
       localSaved.forEach(localItem => {
         if (!apiUsers.some(a => String(a.id) === String(localItem.id) || a.email === localItem.email)) {
           apiUsers.push(localItem)
@@ -136,14 +142,20 @@ const filteredUsers = computed(() => {
   })
 })
 
+function resetForm() {
+  form.value = { ...initialFormState }
+  formErrors.value = {}
+}
+
 function openAddModal() {
-  form.value = { id: null, name: '', email: '', password: '', role: 'Instructor', department: 'BSMT', status: 'Active' }
+  resetForm()
   showAddModal.value = true
 }
 
 function openEditModal(user) {
   selectedUser.value = user
   form.value = { ...user, password: '' }
+  formErrors.value = {}
   showEditModal.value = true
 }
 
@@ -152,13 +164,34 @@ function openDeleteModal(user) {
   showDeleteModal.value = true
 }
 
-async function handleCreateUser() {
-  if (!form.value.name || !form.value.email || !form.value.password) {
-    alert('Please fill in all required fields.')
-    return
+function validateForm(isEdit = false) {
+  const errors = {}
+  if (!form.value.name.trim()) errors.name = 'Full name is required.'
+  if (!form.value.email.trim()) {
+    errors.email = 'Email address is required.'
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email)) {
+    errors.email = 'Invalid email format.'
   }
 
-  const payload = { ...form.value }
+  if (!isEdit && !form.value.password) {
+    errors.password = 'Initial password is required.'
+  }
+
+  formErrors.value = errors
+  return Object.keys(errors).length === 0
+}
+
+async function handleCreateUser() {
+  if (!validateForm(false)) return
+
+  const payload = { 
+    name: form.value.name.trim(),
+    email: form.value.email.trim().toLowerCase(),
+    role: form.value.role,
+    department: form.value.department,
+    status: form.value.status,
+    password: form.value.password
+  }
 
   try {
     const data = await fetchFromEndpoints('/users', {
@@ -169,10 +202,12 @@ async function handleCreateUser() {
     if (data.success || resData.id) {
       const created = {
         ...resData,
-        department: resData.department || payload.department || 'ICT',
-        status: resData.status || payload.status || 'Active'
+        name: resData.name || payload.name,
+        email: resData.email || payload.email,
+        department: resData.department || payload.department,
+        status: resData.status || payload.status
       }
-      users.value.push(created)
+      users.value.unshift(created)
     } else {
       addLocalUser(payload)
     }
@@ -181,6 +216,7 @@ async function handleCreateUser() {
   } finally {
     saveLocalUsers()
     showAddModal.value = false
+    resetForm()
   }
 }
 
@@ -192,14 +228,11 @@ function addLocalUser(payload) {
     status: payload.status || 'Active'
   }
   delete newUser.password
-  users.value.push(newUser)
+  users.value.unshift(newUser)
 }
 
 async function handleUpdateUser() {
-  if (!form.value.name || !form.value.email) {
-    alert('Name and Email are required.')
-    return
-  }
+  if (!validateForm(true)) return
 
   try {
     const data = await fetchFromEndpoints(`/users/${form.value.id}`, {
@@ -211,9 +244,13 @@ async function handleUpdateUser() {
       const idx = users.value.findIndex(u => u.id === form.value.id)
       if (idx !== -1) {
         users.value[idx] = {
+          ...users.value[idx],
           ...resData,
-          department: resData.department || form.value.department || 'ICT',
-          status: resData.status || form.value.status || 'Active'
+          name: form.value.name,
+          email: form.value.email,
+          role: form.value.role,
+          department: form.value.department,
+          status: form.value.status
         }
       }
     } else {
@@ -224,14 +261,21 @@ async function handleUpdateUser() {
   } finally {
     saveLocalUsers()
     showEditModal.value = false
+    resetForm()
   }
 }
 
 function updateLocalUser() {
   const idx = users.value.findIndex(u => u.id === form.value.id)
   if (idx !== -1) {
-    users.value[idx] = { ...users.value[idx], ...form.value }
-    delete users.value[idx].password
+    users.value[idx] = { 
+      ...users.value[idx], 
+      name: form.value.name,
+      email: form.value.email,
+      role: form.value.role,
+      department: form.value.department,
+      status: form.value.status
+    }
   }
 }
 
@@ -407,17 +451,34 @@ async function handleDeleteUser() {
         <div class="space-y-3 text-xs">
           <div>
             <label class="block font-bold text-slate-700 mb-1">Full Name</label>
-            <input v-model="form.name" placeholder="e.g. Percival Banting" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
+            <input 
+              v-model="form.name" 
+              placeholder="e.g. Percival Banting" 
+              class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" 
+            />
+            <p v-if="formErrors.name" class="text-[11px] text-rose-600 mt-1 font-medium">{{ formErrors.name }}</p>
           </div>
 
           <div>
             <label class="block font-bold text-slate-700 mb-1">Email Address</label>
-            <input v-model="form.email" type="email" placeholder="e.g. p.banting@bma.edu.ph" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
+            <input 
+              v-model="form.email" 
+              type="email" 
+              placeholder="e.g. p.banting@bma.edu.ph" 
+              class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" 
+            />
+            <p v-if="formErrors.email" class="text-[11px] text-rose-600 mt-1 font-medium">{{ formErrors.email }}</p>
           </div>
 
           <div>
             <label class="block font-bold text-slate-700 mb-1">Initial Password</label>
-            <input v-model="form.password" type="password" placeholder="••••••••" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
+            <input 
+              v-model="form.password" 
+              type="password" 
+              placeholder="••••••••" 
+              class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" 
+            />
+            <p v-if="formErrors.password" class="text-[11px] text-rose-600 mt-1 font-medium">{{ formErrors.password }}</p>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
@@ -472,16 +533,18 @@ async function handleDeleteUser() {
           <div>
             <label class="block font-bold text-slate-700 mb-1">Full Name</label>
             <input v-model="form.name" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
+            <p v-if="formErrors.name" class="text-[11px] text-rose-600 mt-1 font-medium">{{ formErrors.name }}</p>
           </div>
 
           <div>
             <label class="block font-bold text-slate-700 mb-1">Email Address</label>
             <input v-model="form.email" type="email" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
+            <p v-if="formErrors.email" class="text-[11px] text-rose-600 mt-1 font-medium">{{ formErrors.email }}</p>
           </div>
 
           <div>
-            <label class="block font-bold text-slate-700 mb-1">Reset Password</label>
-            <input v-model="form.password" type="password" placeholder="New Password" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
+            <label class="block font-bold text-slate-700 mb-1">Reset Password (Optional)</label>
+            <input v-model="form.password" type="password" placeholder="Leave blank to keep current password" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
 
           <div class="grid grid-cols-2 gap-3">
