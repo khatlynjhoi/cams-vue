@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { 
@@ -26,10 +26,10 @@ const authStore = useAuthStore()
 const isSidebarOpen = ref(true)
 const showUserMenu = ref(false)
 
-// Determine if current page is login to hide navigation wrapper entirely
+// Hide navigation frame on login page
 const isLoginPage = computed(() => route.path === '/login')
 
-// Role-based Navigation Links
+// Navigation Links with Role Filters
 const navigationItems = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard, roles: ['Admin', 'Assessment Officer', 'Instructor', 'Cadet'] },
   { name: 'Courses', path: '/courses', icon: BookOpen, roles: ['Admin', 'Assessment Officer', 'Instructor'] },
@@ -41,40 +41,32 @@ const navigationItems = [
   { name: 'Student Exam Portal', path: '/student-exam', icon: GraduationCap, roles: ['Cadet', 'Admin'] }
 ]
 
-// Dynamic Active User Data
+// Pure reactive compute from authStore without static fallbacks
 const currentUser = computed(() => {
-  const user = authStore.user || JSON.parse(localStorage.getItem('cams_user') || '{}')
-  const name = user.name || 'IT Administrator'
-  const email = user.email || 'it@bma.edu.ph'
-  const role = user.role || 'Admin'
-  
-  const initials = name
-    .split(' ')
-    .map(n => n[0])
-    .join('')
-    .substring(0, 2)
-    .toUpperCase()
+  const u = authStore.user
+  if (!u) {
+    return { name: 'Not Logged In', email: '', role: 'Guest', initials: '--' }
+  }
+
+  const name = u.name || 'User'
+  const email = u.email || ''
+  const role = u.role || 'User'
+  const initials = authStore.userInitials || 'US'
 
   return { name, email, role, initials }
 })
 
-// Filter navigation items by active user role
 const filteredNavigationItems = computed(() => {
-  const userRole = currentUser.value.role
+  const userRole = (currentUser.value.role || '').toLowerCase()
   return navigationItems.filter(item => {
     if (!item.roles) return true
-    return item.roles.some(r => r.toLowerCase() === userRole.toLowerCase())
+    return item.roles.some(r => r.toLowerCase() === userRole) || userRole === 'admin'
   })
 })
 
-async function handleLogout() {
+function handleLogout() {
   showUserMenu.value = false
-  if (authStore.logout) {
-    await authStore.logout()
-  } else {
-    localStorage.removeItem('cams_token')
-    localStorage.removeItem('cams_user')
-  }
+  authStore.logout()
   router.push('/login')
 }
 </script>
@@ -96,12 +88,12 @@ async function handleLogout() {
     <aside 
       v-if="!isLoginPage"
       :class="[
-        'bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 fixed inset-y-0 z-50 transition-all duration-300 ease-in-out shadow-[4px_0_24px_rgba(0,0,0,0.02)]',
+        'bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 fixed inset-y-0 z-50 transition-all duration-300 ease-in-out shadow-xs',
         isSidebarOpen ? 'w-64 translate-x-0' : '-translate-x-full w-64'
       ]"
     >
       <div class="p-5 space-y-8 overflow-y-auto custom-scrollbar">
-        <!-- System Logo & Title + Close Button -->
+        <!-- Logo Header -->
         <div class="flex items-start justify-between">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 bg-[#123524] rounded-xl flex items-center justify-center font-black text-white text-lg tracking-wider shadow-md">
@@ -147,10 +139,9 @@ async function handleLogout() {
         </nav>
       </div>
 
-      <!-- Authenticated User Profile Footer -->
+      <!-- User Profile Footer -->
       <div class="relative mt-auto border-t border-slate-100 bg-slate-50 p-4">
         
-        <!-- User Menu Popup (Purged Hardcoded Accounts) -->
         <transition
           enter-active-class="transition ease-out duration-200"
           enter-from-class="transform opacity-0 translate-y-2"
@@ -164,7 +155,7 @@ async function handleLogout() {
             class="absolute bottom-full left-4 mb-3 w-56 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-50 p-3 space-y-3"
           >
             <div class="space-y-1">
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Account</p>
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Session</p>
               <p class="text-xs font-bold text-slate-800 truncate">{{ currentUser.name }}</p>
               <p class="text-[11px] text-slate-500 truncate">{{ currentUser.email }}</p>
               <div class="mt-1 flex items-center gap-1">
@@ -185,7 +176,6 @@ async function handleLogout() {
           </div>
         </transition>
 
-        <!-- User Profile Card Button -->
         <button 
           @click="showUserMenu = !showUserMenu"
           class="w-full flex items-center justify-between p-2.5 -m-1 hover:bg-white border border-transparent hover:border-slate-200 hover:shadow-sm rounded-xl transition-all cursor-pointer group"
@@ -202,7 +192,6 @@ async function handleLogout() {
           <MoreVertical :size="16" class="text-slate-400 group-hover:text-slate-700 transition-colors" />
         </button>
 
-        <!-- Click outside overlay to close dropdown -->
         <div 
           v-if="showUserMenu" 
           @click="showUserMenu = false" 
@@ -211,14 +200,7 @@ async function handleLogout() {
       </div>
     </aside>
 
-    <!-- Mobile Backdrop Overlay -->
-    <div 
-      v-if="!isLoginPage && isSidebarOpen" 
-      @click="isSidebarOpen = false"
-      class="fixed inset-0 bg-slate-900/20 z-40 lg:hidden"
-    ></div>
-
-    <!-- Main View Area -->
+    <!-- Main Content Area -->
     <main 
       :class="[
         'flex-1 min-h-screen transition-all duration-300 ease-in-out',

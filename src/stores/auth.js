@@ -2,7 +2,6 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 export const useAuthStore = defineStore('auth', () => {
-  // Safe LocalStorage Parser
   function safeParseStorage(key) {
     try {
       const item = localStorage.getItem(key)
@@ -12,46 +11,34 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // Initialize State from LocalStorage for persistence across reloads
-  const storedUser = safeParseStorage('user') || {
-    name: 'IT Administrator',
-    email: 'admin@bma.edu.ph',
-    role: 'Admin',
-    department: 'ICT'
-  }
-  const storedToken = localStorage.getItem('token') || 'mock-token-admin'
+  // Initialize state from localStorage without forcing mock defaults
+  const rawUser = safeParseStorage('cams_user') || safeParseStorage('user')
+  const rawToken = localStorage.getItem('cams_token') || localStorage.getItem('token')
 
-  const user = ref(storedUser)
-  const token = ref(storedToken)
-  const isAuthenticated = ref(!!storedToken)
+  const user = ref(rawUser)
+  const token = ref(rawToken)
+  const isAuthenticated = computed(() => !!token.value && !!user.value)
 
   // Role Checks (Case-insensitive)
   const userRole = computed(() => (user.value?.role || '').toLowerCase())
 
-  const isAdmin = computed(() => userRole.value === 'admin')
-  const isAssessmentOfficer = computed(() =>
-    ['assessment officer', 'assessor'].includes(userRole.value)
-  )
+  const isAdmin = computed(() => userRole.value === 'admin' || userRole.value === 'it administrator')
+  const isAssessmentOfficer = computed(() => ['assessment officer', 'assessor'].includes(userRole.value))
   const isInstructor = computed(() => userRole.value === 'instructor')
   const isCadet = computed(() => userRole.value === 'cadet')
 
-  const isAdminOrAssessor = computed(() =>
-    ['admin', 'assessor', 'assessment officer'].includes(userRole.value)
-  )
-
-  // User Name Initials Helper (e.g. "Percival Banting" -> "PB")
+  // User Name Initials Helper (e.g., "Percival Banting" -> "PB")
   const userInitials = computed(() => {
-    if (!user.value?.name) return 'CAMS'
-    return user.value.name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .substring(0, 2)
-      .toUpperCase()
+    if (!user.value?.name) return 'US'
+    const parts = user.value.name.trim().split(' ')
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+    }
+    return user.value.name.slice(0, 2).toUpperCase()
   })
 
   /**
-   * Authenticate User with fallback mock login and local persistence
+   * Authenticate User and save to storage
    */
   async function login(email, password) {
     if (email && password) {
@@ -64,9 +51,11 @@ export const useAuthStore = defineStore('auth', () => {
         ? 'Instructor' 
         : 'Admin'
 
+      const formattedName = email.split('@')[0].replace('.', ' ').toUpperCase()
+
       const userData = {
-        name: email.split('@')[0].replace('.', ' ').toUpperCase(),
-        email,
+        name: formattedName || 'IT Administrator',
+        email: email.toLowerCase(),
         role: assignedRole,
         department: isCadetUser ? 'BSMT' : 'ICT'
       }
@@ -75,9 +64,11 @@ export const useAuthStore = defineStore('auth', () => {
 
       user.value = userData
       token.value = authToken
-      isAuthenticated.value = true
 
+      // Unified storage keys
+      localStorage.setItem('cams_user', JSON.stringify(userData))
       localStorage.setItem('user', JSON.stringify(userData))
+      localStorage.setItem('cams_token', authToken)
       localStorage.setItem('token', authToken)
 
       return true
@@ -86,44 +77,17 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Switch Active User Account (Integration with Sidebar User Switcher)
-   */
-  function switchUserAccount(account) {
-    const mockAuthToken = `mock-token-${account.role.toLowerCase()}`
-    
-    user.value = {
-      name: account.name,
-      email: account.email,
-      role: account.role,
-      department: account.department || 'ICT'
-    }
-    token.value = mockAuthToken
-    isAuthenticated.value = true
-
-    localStorage.setItem('user', JSON.stringify(user.value))
-    localStorage.setItem('token', mockAuthToken)
-  }
-
-  /**
-   * Update Profile Details in State & Storage
-   */
-  function updateUserProfile(updatedFields) {
-    if (user.value) {
-      user.value = { ...user.value, ...updatedFields }
-      localStorage.setItem('user', JSON.stringify(user.value))
-    }
-  }
-
-  /**
    * Clear Session State & Local Storage
    */
   function logout() {
     user.value = null
     token.value = null
-    isAuthenticated.value = false
 
+    localStorage.removeItem('cams_user')
+    localStorage.removeItem('cams_token')
     localStorage.removeItem('user')
     localStorage.removeItem('token')
+    localStorage.removeItem('cams_users_list')
   }
 
   return {
@@ -135,11 +99,8 @@ export const useAuthStore = defineStore('auth', () => {
     isAssessmentOfficer,
     isInstructor,
     isCadet,
-    isAdminOrAssessor,
     userInitials,
     login,
-    switchUserAccount,
-    updateUserProfile,
     logout
   }
 })

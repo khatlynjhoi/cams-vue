@@ -56,7 +56,7 @@ const routes = [
   },
   {
     path: '/analytics',
-    redirect: to => ({ path: '/reports', query: { tab: 'analytics' } })
+    redirect: () => ({ path: '/reports', query: { tab: 'analytics' } })
   },
 
   // 7. User Management
@@ -86,7 +86,7 @@ const routes = [
   // Fallback Catch-All Route
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/'
+    redirect: '/login'
   }
 ]
 
@@ -98,20 +98,18 @@ const router = createRouter({
   }
 })
 
-// Navigation Guard for Authentication and Roles
+// Navigation Guard
 router.beforeEach((to, from, next) => {
-  // Support both key formats (cams_token & token)
   const token = localStorage.getItem('cams_token') || localStorage.getItem('token')
-  
-  let user = {}
+  let user = null
+
   try {
-    user = JSON.parse(
-      localStorage.getItem('cams_user') || 
-      localStorage.getItem('user') || 
-      '{}'
-    )
+    const raw = localStorage.getItem('cams_user') || localStorage.getItem('user')
+    if (raw && raw !== 'null' && raw !== 'undefined') {
+      user = JSON.parse(raw)
+    }
   } catch (e) {
-    user = {}
+    user = null
   }
 
   // Update Page Title
@@ -119,31 +117,29 @@ router.beforeEach((to, from, next) => {
     document.title = to.meta.title
   }
 
-  // Allow guest access if no token check is enforced or token exists
-  if (to.meta.requiresAuth && !token) {
-    // If no token exists in development, auto-seed admin token to prevent login loops
-    localStorage.setItem('cams_token', 'dev-session-token')
-    localStorage.setItem('cams_user', JSON.stringify({ name: 'IT Administrator', email: 'it@bma.edu.ph', role: 'admin' }))
+  const isValidToken = token && token !== 'null' && token !== 'undefined'
+
+  // 1. Force strict redirect to /login if token is missing
+  if (to.meta.requiresAuth && !isValidToken) {
+    return next({ name: 'Login' })
   }
 
-  // Prevent Authenticated Users from Accessing Guest-only Routes (e.g. Login)
-  if (to.meta.guestOnly && token) {
-    return next('/')
+  // 2. Prevent authenticated users from visiting /login
+  if (to.meta.guestOnly && isValidToken) {
+    return next({ name: 'Dashboard' })
   }
 
-  // Role Access Validation
-  const userRole = (user.role || 'admin').toLowerCase()
-
-  // Single Role Requirement Check
-  if (to.meta.role && userRole !== to.meta.role.toLowerCase() && userRole !== 'admin') {
-    return next('/')
-  }
-
-  // Multiple Roles Requirement Check
-  if (to.meta.roles && Array.isArray(to.meta.roles)) {
-    const allowedRoles = to.meta.roles.map(r => r.toLowerCase())
-    if (!allowedRoles.includes(userRole) && userRole !== 'admin') {
-      return next('/')
+  // 3. Role Validation
+  if (user) {
+    const userRole = (user.role || '').toLowerCase()
+    if (to.meta.role && userRole !== to.meta.role.toLowerCase() && userRole !== 'admin') {
+      return next({ name: 'Dashboard' })
+    }
+    if (to.meta.roles && Array.isArray(to.meta.roles)) {
+      const allowed = to.meta.roles.map(r => r.toLowerCase())
+      if (!allowed.includes(userRole) && userRole !== 'admin') {
+        return next({ name: 'Dashboard' })
+      }
     }
   }
 
