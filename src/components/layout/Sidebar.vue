@@ -1,8 +1,8 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { 
   LayoutDashboard, Database, BookOpen, PenTool, 
-  Settings, PieChart, Users, GraduationCap, X, MoreVertical, LogOut, UserCheck
+  Settings, PieChart, Users, GraduationCap, X, MoreVertical, LogOut, Shield
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
@@ -21,7 +21,7 @@ const router = useRouter()
 const showUserMenu = ref(false)
 
 /**
- * Normalized user role for permission checks
+ * Normalized user role for menu authorization
  */
 const userRole = computed(() => {
   const rawRole = auth.user?.role || ''
@@ -32,14 +32,14 @@ const userRole = computed(() => {
   if (['instructor', 'faculty'].includes(normalized)) return 'Instructor'
   if (['cadet', 'student'].includes(normalized)) return 'Cadet'
   
-  return rawRole || 'Guest'
+  return rawRole || 'Admin'
 })
 
 /**
- * Generate 2-letter avatar initials dynamically from user's full name
+ * Generate 2-letter avatar initials dynamically from user name
  */
 const userInitials = computed(() => {
-  const name = auth.user?.name || 'User'
+  const name = auth.user?.name || 'Admin User'
   const parts = name.trim().split(' ')
   if (parts.length >= 2) {
     return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
@@ -112,7 +112,9 @@ const filteredMenuItems = computed(() => {
 
 async function handleLogout() {
   showUserMenu.value = false
-  await auth.logout()
+  if (auth.logout) {
+    await auth.logout()
+  }
   router.push('/login')
 }
 </script>
@@ -180,32 +182,41 @@ async function handleLogout() {
 
       <!-- Authenticated User Profile Footer -->
       <div class="p-3 border-t border-gray-200 relative bg-gray-50/50">
-        <!-- Dropdown Popup for User Actions -->
+        <!-- User Profile Popup (Purged Mock Accounts) -->
         <div 
           v-if="showUserMenu" 
-          class="absolute bottom-16 left-3 right-3 bg-white rounded-xl shadow-lg border border-gray-200 p-2 z-40 space-y-1"
+          class="absolute bottom-16 left-3 right-3 bg-white rounded-xl shadow-xl border border-gray-200 p-3 z-40 space-y-3"
         >
-          <div class="px-3 py-2 border-b border-gray-100">
-            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Signed in as</p>
-            <p class="text-sm font-medium text-gray-900 truncate">{{ auth.user?.name || 'User' }}</p>
-            <span class="inline-block mt-0.5 px-2 py-0.5 text-xs bg-emerald-100 text-emerald-800 rounded font-medium">
-              {{ auth.user?.role || 'Admin' }}
-            </span>
+          <div class="space-y-1">
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Active Account</p>
+            <p class="text-sm font-bold text-gray-900 truncate">{{ auth.user?.name || 'IT Administrator' }}</p>
+            <p class="text-xs text-gray-500 truncate">{{ auth.user?.email || 'it@bma.edu.ph' }}</p>
+            <div class="mt-1 flex items-center gap-1.5">
+              <Shield :size="12" class="text-emerald-600" />
+              <span class="text-xs text-emerald-800 font-semibold">
+                {{ auth.user?.role || 'Admin' }}
+              </span>
+            </div>
           </div>
 
-          <button 
-            @click="handleLogout"
-            class="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-          >
-            <LogOut :size="14" />
-            Sign Out
-          </button>
+          <div class="border-t border-gray-100 pt-2">
+            <button 
+              @click="handleLogout"
+              class="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+            >
+              <LogOut :size="14" />
+              Log out
+            </button>
+          </div>
         </div>
 
         <!-- Profile Bar Button -->
-        <div class="flex items-center justify-between p-2 rounded-lg hover:bg-gray-100/80 transition-colors cursor-pointer" @click="showUserMenu = !showUserMenu">
+        <div 
+          class="flex items-center justify-between p-2 rounded-lg hover:bg-gray-200/60 transition-colors cursor-pointer" 
+          @click="showUserMenu = !showUserMenu"
+        >
           <div class="flex items-center gap-2.5 overflow-hidden">
-            <div class="w-8 h-8 rounded-full bg-emerald-900 text-white font-semibold text-xs flex items-center justify-center shrink-0">
+            <div class="w-8 h-8 rounded-full bg-emerald-900 text-white font-semibold text-xs flex items-center justify-center shrink-0 shadow-sm">
               {{ userInitials }}
             </div>
             <div class="overflow-hidden text-left">
@@ -217,7 +228,7 @@ async function handleLogout() {
               </p>
             </div>
           </div>
-          <button class="text-gray-400 hover:text-gray-600 p-1">
+          <button class="text-gray-400 hover:text-gray-600 p-1" aria-label="User menu options">
             <MoreVertical :size="16" />
           </button>
         </div>
