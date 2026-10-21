@@ -3,33 +3,19 @@ import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { 
-  LayoutDashboard, 
-  BookOpen, 
-  HelpCircle, 
-  Wrench, 
-  SlidersHorizontal, 
-  BarChart3, 
-  Users, 
-  GraduationCap,
-  LogOut,
-  MoreVertical,
-  Menu,
-  ChevronLeft,
-  Shield
+  LayoutDashboard, BookOpen, HelpCircle, Wrench, SlidersHorizontal, 
+  BarChart3, Users, GraduationCap, LogOut, MoreVertical, Menu, ChevronLeft, Shield
 } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
-// UI State
 const isSidebarOpen = ref(true)
 const showUserMenu = ref(false)
 
-// Hide navigation frame on login page
 const isLoginPage = computed(() => route.path === '/login')
 
-// Navigation Links with Role Filters
 const navigationItems = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard, roles: ['Admin', 'Assessment Officer', 'Instructor', 'Cadet'] },
   { name: 'Courses', path: '/courses', icon: BookOpen, roles: ['Admin', 'Assessment Officer', 'Instructor'] },
@@ -41,19 +27,18 @@ const navigationItems = [
   { name: 'Student Exam Portal', path: '/student-exam', icon: GraduationCap, roles: ['Cadet', 'Admin'] }
 ]
 
-// Pure reactive compute from authStore without static fallbacks
 const currentUser = computed(() => {
   const u = authStore.user
   if (!u) {
     return { name: 'Not Logged In', email: '', role: 'Guest', initials: '--' }
   }
 
-  const name = u.name || 'User'
-  const email = u.email || ''
-  const role = u.role || 'User'
-  const initials = authStore.userInitials || 'US'
-
-  return { name, email, role, initials }
+  return {
+    name: u.name || 'User',
+    email: u.email || '',
+    role: u.role || 'User',
+    initials: authStore.userInitials || 'US'
+  }
 })
 
 const filteredNavigationItems = computed(() => {
@@ -74,17 +59,15 @@ function handleLogout() {
 <template>
   <div class="min-h-screen bg-slate-50 flex text-slate-800 antialiased font-sans overflow-x-hidden">
     
-    <!-- Floating Menu Toggle (Visible only when sidebar is closed and not on login page) -->
     <button 
       v-if="!isLoginPage && !isSidebarOpen"
       @click="isSidebarOpen = true"
       class="fixed top-5 left-5 z-40 p-2.5 bg-white border border-slate-200 shadow-sm rounded-xl hover:bg-slate-50 text-slate-600 transition-all cursor-pointer group"
       title="Open Menu"
     >
-      <Menu :size="20" class="group-hover:scale-110 transition-transform" />
+      <Menu :size="20" />
     </button>
 
-    <!-- Navigation Sidebar -->
     <aside 
       v-if="!isLoginPage"
       :class="[
@@ -93,7 +76,6 @@ function handleLogout() {
       ]"
     >
       <div class="p-5 space-y-8 overflow-y-auto custom-scrollbar">
-        <!-- Logo Header -->
         <div class="flex items-start justify-between">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 bg-[#123524] rounded-xl flex items-center justify-center font-black text-white text-lg tracking-wider shadow-md">
@@ -104,16 +86,11 @@ function handleLogout() {
               <p class="text-[10px] text-emerald-700 font-semibold tracking-wide">STCW Exam Engine v2.4</p>
             </div>
           </div>
-          <button 
-            @click="isSidebarOpen = false" 
-            class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-            title="Collapse Sidebar"
-          >
+          <button @click="isSidebarOpen = false" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">
             <ChevronLeft :size="18" />
           </button>
         </div>
 
-        <!-- Navigation Links -->
         <nav class="space-y-1.5">
           <router-link
             v-for="item in filteredNavigationItems"
@@ -129,19 +106,14 @@ function handleLogout() {
             <component 
               :is="item.icon" 
               :size="18" 
-              :class="[
-                'transition-colors',
-                route.path === item.path ? 'text-emerald-600' : 'text-slate-400 group-hover:text-slate-600'
-              ]" 
+              :class="route.path === item.path ? 'text-emerald-600' : 'text-slate-400 group-hover:text-slate-600'" 
             />
             <span>{{ item.name }}</span>
           </router-link>
         </nav>
       </div>
 
-      <!-- User Profile Footer -->
       <div class="relative mt-auto border-t border-slate-100 bg-slate-50 p-4">
-        
         <transition
           enter-active-class="transition ease-out duration-200"
           enter-from-class="transform opacity-0 translate-y-2"
@@ -155,7 +127,7 @@ function handleLogout() {
             class="absolute bottom-full left-4 mb-3 w-56 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-50 p-3 space-y-3"
           >
             <div class="space-y-1">
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Session</p>
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Account</p>
               <p class="text-xs font-bold text-slate-800 truncate">{{ currentUser.name }}</p>
               <p class="text-[11px] text-slate-500 truncate">{{ currentUser.email }}</p>
               <div class="mt-1 flex items-center gap-1">
@@ -178,10 +150,10 @@ function handleLogout() {
 
         <button 
           @click="showUserMenu = !showUserMenu"
-          class="w-full flex items-center justify-between p-2.5 -m-1 hover:bg-white border border-transparent hover:border-slate-200 hover:shadow-sm rounded-xl transition-all cursor-pointer group"
+          class="w-full flex items-center justify-between p-2.5 -m-1 hover:bg-white border border-transparent hover:border-slate-200 rounded-xl transition-all cursor-pointer group"
         >
           <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-full bg-[#123524] text-white font-bold flex items-center justify-center text-xs shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+            <div class="w-9 h-9 rounded-full bg-[#123524] text-white font-bold flex items-center justify-center text-xs shadow-xs shrink-0">
               {{ currentUser.initials }}
             </div>
             <div class="text-left overflow-hidden">
@@ -189,41 +161,15 @@ function handleLogout() {
               <p class="text-[10px] text-slate-400 truncate">{{ currentUser.email }}</p>
             </div>
           </div>
-          <MoreVertical :size="16" class="text-slate-400 group-hover:text-slate-700 transition-colors" />
+          <MoreVertical :size="16" class="text-slate-400 group-hover:text-slate-700" />
         </button>
 
-        <div 
-          v-if="showUserMenu" 
-          @click="showUserMenu = false" 
-          class="fixed inset-0 z-40"
-        ></div>
+        <div v-if="showUserMenu" @click="showUserMenu = false" class="fixed inset-0 z-40"></div>
       </div>
     </aside>
 
-    <!-- Main Content Area -->
-    <main 
-      :class="[
-        'flex-1 min-h-screen transition-all duration-300 ease-in-out',
-        isLoginPage ? 'pl-0' : (isSidebarOpen ? 'lg:pl-64 pl-0' : 'pl-0')
-      ]"
-    >
+    <main :class="['flex-1 min-h-screen transition-all duration-300', isLoginPage ? 'pl-0' : (isSidebarOpen ? 'lg:pl-64 pl-0' : 'pl-0')]">
       <router-view />
     </main>
   </div>
 </template>
-
-<style scoped>
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-.custom-scrollbar:hover::-webkit-scrollbar-thumb {
-  background: #94a3b8;
-}
-</style>

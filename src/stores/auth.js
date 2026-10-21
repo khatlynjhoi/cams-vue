@@ -2,24 +2,29 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 export const useAuthStore = defineStore('auth', () => {
-  function safeParseStorage(key) {
+  // Safe LocalStorage Reader
+  function getStorageItem(key) {
+    const val = localStorage.getItem(key)
+    if (!val || val === 'null' || val === 'undefined') return null
+    return val
+  }
+
+  function parseInitialUser() {
+    const raw = getStorageItem('cams_user') || getStorageItem('user')
+    if (!raw) return null
     try {
-      const item = localStorage.getItem(key)
-      return item ? JSON.parse(item) : null
+      return JSON.parse(raw)
     } catch (e) {
       return null
     }
   }
 
-  // Initialize state from localStorage without forcing mock defaults
-  const rawUser = safeParseStorage('cams_user') || safeParseStorage('user')
-  const rawToken = localStorage.getItem('cams_token') || localStorage.getItem('token')
+  // Reactive State
+  const user = ref(parseInitialUser())
+  const token = ref(getStorageItem('cams_token') || getStorageItem('token'))
 
-  const user = ref(rawUser)
-  const token = ref(rawToken)
+  // Computed Getters
   const isAuthenticated = computed(() => !!token.value && !!user.value)
-
-  // Role Checks (Case-insensitive)
   const userRole = computed(() => (user.value?.role || '').toLowerCase())
 
   const isAdmin = computed(() => userRole.value === 'admin' || userRole.value === 'it administrator')
@@ -27,9 +32,8 @@ export const useAuthStore = defineStore('auth', () => {
   const isInstructor = computed(() => userRole.value === 'instructor')
   const isCadet = computed(() => userRole.value === 'cadet')
 
-  // User Name Initials Helper (e.g., "Percival Banting" -> "PB")
   const userInitials = computed(() => {
-    if (!user.value?.name) return 'US'
+    if (!user.value?.name) return '--'
     const parts = user.value.name.trim().split(' ')
     if (parts.length >= 2) {
       return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
@@ -38,46 +42,45 @@ export const useAuthStore = defineStore('auth', () => {
   })
 
   /**
-   * Authenticate User and save to storage
+   * Authenticates user and persists standardized keys to LocalStorage
    */
   async function login(email, password) {
-    if (email && password) {
-      const isCadetUser = email.includes('student') || email.includes('cadet')
-      const isInstructorUser = email.includes('instructor') || email.includes('capt')
+    if (!email || !password) return false
 
-      const assignedRole = isCadetUser 
-        ? 'Cadet' 
-        : isInstructorUser 
-        ? 'Instructor' 
-        : 'Admin'
+    const isCadetUser = email.includes('student') || email.includes('cadet')
+    const isInstructorUser = email.includes('instructor') || email.includes('capt')
 
-      const formattedName = email.split('@')[0].replace('.', ' ').toUpperCase()
+    const assignedRole = isCadetUser 
+      ? 'Cadet' 
+      : isInstructorUser 
+      ? 'Instructor' 
+      : 'Admin'
 
-      const userData = {
-        name: formattedName || 'IT Administrator',
-        email: email.toLowerCase(),
-        role: assignedRole,
-        department: isCadetUser ? 'BSMT' : 'ICT'
-      }
+    const formattedName = email.split('@')[0].replace('.', ' ').toUpperCase()
 
-      const authToken = `token-${Date.now()}`
-
-      user.value = userData
-      token.value = authToken
-
-      // Unified storage keys
-      localStorage.setItem('cams_user', JSON.stringify(userData))
-      localStorage.setItem('user', JSON.stringify(userData))
-      localStorage.setItem('cams_token', authToken)
-      localStorage.setItem('token', authToken)
-
-      return true
+    const userData = {
+      name: formattedName || 'IT Administrator',
+      email: email.toLowerCase(),
+      role: assignedRole,
+      department: isCadetUser ? 'BSMT' : 'ICT'
     }
-    return false
+
+    const authToken = `token-${Date.now()}`
+
+    user.value = userData
+    token.value = authToken
+
+    // Save under standardized & legacy keys for full compatibility
+    localStorage.setItem('cams_user', JSON.stringify(userData))
+    localStorage.setItem('user', JSON.stringify(userData))
+    localStorage.setItem('cams_token', authToken)
+    localStorage.setItem('token', authToken)
+
+    return true
   }
 
   /**
-   * Clear Session State & Local Storage
+   * Purges all session storage keys and resets Pinia state
    */
   function logout() {
     user.value = null
