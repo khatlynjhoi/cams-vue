@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -12,13 +13,14 @@ import {
   GraduationCap,
   LogOut,
   MoreVertical,
-  Check,
   Menu,
-  ChevronLeft
+  ChevronLeft,
+  Shield
 } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 // UI State
 const isSidebarOpen = ref(true)
@@ -27,52 +29,52 @@ const showUserMenu = ref(false)
 // Determine if current page is login to hide navigation wrapper entirely
 const isLoginPage = computed(() => route.path === '/login')
 
-// Exact Navigation Order Alignment
+// Role-based Navigation Links
 const navigationItems = [
-  { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { name: 'Courses', path: '/courses', icon: BookOpen },
-  { name: 'Question Bank', path: '/questions', icon: HelpCircle },
-  { name: 'Test Builder', path: '/test-builder', icon: Wrench },
-  { name: 'Pilot Administration', path: '/pilot-admin', icon: SlidersHorizontal },
-  { name: 'Reports & Analysis', path: '/reports', icon: BarChart3 },
-  { name: 'User Management', path: '/users', icon: Users },
-  { name: 'Student Exam Portal', path: '/student-exam', icon: GraduationCap }
+  { name: 'Dashboard', path: '/', icon: LayoutDashboard, roles: ['Admin', 'Assessment Officer', 'Instructor', 'Cadet'] },
+  { name: 'Courses', path: '/courses', icon: BookOpen, roles: ['Admin', 'Assessment Officer', 'Instructor'] },
+  { name: 'Question Bank', path: '/questions', icon: HelpCircle, roles: ['Admin', 'Assessment Officer', 'Instructor'] },
+  { name: 'Test Builder', path: '/test-builder', icon: Wrench, roles: ['Admin', 'Assessment Officer', 'Instructor'] },
+  { name: 'Pilot Administration', path: '/pilot-admin', icon: SlidersHorizontal, roles: ['Admin', 'Assessment Officer'] },
+  { name: 'Reports & Analysis', path: '/reports', icon: BarChart3, roles: ['Admin', 'Assessment Officer', 'Instructor'] },
+  { name: 'User Management', path: '/users', icon: Users, roles: ['Admin'] },
+  { name: 'Student Exam Portal', path: '/student-exam', icon: GraduationCap, roles: ['Cadet', 'Admin'] }
 ]
 
-const currentUser = ref({ 
-  name: 'Assessment Officer', 
-  email: 'admin@bma.edu.ph', 
-  role: 'admin',
-  initials: 'BMA' 
+// Dynamic Active User Data
+const currentUser = computed(() => {
+  const user = authStore.user || JSON.parse(localStorage.getItem('cams_user') || '{}')
+  const name = user.name || 'IT Administrator'
+  const email = user.email || 'it@bma.edu.ph'
+  const role = user.role || 'Admin'
+  
+  const initials = name
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase()
+
+  return { name, email, role, initials }
 })
 
-// Mock accounts for quick role switching
-const availableAccounts = [
-  { name: 'Admin User', email: 'admin@bma.edu.ph', role: 'admin' },
-  { name: 'Capt. Ramirez', email: 'e.ramirez@bma.edu.ph', role: 'instructor' },
-  { name: 'Cadet Dela Cruz', email: 'j.delacruz@student.bma.edu.ph', role: 'cadet' }
-]
-
-onMounted(() => {
-  try {
-    const user = JSON.parse(localStorage.getItem('user') || '{}')
-    if (user.name) {
-      currentUser.value = user
-      currentUser.value.initials = user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-    }
-  } catch (e) {}
+// Filter navigation items by active user role
+const filteredNavigationItems = computed(() => {
+  const userRole = currentUser.value.role
+  return navigationItems.filter(item => {
+    if (!item.roles) return true
+    return item.roles.some(r => r.toLowerCase() === userRole.toLowerCase())
+  })
 })
 
-function switchAccount(account) {
-  localStorage.setItem('user', JSON.stringify(account))
-  localStorage.setItem('token', 'mock-token-' + account.role)
+async function handleLogout() {
   showUserMenu.value = false
-  window.location.href = '/' // Hard reload to apply new role routes
-}
-
-function handleLogout() {
-  localStorage.removeItem('token')
-  localStorage.removeItem('user')
+  if (authStore.logout) {
+    await authStore.logout()
+  } else {
+    localStorage.removeItem('cams_token')
+    localStorage.removeItem('cams_user')
+  }
   router.push('/login')
 }
 </script>
@@ -122,7 +124,7 @@ function handleLogout() {
         <!-- Navigation Links -->
         <nav class="space-y-1.5">
           <router-link
-            v-for="item in navigationItems"
+            v-for="item in filteredNavigationItems"
             :key="item.path"
             :to="item.path"
             :class="[
@@ -145,10 +147,10 @@ function handleLogout() {
         </nav>
       </div>
 
-      <!-- User Profile Card & Account Switcher -->
+      <!-- Authenticated User Profile Footer -->
       <div class="relative mt-auto border-t border-slate-100 bg-slate-50 p-4">
         
-        <!-- Account Switcher Popup Menu -->
+        <!-- User Menu Popup (Purged Hardcoded Accounts) -->
         <transition
           enter-active-class="transition ease-out duration-200"
           enter-from-class="transform opacity-0 translate-y-2"
@@ -159,31 +161,22 @@ function handleLogout() {
         >
           <div 
             v-if="showUserMenu" 
-            class="absolute bottom-full left-4 mb-3 w-56 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-50"
+            class="absolute bottom-full left-4 mb-3 w-56 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-50 p-3 space-y-3"
           >
-            <div class="p-2 space-y-1">
-              <div class="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                Switch Account
+            <div class="space-y-1">
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Account</p>
+              <p class="text-xs font-bold text-slate-800 truncate">{{ currentUser.name }}</p>
+              <p class="text-[11px] text-slate-500 truncate">{{ currentUser.email }}</p>
+              <div class="mt-1 flex items-center gap-1">
+                <Shield :size="12" class="text-emerald-600" />
+                <span class="text-[11px] font-semibold text-emerald-700 capitalize">{{ currentUser.role }}</span>
               </div>
-              
-              <button 
-                v-for="acc in availableAccounts" 
-                :key="acc.email"
-                @click="switchAccount(acc)"
-                class="w-full flex items-center justify-between px-3 py-2 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg transition-colors cursor-pointer group"
-              >
-                <div class="flex flex-col text-left">
-                  <span class="font-bold text-xs group-hover:text-emerald-800">{{ acc.name }}</span>
-                  <span class="text-[10px] text-slate-500 capitalize">{{ acc.role }}</span>
-                </div>
-                <Check v-if="currentUser.email === acc.email" :size="14" class="text-emerald-600" />
-              </button>
+            </div>
 
-              <div class="h-px bg-slate-100 my-2"></div>
-
+            <div class="border-t border-slate-100 pt-2">
               <button 
                 @click="handleLogout" 
-                class="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 font-bold rounded-lg transition-colors cursor-pointer"
+                class="w-full flex items-center gap-2 px-3 py-2 text-xs text-rose-600 hover:bg-rose-50 font-bold rounded-lg transition-colors cursor-pointer"
               >
                 <LogOut :size="14" />
                 Log out
@@ -192,7 +185,7 @@ function handleLogout() {
           </div>
         </transition>
 
-        <!-- User Profile Button -->
+        <!-- User Profile Card Button -->
         <button 
           @click="showUserMenu = !showUserMenu"
           class="w-full flex items-center justify-between p-2.5 -m-1 hover:bg-white border border-transparent hover:border-slate-200 hover:shadow-sm rounded-xl transition-all cursor-pointer group"
@@ -209,7 +202,7 @@ function handleLogout() {
           <MoreVertical :size="16" class="text-slate-400 group-hover:text-slate-700 transition-colors" />
         </button>
 
-        <!-- Overlay to close user menu when clicking outside -->
+        <!-- Click outside overlay to close dropdown -->
         <div 
           v-if="showUserMenu" 
           @click="showUserMenu = false" 
@@ -218,7 +211,7 @@ function handleLogout() {
       </div>
     </aside>
 
-    <!-- Overlay for mobile screens when sidebar is open -->
+    <!-- Mobile Backdrop Overlay -->
     <div 
       v-if="!isLoginPage && isSidebarOpen" 
       @click="isSidebarOpen = false"
