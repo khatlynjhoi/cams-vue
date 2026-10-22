@@ -47,7 +47,7 @@ const routes = [
     path: '/student-exam',
     name: 'StudentExam',
     component: () => import('../views/StudentExamView.vue'),
-    meta: { requiresAuth: true, title: 'Student Exam Portal - CAMS Portal' }
+    meta: { requiresAuth: true, roles: ['cadet', 'admin'], title: 'Student Exam Portal - CAMS Portal' }
   },
   {
     path: '/login',
@@ -75,6 +75,16 @@ function getValidToken() {
 
 router.beforeEach((to, from, next) => {
   const token = getValidToken()
+  let user = null
+
+  try {
+    const raw = localStorage.getItem('cams_user') || localStorage.getItem('user')
+    if (raw && raw !== 'null' && raw !== 'undefined') {
+      user = JSON.parse(raw)
+    }
+  } catch (e) {
+    user = null
+  }
 
   if (to.meta.title) {
     document.title = to.meta.title
@@ -87,7 +97,19 @@ router.beforeEach((to, from, next) => {
 
   // 2. Prevent authenticated users from opening guest-only routes (/login)
   if (to.meta.guestOnly && token) {
+    const userRole = (user?.role || '').toLowerCase()
+    if (userRole === 'cadet') {
+      return next('/student-exam')
+    }
     return next('/')
+  }
+
+  // 3. Cadet Protection: Redirect Cadets attempting to navigate to staff routes back to Student Exam
+  if (user) {
+    const userRole = (user.role || '').toLowerCase()
+    if (userRole === 'cadet' && to.path !== '/student-exam') {
+      return next('/student-exam')
+    }
   }
 
   next()

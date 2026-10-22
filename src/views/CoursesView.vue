@@ -1,10 +1,464 @@
+<template>
+  <div class="p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans text-slate-800 antialiased relative min-h-screen bg-slate-50">
+    
+    <!-- CAMS SYSTEM PRELOADER CARD -->
+    <transition
+      enter-active-class="transition ease-out duration-300"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition ease-in duration-200"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div 
+        v-if="isLoading" 
+        class="min-h-125 w-full bg-white/90 backdrop-blur-xs border border-slate-100 rounded-3xl p-12 flex flex-col items-center justify-center text-center space-y-5 shadow-xs"
+      >
+        <!-- CAMS Emblem with Radar Pulse Effect -->
+        <div class="relative flex items-center justify-center">
+          <div class="absolute w-20 h-20 bg-emerald-500/10 rounded-full animate-ping"></div>
+          <div class="absolute w-16 h-16 bg-[#123524]/10 rounded-full animate-pulse"></div>
+          
+          <div class="w-14 h-14 bg-[#123524] rounded-2xl flex items-center justify-center font-black text-white text-2xl tracking-wider shadow-xl relative z-10">
+            C
+          </div>
+        </div>
+
+        <!-- Branding Text & Progress Bar -->
+        <div class="space-y-1.5 max-w-xs">
+          <h3 class="text-base font-bold text-slate-900 tracking-tight">CAMS STCW Portal</h3>
+          <p class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">Synchronizing Course Syllabus Data...</p>
+        </div>
+
+        <div class="w-48 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+          <div class="bg-[#123524] h-full rounded-full animate-pulse w-3/4"></div>
+        </div>
+
+        <p class="text-[10px] text-slate-400 font-mono">Baliwag Maritime Academy System</p>
+      </div>
+    </transition>
+
+    <!-- MAIN COURSES VIEW CONTENT -->
+    <div v-show="!isLoading" class="space-y-6">
+
+      <!-- Module Header Hero Banner -->
+      <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-xs">
+        <div class="space-y-1">
+          <h1 class="text-xl font-bold flex items-center gap-2 text-white tracking-tight">
+            <BookOpen :size="22" class="text-emerald-400" />
+            Course Builder & Syllabus Manager
+          </h1>
+          <p class="text-xs text-slate-200 font-normal">
+            Define Programs, Course Codes, Titles, Course Outcomes (COs), and Learning Objectives (LOs) with hours allocation.
+          </p>
+        </div>
+      </div>
+
+      <!-- Manual Entry / Edit Form Card -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-6">
+        
+        <!-- Card Header -->
+        <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-3 border-b border-slate-100 pb-4">
+
+          <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <Pencil 
+              v-if="editingCourseId" 
+              :size="16" 
+              class="text-amber-600" 
+            />
+            <Plus 
+              v-else 
+              :size="16" 
+              class="text-emerald-700" 
+            /> 
+            {{ editingCourseId ? 'Edit Course Syllabus' : 'Create New Course Syllabus' }}
+          </h2>
+
+          <!-- CSV Actions -->
+          <div class="flex items-center gap-2 shrink-0">
+
+            <button 
+              @click="downloadCSVTemplate" 
+              type="button"
+              class="px-3.5 py-2 bg-white hover:bg-emerald-50 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-300 flex items-center gap-2 transition shadow-xs cursor-pointer"
+            >
+              <Download :size="14" class="text-emerald-700" />
+              Download .CSV Template
+            </button>
+
+            <label 
+              class="px-3.5 py-2 bg-[#123524] hover:bg-[#0e2a1d] text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-xs"
+            >
+              <Upload :size="14" /> 
+              <span>{{ isUploadingBulk ? 'Uploading...' : 'Bulk Upload CSV' }}</span>
+              
+              <input 
+                ref="bulkFileInput" 
+                type="file" 
+                accept=".csv" 
+                @change="handleBulkCSVUpload" 
+                :disabled="isUploadingBulk" 
+                class="hidden" 
+              />
+            </label>
+
+            <button 
+              v-if="editingCourseId" 
+              @click="cancelEdit" 
+              class="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1 font-bold bg-slate-100 px-3 py-2 rounded-xl border border-slate-200 cursor-pointer"
+            >
+              <RotateCcw :size="14" /> Cancel Edit
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Target Program</label>
+            <select v-model="courseProgram" class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer text-slate-900">
+              <option value="BSMT">BSMT</option>
+              <option value="BSMarE">BSMarE</option>
+              <option value="Both">Both (BSMT & BSMarE)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Course Code</label>
+            <input v-model="courseCode" placeholder="e.g. NAV1" class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-mono font-bold focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900" />
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-xs font-bold text-slate-700 mb-1">Course Descriptive Title</label>
+            <input v-model="courseTitle" placeholder="e.g. Navigational Instruments with Compasses" class="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 font-medium" />
+          </div>
+        </div>
+
+        <div class="space-y-6">
+          <div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <span class="text-xs font-bold text-slate-800">Course Outcomes (CO) & Objectives (LO) Breakdown</span>
+            <span class="text-xs font-bold text-emerald-800 flex items-center gap-1 font-mono">
+              <Clock :size="14" /> Total Hours: {{ totalCourseHours }} hrs
+            </span>
+          </div>
+
+          <div v-for="(co, coIndex) in courseOutcomes" :key="coIndex" class="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 space-y-4">
+            <div class="flex items-center gap-3">
+              <span class="px-2.5 py-1 bg-[#123524] text-white font-mono text-xs font-bold rounded-lg">{{ co.id }}</span>
+              <input 
+                v-model="co.title" 
+                :placeholder="`Course Outcome ${coIndex + 1} Description`" 
+                class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-semibold bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900"
+              />
+              <button @click="removeCourseOutcome(coIndex)" class="text-rose-500 hover:text-rose-700 p-1 cursor-pointer">
+                <Trash2 :size="16" />
+              </button>
+            </div>
+
+            <div class="pl-6 border-l-2 border-emerald-600 space-y-3">
+              <div class="flex justify-between items-center">
+                <label class="text-[11px] font-bold text-slate-600 uppercase">Learning Objectives (LO) & Hours</label>
+                <button @click="addLearningOutcome(coIndex)" class="text-xs text-emerald-800 font-bold hover:underline cursor-pointer">+ Add LO</button>
+              </div>
+
+              <div v-for="(lo, loIndex) in co.learningOutcomes" :key="loIndex" class="flex items-center gap-3">
+                <span class="text-xs font-mono font-bold text-slate-500 w-12">{{ lo.id }}</span>
+                <input 
+                  v-model="lo.description" 
+                  placeholder="Learning Objective Description" 
+                  class="w-full text-xs p-2 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 font-medium"
+                />
+                <div class="flex items-center gap-1 min-w-28">
+                  <input 
+                    type="number" 
+                    v-model="lo.hours" 
+                    min="0"
+                    class="w-16 text-xs p-2 border border-slate-200 rounded-xl text-center font-bold bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900" 
+                  />
+                  <span class="text-xs text-slate-500 font-medium">hrs</span>
+                </div>
+                <button @click="removeLearningOutcome(coIndex, loIndex)" class="text-slate-400 hover:text-rose-600 p-1 cursor-pointer">
+                  <Trash2 :size="14" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <button @click="addCourseOutcome" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer">
+            <Plus :size="14" /> Add Another Course Outcome (CO)
+          </button>
+        </div>
+
+        <!-- CSV Upload Preview -->
+        <div 
+          v-if="bulkPreview.length > 0 || csvParseError || csvFileName" 
+          class="border-t border-slate-200 pt-5 space-y-4"
+        >
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <h3 class="text-xs font-bold text-slate-800">
+              CSV Course Import
+            </h3>
+
+            <span 
+              v-if="csvFileName" 
+              class="text-[11px] text-emerald-800 font-semibold"
+            >
+              Loaded File: {{ csvFileName }}
+            </span>
+          </div>
+
+          <p 
+            v-if="csvParseError" 
+            class="text-xs text-rose-600 font-semibold"
+          >
+            {{ csvParseError }}
+          </p>
+
+          <div v-if="bulkPreview.length > 0" class="space-y-4">
+            <h3 class="text-xs font-bold text-slate-800">
+              Parsed Course Preview ({{ bulkPreview.length }} Courses)
+            </h3>
+
+            <div class="space-y-3 max-h-80 overflow-y-auto pr-1">
+              <div 
+                v-for="(c, idx) in bulkPreview" 
+                :key="idx" 
+                class="border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-2"
+              >
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 bg-[#123524] text-white font-mono text-xs font-bold rounded">
+                    {{ c.program || 'BSMT' }}
+                  </span>
+                  <span class="px-2 py-0.5 bg-slate-200 text-slate-800 font-mono text-xs font-bold rounded">
+                    {{ c.code }}
+                  </span>
+                  <span class="text-xs font-bold text-slate-900">
+                    {{ c.title }}
+                  </span>
+                </div>
+
+                <div class="pl-4 space-y-1">
+                  <div 
+                    v-for="co in c.courseOutcomes" 
+                    :key="co.id" 
+                    class="text-xs"
+                  >
+                    <span class="font-bold text-slate-700">
+                      {{ co.id }}: {{ co.title }}
+                    </span>
+
+                    <div 
+                      v-for="lo in co.learningOutcomes" 
+                      :key="lo.id" 
+                      class="pl-4 text-slate-600 text-[11px] flex justify-between"
+                    >
+                      <span>
+                        <strong>{{ lo.id }}:</strong> {{ lo.description }}
+                      </span>
+                      <span class="font-mono font-bold">
+                        {{ lo.hours }} hrs
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              @click="submitBulkCourses" 
+              class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+            >
+              Import All {{ bulkPreview.length }} Courses
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 pt-2">
+          <button 
+            @click="handleSaveCourse" 
+            class="px-6 py-2.5 text-xs font-bold text-white rounded-xl shadow-xs transition-colors cursor-pointer"
+            :class="editingCourseId ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+          >
+            {{ editingCourseId ? 'Update Syllabus & Structure' : 'Save Syllabus & Structure' }}
+          </button>
+          <button 
+            v-if="editingCourseId" 
+            @click="cancelEdit" 
+            class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-300 cursor-pointer"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+
+      <!-- Search, Filter & Sort Toolbar -->
+      <div class="bg-white p-4 rounded-2xl flex flex-wrap gap-4 items-center justify-between border border-slate-200 shadow-xs">
+        <div class="flex items-center gap-3 flex-1 min-w-72">
+          <div class="relative w-full max-w-xs">
+            <Search class="absolute left-3 top-2.5 text-slate-400" :size="14" />
+            <input v-model="searchQuery" placeholder="Search course code or title..." class="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs bg-slate-50 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800" />
+          </div>
+
+          <div class="flex items-center gap-1.5 text-slate-700 font-bold text-xs">
+            <Filter :size="14" />
+            <select v-model="filterProgram" class="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 outline-none cursor-pointer font-bold text-slate-800">
+              <option value="All">All Programs</option>
+              <option value="BSMT">BSMT Only</option>
+              <option value="BSMarE">BSMarE Only</option>
+              <option value="Both">Both Programs</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 font-bold text-slate-700 text-xs">
+          <ArrowUpDown :size="14" />
+          <span>Sort By:</span>
+          <select v-model="sortBy" class="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 outline-none cursor-pointer font-bold text-slate-800">
+            <option value="code">Course Code</option>
+            <option value="title">Course Title</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Collapsible Course Registry -->
+      <div class="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+        <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+          <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Registered Courses ({{ filteredAndSortedCourses.length }})</h3>
+        </div>
+
+        <div v-if="filteredAndSortedCourses.length === 0" class="p-8 text-center text-slate-500 text-xs">
+          No courses found matching your filter criteria.
+        </div>
+
+        <div class="divide-y divide-slate-100">
+          <div 
+            v-for="c in filteredAndSortedCourses" 
+            :key="c.id" 
+            class="bg-white transition-colors"
+            :class="{ 'bg-amber-50/40': editingCourseId === c.id }"
+          >
+            <!-- Course Level Accordion Header -->
+            <div class="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+              <button @click="toggleCourse(c.id)" class="flex items-center gap-3 text-left flex-1 cursor-pointer">
+                <component :is="expandedCourses.has(c.id) ? ChevronDown : ChevronRight" :size="18" class="text-slate-400" />
+                <span class="px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider"
+                      :class="{
+                        'bg-emerald-100 text-emerald-800': c.program === 'BSMT',
+                        'bg-slate-100 text-slate-800': c.program === 'BSMarE',
+                        'bg-[#123524] text-white': c.program === 'Both' || !c.program
+                      }">
+                  {{ c.program || 'BSMT' }}
+                </span>
+                <span class="px-2 py-0.5 bg-[#123524] text-white font-mono text-xs font-bold rounded-md">{{ c.code }}</span>
+                <span class="text-xs font-bold text-slate-900">{{ c.title }}</span>
+              </button>
+
+              <div class="flex items-center gap-3">
+                <span class="text-[11px] font-semibold text-slate-400">
+                  {{ c.courseOutcomes?.length || 0 }} Outcomes
+                </span>
+                <button 
+                  @click="startEditCourse(c)" 
+                  class="text-slate-400 hover:text-amber-600 p-1 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                  title="Edit Course"
+                >
+                  <Pencil :size="16" />
+                </button>
+                <button 
+                  @click="deleteCourse(c.id)" 
+                  class="text-slate-400 hover:text-rose-600 p-1 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                  title="Delete Course"
+                >
+                  <Trash2 :size="16" />
+                </button>
+              </div>
+            </div>
+
+            <!-- Course Level Collapsible Content -->
+            <div v-if="expandedCourses.has(c.id)" class="px-6 pb-4 pt-1 bg-slate-50/50 space-y-3 border-t border-slate-100">
+              <div v-if="!c.courseOutcomes || c.courseOutcomes.length === 0" class="text-xs text-slate-400 italic py-2">
+                No course outcomes defined.
+              </div>
+
+              <!-- Course Outcome Level Accordion -->
+              <div v-for="co in c.courseOutcomes" :key="co.id" class="border border-slate-200 rounded-xl bg-white overflow-hidden shadow-xs">
+                <button @click="toggleOutcome(`${c.id}-${co.id}`)" class="w-full p-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer">
+                  <div class="flex items-center gap-2 text-xs">
+                    <component :is="expandedOutcomes.has(`${c.id}-${co.id}`) ? ChevronDown : ChevronRight" :size="16" class="text-slate-400" />
+                    <span class="font-bold text-slate-800">{{ co.id }}:</span>
+                    <span class="text-slate-700 font-medium">{{ co.title }}</span>
+                  </div>
+                  <span class="text-[10px] text-slate-400 font-semibold">{{ co.learningOutcomes?.length || 0 }} LOs</span>
+                </button>
+
+                <!-- Learning Outcomes Collapsible Content -->
+                <div v-if="expandedOutcomes.has(`${c.id}-${co.id}`)" class="p-3 bg-slate-50/60 border-t border-slate-100 space-y-2 pl-8">
+                  <div v-for="lo in co.learningOutcomes" :key="lo.id" class="flex justify-between items-center text-xs">
+                    <div class="flex items-start gap-2 text-slate-700">
+                      <span class="font-mono font-bold text-emerald-700 min-w-12">{{ lo.id }}:</span>
+                      <span>{{ lo.description }}</span>
+                    </div>
+                    <span class="font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-[11px] min-w-14 text-center">
+                      {{ lo.hours }} hrs
+                    </span>
+                  </div>
+                  <div v-if="!co.learningOutcomes || co.learningOutcomes.length === 0" class="text-xs text-slate-400 italic">
+                    No learning outcomes attached.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</template>
+
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import {
   Plus, Trash2, Clock, Download,
   Upload, ChevronDown, ChevronRight, Search, Filter, ArrowUpDown,
-  Pencil, RotateCcw
+  Pencil, RotateCcw, BookOpen
 } from 'lucide-vue-next'
+
+const STORAGE_KEY = 'cams_courses_data'
+
+// DEFAULT STCW CURRICULUM COURSES
+const DEFAULT_COURSES = [
+  {
+    id: 'course-nav-101',
+    program: 'BSMT',
+    code: 'NAV-101',
+    title: 'Terrestrial and Coastal Navigation',
+    courseOutcomes: [
+      {
+        id: 'CO1',
+        title: 'Demonstrate competence in maintaining a safe navigational watch and coastal navigation.',
+        learningOutcomes: [
+          { id: 'LO1.1', description: 'Apply COLREG Rules of the Road in navigational watch scenario', hours: 12 },
+          { id: 'LO1.2', description: 'Plot positions using compass bearings and nautical charts', hours: 15 }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'course-eng-201',
+    program: 'BSMarE',
+    code: 'ENG-201',
+    title: 'Marine Engineering Systems & Watchkeeping',
+    courseOutcomes: [
+      {
+        id: 'CO1',
+        title: 'Operate main propulsion machinery and auxiliary control systems safely.',
+        learningOutcomes: [
+          { id: 'LO1.1', description: 'Perform pre-start checks on diesel main engines', hours: 15 },
+          { id: 'LO1.2', description: 'Monitor temperature and pressure gauges during engine operation', hours: 10 }
+        ]
+      }
+    ]
+  }
+]
 
 const courses = ref([])
 const isLoading = ref(true)
@@ -41,16 +495,9 @@ const bulkPreview = ref([])
 const isUploadingBulk = ref(false)
 const bulkFileInput = ref(null)
 
-// Local Storage Cache
-const STORAGE_KEY = 'cams_courses_data'
-
-// --------------------------------------------------
-// RESILIENT MULTI-PORT API HELPER
-// --------------------------------------------------
-
+// Proxy-aware API fetcher with local storage fallback
 async function fetchFromEndpoints(path, options = {}) {
-  const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://127.0.0.1:8080/api', 'http://localhost:8000/api']
-  const token = localStorage.getItem('token')
+  const token = localStorage.getItem('cams_token') || localStorage.getItem('token') || ''
   
   const headers = {
     'Content-Type': 'application/json',
@@ -59,55 +506,52 @@ async function fetchFromEndpoints(path, options = {}) {
     ...(options.headers || {})
   }
 
-  for (const baseUrl of ports) {
-    try {
-      const res = await fetch(`${baseUrl}${path}`, { ...options, headers })
-      if (res.ok) {
-        return await res.json()
-      }
-    } catch (e) {
-      // Try next port
+  try {
+    const res = await fetch(`/api${path}`, { ...options, headers })
+    if (res.ok) {
+      return await res.json()
     }
+  } catch (e) {
+    // Fall through to local storage
   }
   throw new Error('Backend API unreachable')
 }
 
-// --------------------------------------------------
-// LOAD COURSES FROM API / STORAGE
-// --------------------------------------------------
-
+// Load Courses Data
 async function loadCoursesFromStorage() {
   isLoading.value = true
 
   try {
     const data = await fetchFromEndpoints('/courses')
+    const rawList = Array.isArray(data) ? data : (data?.data || [])
 
-    courses.value = Array.isArray(data)
-      ? data.map(course => ({
-          ...course,
-          courseOutcomes: course.course_outcomes || course.courseOutcomes || []
-        }))
-      : []
+    if (rawList.length > 0) {
+      courses.value = rawList.map(course => ({
+        ...course,
+        courseOutcomes: course.course_outcomes || course.courseOutcomes || []
+      }))
+    } else {
+      const savedData = localStorage.getItem(STORAGE_KEY)
+      const parsed = savedData ? JSON.parse(savedData) : []
+      courses.value = parsed.length > 0 ? parsed : DEFAULT_COURSES
+    }
 
     saveCoursesToStorage()
   } catch (err) {
-    console.warn('Failed to load courses from API, checking local storage:', err)
-
     try {
       const savedData = localStorage.getItem(STORAGE_KEY)
-      courses.value = savedData ? JSON.parse(savedData) : []
+      const parsed = savedData ? JSON.parse(savedData) : []
+      courses.value = parsed.length > 0 ? parsed : DEFAULT_COURSES
     } catch (storageError) {
-      console.error('Failed to load courses from localStorage:', storageError)
-      courses.value = []
+      courses.value = DEFAULT_COURSES
     }
+    saveCoursesToStorage()
   } finally {
-    isLoading.value = false
+    setTimeout(() => {
+      isLoading.value = false
+    }, 400)
   }
 }
-
-// --------------------------------------------------
-// LOCAL STORAGE CACHE
-// --------------------------------------------------
 
 function saveCoursesToStorage() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(courses.value))
@@ -117,10 +561,7 @@ onMounted(() => {
   loadCoursesFromStorage()
 })
 
-// --------------------------------------------------
-// ACCORDION FUNCTIONS
-// --------------------------------------------------
-
+// Accordion Controls
 function toggleCourse(courseId) {
   const next = new Set(expandedCourses.value)
   if (next.has(courseId)) {
@@ -141,10 +582,7 @@ function toggleOutcome(coKey) {
   expandedOutcomes.value = next
 }
 
-// --------------------------------------------------
-// FILTER AND SORT
-// --------------------------------------------------
-
+// Filter and Sort Computations
 const filteredAndSortedCourses = computed(() => {
   return courses.value
     .filter(c => {
@@ -174,10 +612,7 @@ const filteredAndSortedCourses = computed(() => {
     })
 })
 
-// --------------------------------------------------
-// CO & LO HELPERS
-// --------------------------------------------------
-
+// CO & LO Builder Functions
 function addCourseOutcome() {
   const nextCoNum = courseOutcomes.value.length + 1
 
@@ -227,10 +662,7 @@ const totalCourseHours = computed(() => {
   return total
 })
 
-// --------------------------------------------------
-// EDIT COURSE
-// --------------------------------------------------
-
+// Edit Management
 function startEditCourse(course) {
   editingCourseId.value = course.id
   courseCode.value = course.code || ''
@@ -245,10 +677,6 @@ function startEditCourse(course) {
 
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
-
-// --------------------------------------------------
-// RESET / CANCEL EDIT
-// --------------------------------------------------
 
 function cancelEdit() {
   editingCourseId.value = null
@@ -267,10 +695,7 @@ function cancelEdit() {
   ]
 }
 
-// --------------------------------------------------
-// SAVE / UPDATE COURSE
-// --------------------------------------------------
-
+// Save Course Data
 async function handleSaveCourse() {
   if (!courseCode.value.trim() || !courseTitle.value.trim()) {
     alert('Please enter both Course Code and Course Title.')
@@ -311,8 +736,6 @@ async function handleSaveCourse() {
     saveCoursesToStorage()
     cancelEdit()
   } catch (err) {
-    console.warn('API save failed, using local storage fallback:', err)
-
     const fallbackCourse = {
       id: editingCourseId.value || Date.now(),
       code: payload.code,
@@ -335,10 +758,7 @@ async function handleSaveCourse() {
   }
 }
 
-// --------------------------------------------------
-// CSV TEMPLATE
-// --------------------------------------------------
-
+// CSV Handlers
 function downloadCSVTemplate() {
   const headers = [
     'program',
@@ -525,10 +945,7 @@ async function submitBulkCourses() {
   isLoading.value = false
 }
 
-// --------------------------------------------------
-// DELETE COURSE
-// --------------------------------------------------
-
+// Delete Course
 async function deleteCourse(id) {
   if (!confirm('Are you sure you want to delete this course structure?')) return
 
@@ -537,7 +954,7 @@ async function deleteCourse(id) {
   try {
     await fetchFromEndpoints(`/courses/${id}`, { method: 'DELETE' })
   } catch (err) {
-    console.warn('API delete failed, removing locally:', err)
+    // Delete local fallback
   } finally {
     courses.value = courses.value.filter(c => c.id !== id)
     if (editingCourseId.value === id) cancelEdit()
@@ -546,379 +963,3 @@ async function deleteCourse(id) {
   }
 }
 </script>
-
-<template>
-  <div class="p-6 md:p-8 space-y-6 min-h-screen bg-[#f4f6f9] text-slate-800">
-    <!-- Header -->
-    <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-sm">
-      <div class="space-y-1">
-        <h1 class="text-xl font-bold flex items-center gap-2 text-white tracking-tight">
-          Course Builder
-        </h1>
-        <p class="text-xs text-white/80 font-normal">
-          Define Programs, Course Codes, Titles, Outcomes (COs), and Learning Objectives (LOs) with hours allocation.
-        </p>
-      </div>
-    </div>
-
-    <!-- Manual Entry / Edit View -->
-    <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-6">
-      
-      <!-- Header -->
-      <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-3 border-b pb-3">
-
-        <!-- Title -->
-        <h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
-          <Pencil 
-            v-if="editingCourseId" 
-            :size="18" 
-            class="text-amber-600" 
-          />
-          <Plus 
-            v-else 
-            :size="18" 
-            class="text-emerald-600" 
-          /> 
-          {{ editingCourseId ? 'Edit Course Syllabus' : 'Create New Course Syllabus' }}
-        </h2>
-
-        <!-- CSV Actions -->
-        <div class="flex items-center gap-2 shrink-0">
-
-          <!-- Download CSV Template -->
-          <button 
-            @click="downloadCSVTemplate" 
-            type="button"
-            class="px-4 py-2.5 bg-white hover:bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-xl border border-emerald-500 flex items-center gap-2 transition shadow-sm cursor-pointer"
-          >
-            <Download :size="14" class="text-emerald-600" />
-            Download .CSV Template
-          </button>
-
-          <!-- Bulk Upload CSV -->
-          <label 
-            class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-900 text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-sm"
-          >
-            <Upload :size="14" /> 
-            <span>{{ isUploadingBulk ? 'Uploading...' : 'Bulk Upload CSV' }}</span>
-            
-            <input 
-              ref="bulkFileInput" 
-              type="file" 
-              accept=".csv" 
-              @change="handleBulkCSVUpload" 
-              :disabled="isUploadingBulk" 
-              class="hidden" 
-            />
-          </label>
-
-          <!-- Cancel Edit -->
-          <button 
-            v-if="editingCourseId" 
-            @click="cancelEdit" 
-            class="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 font-semibold bg-slate-100 px-2.5 py-2.5 rounded-xl border border-slate-200 cursor-pointer"
-          >
-            <RotateCcw :size="14" /> Cancel Edit
-          </button>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">Target Program</label>
-          <select v-model="courseProgram" class="w-full text-xs p-2.5 border rounded-lg font-bold bg-slate-50 focus:ring-2 focus:ring-emerald-500 outline-none">
-            <option value="BSMT">BSMT</option>
-            <option value="BSMarE">BSMarE</option>
-            <option value="Both">Both (BSMT & BSMarE)</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">Course Code</label>
-          <input v-model="courseCode" placeholder="e.g. NAV1" class="w-full text-xs p-2.5 border rounded-lg font-mono font-bold focus:ring-2 focus:ring-emerald-500 outline-none" />
-        </div>
-        <div class="md:col-span-2">
-          <label class="block text-xs font-bold text-gray-700 mb-1">Course Descriptive Title</label>
-          <input v-model="courseTitle" placeholder="e.g. Navigational Instruments with Compasses" class="w-full text-xs p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
-        </div>
-      </div>
-
-      <div class="space-y-6">
-        <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border">
-          <span class="text-xs font-bold text-slate-800">Course Outcomes (CO) & Objectives (LO) Breakdown</span>
-          <span class="text-xs font-bold text-emerald-700 flex items-center gap-1">
-            <Clock :size="14" /> Total Hours: {{ totalCourseHours }} hrs
-          </span>
-        </div>
-
-        <div v-for="(co, coIndex) in courseOutcomes" :key="coIndex" class="border border-slate-200 rounded-xl p-4 bg-slate-50/50 space-y-4">
-          <div class="flex items-center gap-3">
-            <span class="px-2.5 py-1 bg-slate-800 text-white font-mono text-xs font-bold rounded-lg">{{ co.id }}</span>
-            <input 
-              v-model="co.title" 
-              :placeholder="`Course Outcome ${coIndex + 1} Description`" 
-              class="w-full text-xs p-2 border rounded-lg font-semibold bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
-            />
-            <button @click="removeCourseOutcome(coIndex)" class="text-red-500 hover:text-red-700 p-1 cursor-pointer">
-              <Trash2 :size="16" />
-            </button>
-          </div>
-
-          <div class="pl-6 border-l-2 border-emerald-500 space-y-3">
-            <div class="flex justify-between items-center">
-              <label class="text-[11px] font-bold text-slate-600 uppercase">Learning Objectives (LO) & Total Hours</label>
-              <button @click="addLearningOutcome(coIndex)" class="text-xs text-emerald-700 font-bold hover:underline cursor-pointer">+ Add LO</button>
-            </div>
-
-            <div v-for="(lo, loIndex) in co.learningOutcomes" :key="loIndex" class="flex items-center gap-3">
-              <span class="text-xs font-mono font-bold text-slate-500 w-12">{{ lo.id }}</span>
-              <input 
-                v-model="lo.description" 
-                placeholder="Learning Objective Description" 
-                class="w-full text-xs p-2 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-              <div class="flex items-center gap-1 min-w-[120px]">
-                <input 
-                  type="number" 
-                  v-model="lo.hours" 
-                  min="0"
-                  class="w-16 text-xs p-2 border rounded-lg text-center font-bold bg-white focus:ring-2 focus:ring-emerald-500 outline-none" 
-                />
-                <span class="text-xs text-gray-500 font-medium">hrs</span>
-              </div>
-              <button @click="removeLearningOutcome(coIndex, loIndex)" class="text-gray-400 hover:text-red-500 p-1 cursor-pointer">
-                <Trash2 :size="14" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <button @click="addCourseOutcome" class="w-full py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer">
-          <Plus :size="14" /> Add Another Course Outcome (CO)
-        </button>
-      </div>
-
-      <!-- CSV Upload Preview -->
-      <div 
-        v-if="bulkPreview.length > 0 || csvParseError || csvFileName" 
-        class="border-t border-gray-200 pt-5 space-y-4"
-      >
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <h3 class="text-xs font-bold text-slate-800">
-            CSV Course Import
-          </h3>
-
-          <span 
-            v-if="csvFileName" 
-            class="text-[11px] text-emerald-700 font-semibold"
-          >
-            Loaded File: {{ csvFileName }}
-          </span>
-        </div>
-
-        <p 
-          v-if="csvParseError" 
-          class="text-xs text-red-600 font-semibold"
-        >
-          {{ csvParseError }}
-        </p>
-
-        <!-- Preview parsed CSV structures -->
-        <div v-if="bulkPreview.length > 0" class="space-y-4">
-          <h3 class="text-xs font-bold text-slate-800">
-            Parsed Course Preview ({{ bulkPreview.length }} Courses)
-          </h3>
-
-          <div class="space-y-3 max-h-80 overflow-y-auto pr-1">
-            <div 
-              v-for="(c, idx) in bulkPreview" 
-              :key="idx" 
-              class="border rounded-xl p-4 bg-slate-50 space-y-2"
-            >
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 bg-slate-800 text-white font-mono text-xs font-bold rounded">
-                  {{ c.program || 'BSMT' }}
-                </span>
-                <span class="px-2 py-0.5 bg-slate-200 text-slate-800 font-mono text-xs font-bold rounded">
-                  {{ c.code }}
-                </span>
-                <span class="text-xs font-bold text-slate-900">
-                  {{ c.title }}
-                </span>
-              </div>
-
-              <div class="pl-4 space-y-1">
-                <div 
-                  v-for="co in c.courseOutcomes" 
-                  :key="co.id" 
-                  class="text-xs"
-                >
-                  <span class="font-bold text-slate-700">
-                    {{ co.id }}: {{ co.title }}
-                  </span>
-
-                  <div 
-                    v-for="lo in co.learningOutcomes" 
-                    :key="lo.id" 
-                    class="pl-4 text-gray-600 text-[11px] flex justify-between"
-                  >
-                    <span>
-                      <strong>{{ lo.id }}:</strong> {{ lo.description }}
-                    </span>
-                    <span class="font-mono font-bold">
-                      {{ lo.hours }} hrs
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <button 
-            @click="submitBulkCourses" 
-            class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm cursor-pointer"
-          >
-            Import All {{ bulkPreview.length }} Courses
-          </button>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-3">
-        <button 
-          @click="handleSaveCourse" 
-          class="px-6 py-2.5 text-xs font-bold text-white rounded-xl shadow-sm transition-colors cursor-pointer"
-          :class="editingCourseId ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
-        >
-          {{ editingCourseId ? 'Update Syllabus & Structure' : 'Save Syllabus & Structure' }}
-        </button>
-        <button 
-          v-if="editingCourseId" 
-          @click="cancelEdit" 
-          class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-300 cursor-pointer"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-
-    <!-- Search, Filter & Sort Toolbar -->
-    <div class="bg-slate-100 p-4 rounded-xl flex flex-wrap gap-4 items-center justify-between border border-slate-200">
-      <div class="flex items-center gap-3 flex-1 min-w-[280px]">
-        <div class="relative w-full max-w-xs">
-          <Search class="absolute left-3 top-2.5 text-slate-400" :size="14" />
-          <input v-model="searchQuery" placeholder="Search course code or title..." class="w-full pl-8 pr-3 py-2 border rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500" />
-        </div>
-
-        <div class="flex items-center gap-1.5 text-slate-700 font-bold text-xs">
-          <Filter :size="14" />
-          <select v-model="filterProgram" class="p-2 border rounded-lg text-xs bg-white outline-none cursor-pointer">
-            <option value="All">All Programs</option>
-            <option value="BSMT">BSMT Only</option>
-            <option value="BSMarE">BSMarE Only</option>
-            <option value="Both">Both Programs</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-2 font-bold text-slate-700 text-xs">
-        <ArrowUpDown :size="14" />
-        <span>Sort By:</span>
-        <select v-model="sortBy" class="p-2 border rounded-lg text-xs bg-white outline-none cursor-pointer">
-          <option value="code">Course Code</option>
-          <option value="title">Course Title</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Collapsible Course Registry -->
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-      <div class="p-4 bg-gray-50 border-b flex justify-between items-center">
-        <h3 class="text-sm font-bold text-gray-900">Registered Courses ({{ filteredAndSortedCourses.length }})</h3>
-      </div>
-
-      <div v-if="filteredAndSortedCourses.length === 0" class="p-8 text-center text-slate-500 text-xs">
-        No courses found matching your filter criteria.
-      </div>
-
-      <div class="divide-y">
-        <div 
-          v-for="c in filteredAndSortedCourses" 
-          :key="c.id" 
-          class="bg-white transition-colors"
-          :class="{ 'bg-amber-50/40': editingCourseId === c.id }"
-        >
-          <!-- Course Level Accordion Header -->
-          <div class="p-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors">
-            <button @click="toggleCourse(c.id)" class="flex items-center gap-3 text-left flex-1 cursor-pointer">
-              <component :is="expandedCourses.has(c.id) ? ChevronDown : ChevronRight" :size="18" class="text-slate-400" />
-              <span class="px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider"
-                    :class="{
-                      'bg-blue-100 text-blue-800': c.program === 'BSMT',
-                      'bg-amber-100 text-amber-800': c.program === 'BSMarE',
-                      'bg-emerald-100 text-emerald-800': c.program === 'Both' || !c.program
-                    }">
-                {{ c.program || 'BSMT' }}
-              </span>
-              <span class="px-2 py-0.5 bg-slate-800 text-white font-mono text-xs font-bold rounded">{{ c.code }}</span>
-              <span class="text-xs font-bold text-slate-900">{{ c.title }}</span>
-            </button>
-
-            <div class="flex items-center gap-3">
-              <span class="text-[11px] font-semibold text-slate-400">
-                {{ c.courseOutcomes?.length || 0 }} Outcomes
-              </span>
-              <button 
-                @click="startEditCourse(c)" 
-                class="text-gray-400 hover:text-amber-600 p-1 hover:bg-amber-50 rounded transition-colors cursor-pointer"
-                title="Edit Course"
-              >
-                <Pencil :size="16" />
-              </button>
-              <button 
-                @click="deleteCourse(c.id)" 
-                class="text-gray-400 hover:text-red-600 p-1 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                title="Delete Course"
-              >
-                <Trash2 :size="16" />
-              </button>
-            </div>
-          </div>
-
-          <!-- Course Level Collapsible Content -->
-          <div v-if="expandedCourses.has(c.id)" class="px-6 pb-4 pt-1 bg-slate-50/50 space-y-3 border-t">
-            <div v-if="!c.courseOutcomes || c.courseOutcomes.length === 0" class="text-xs text-slate-400 italic py-2">
-              No course outcomes defined.
-            </div>
-
-            <!-- Course Outcome Level Accordion -->
-            <div v-for="co in c.courseOutcomes" :key="co.id" class="border border-slate-200 rounded-xl bg-white overflow-hidden shadow-xs">
-              <button @click="toggleOutcome(`${c.id}-${co.id}`)" class="w-full p-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer">
-                <div class="flex items-center gap-2 text-xs">
-                  <component :is="expandedOutcomes.has(`${c.id}-${co.id}`) ? ChevronDown : ChevronRight" :size="16" class="text-slate-400" />
-                  <span class="font-bold text-slate-800">{{ co.id }}:</span>
-                  <span class="text-slate-700 font-medium">{{ co.title }}</span>
-                </div>
-                <span class="text-[10px] text-slate-400 font-semibold">{{ co.learningOutcomes?.length || 0 }} LOs</span>
-              </button>
-
-              <!-- Learning Outcomes Collapsible Content -->
-              <div v-if="expandedOutcomes.has(`${c.id}-${co.id}`)" class="p-3 bg-slate-50/60 border-t space-y-2 pl-8">
-                <div v-for="lo in co.learningOutcomes" :key="lo.id" class="flex justify-between items-center text-xs">
-                  <div class="flex items-start gap-2 text-slate-700">
-                    <span class="font-mono font-bold text-emerald-700 min-w-[45px]">{{ lo.id }}:</span>
-                    <span>{{ lo.description }}</span>
-                  </div>
-                  <span class="font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded border border-gray-200 text-[11px] min-w-[55px] text-center">
-                    {{ lo.hours }} hrs
-                  </span>
-                </div>
-                <div v-if="!co.learningOutcomes || co.learningOutcomes.length === 0" class="text-xs text-slate-400 italic">
-                  No learning outcomes attached.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>

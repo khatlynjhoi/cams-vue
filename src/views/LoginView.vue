@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { LogIn, Mail, Lock, AlertCircle, RefreshCw } from 'lucide-vue-next'
+import { LogIn, Mail, Lock, AlertCircle, RefreshCw, GraduationCap } from 'lucide-vue-next'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -10,6 +10,7 @@ const authStore = useAuthStore()
 const email = ref('it@bma.edu.ph')
 const password = ref('password')
 const isLoading = ref(false)
+const isStudentLoading = ref(false)
 const errorMessage = ref('')
 
 async function handleLogin() {
@@ -32,6 +33,18 @@ async function handleLogin() {
     errorMessage.value = 'Authentication service unreachable.'
   } finally {
     isLoading.value = false
+  }
+}
+
+async function handleStudentContinue() {
+  isStudentLoading.value = true
+  try {
+    await authStore.loginAsStudent()
+    router.push('/student-exam')
+  } catch (err) {
+    errorMessage.value = 'Failed to open Student Portal. Please try again.'
+  } finally {
+    isStudentLoading.value = false
   }
 }
 </script>
@@ -84,14 +97,30 @@ async function handleLogin() {
 
         <button 
           type="submit" 
-          :disabled="isLoading"
+          :disabled="isLoading || isStudentLoading"
           class="w-full py-3 bg-[#123524] hover:bg-[#0e2a1d] text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
         >
           <RefreshCw v-if="isLoading" :size="16" class="animate-spin" />
           <LogIn v-else :size="16" />
-          <span>{{ isLoading ? 'Authenticating...' : 'Sign In to Portal' }}</span>
+          <span>{{ isLoading ? 'Authenticating...' : 'Sign In as Faculty / Staff' }}</span>
         </button>
       </form>
+
+      <div class="relative flex items-center justify-center my-2">
+        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div>
+        <span class="relative bg-white px-3 text-[10px] uppercase font-bold text-slate-400 tracking-wider">Candidate Portal</span>
+      </div>
+
+      <button 
+        type="button"
+        @click="handleStudentContinue"
+        :disabled="isLoading || isStudentLoading"
+        class="w-full py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+      >
+        <RefreshCw v-if="isStudentLoading" :size="16" class="animate-spin text-emerald-700" />
+        <GraduationCap v-else :size="18" class="text-emerald-700" />
+        <span>Continue as Student / Cadet</span>
+      </button>
 
       <div class="text-center pt-2 border-t border-slate-100">
         <p class="text-[11px] text-slate-400">Baliwag Maritime Academy System</p>

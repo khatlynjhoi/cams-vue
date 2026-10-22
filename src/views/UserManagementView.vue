@@ -1,3 +1,344 @@
+<template>
+  <div class="p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans text-slate-800 antialiased relative min-h-screen bg-slate-50">
+    
+    <!-- BRANDED SYSTEM PRELOADER CARD -->
+    <transition
+      enter-active-class="transition ease-out duration-300"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition ease-in duration-200"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div 
+        v-if="isLoading" 
+        class="min-h-125 w-full bg-white/90 backdrop-blur-xs border border-slate-100 rounded-3xl p-12 flex flex-col items-center justify-center text-center space-y-5 shadow-xs"
+      >
+        <!-- CAMS Emblem with Radar Pulse Effect -->
+        <div class="relative flex items-center justify-center">
+          <div class="absolute w-20 h-20 bg-emerald-500/10 rounded-full animate-ping"></div>
+          <div class="absolute w-16 h-16 bg-[#123524]/10 rounded-full animate-pulse"></div>
+          
+          <div class="w-14 h-14 bg-[#123524] rounded-2xl flex items-center justify-center font-black text-white text-2xl tracking-wider shadow-xl relative z-10">
+            C
+          </div>
+        </div>
+
+        <!-- Branding Text & Progress Bar -->
+        <div class="space-y-1.5 max-w-xs">
+          <h3 class="text-base font-bold text-slate-900 tracking-tight">CAMS STCW Portal</h3>
+          <p class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">Synchronizing User Accounts...</p>
+        </div>
+
+        <div class="w-48 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+          <div class="bg-[#123524] h-full rounded-full animate-pulse w-3/4"></div>
+        </div>
+
+        <p class="text-[10px] text-slate-400 font-mono">Baliwag Maritime Academy System</p>
+      </div>
+    </transition>
+
+    <!-- MAIN VIEW CONTENT -->
+    <div v-show="!isLoading" class="space-y-6">
+
+      <!-- Header Hero Banner -->
+      <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xs">
+        <div class="space-y-1">
+          <h1 class="text-xl font-bold flex items-center gap-2 text-white tracking-tight">
+            <Users class="text-emerald-400" :size="22" />
+            User Access & Authorization
+          </h1>
+          <p class="text-xs text-slate-200 font-normal">
+            Manage system privileges, edit accounts, and grant or revoke access rights across BMA departments.
+          </p>
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0">
+          <button 
+            @click="openAddModal"
+            class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
+          >
+            <UserPlus :size="16" /> Add New Account
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Toolbar -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center gap-3">
+        <div class="relative flex-1 w-full">
+          <Search class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input 
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search by name, email, or department..."
+            class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none font-medium"
+          />
+        </div>
+
+        <select 
+          v-model="selectedRoleFilter" 
+          class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer focus:bg-white focus:ring-2 focus:ring-emerald-500"
+        >
+          <option value="All">All Roles</option>
+          <option v-for="r in rolesList" :key="r" :value="r">{{ r }}</option>
+        </select>
+      </div>
+
+      <!-- User Data Table -->
+      <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
+              <th class="p-3.5">User Details</th>
+              <th class="p-3.5">Assigned Role</th>
+              <th class="p-3.5">Department</th>
+              <th class="p-3.5">System Access</th>
+              <th class="p-3.5 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 text-xs text-slate-700">
+            <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-slate-50/80 transition-colors">
+              
+              <td class="p-3.5">
+                <div class="font-bold text-slate-900">{{ user.name }}</div>
+                <div class="text-[11px] text-slate-400 font-mono font-semibold">{{ user.email }}</div>
+              </td>
+
+              <td class="p-3.5">
+                <span :class="[
+                  'px-2.5 py-1 rounded-full text-[11px] font-bold border',
+                  user.role === 'Admin' ? 'bg-purple-50 text-purple-800 border-purple-200' :
+                  user.role === 'Assessment Officer' ? 'bg-blue-50 text-blue-800 border-blue-200' :
+                  user.role === 'Instructor' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                  'bg-slate-100 text-slate-700 border-slate-200'
+                ]">
+                  {{ user.role }}
+                </span>
+              </td>
+
+              <td class="p-3.5 font-bold text-slate-800">{{ user.department || 'ICT' }}</td>
+
+              <td class="p-3.5">
+                <button 
+                  @click="toggleUserAccess(user)"
+                  :class="[
+                    'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold transition cursor-pointer border shadow-xs',
+                    (user.status || 'Active') === 'Active' 
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100' 
+                      : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                  ]"
+                  title="Click to toggle system access permission"
+                >
+                  <CheckCircle2 v-if="(user.status || 'Active') === 'Active'" :size="12" />
+                  <XCircle v-else :size="12" />
+                  {{ (user.status || 'Active') === 'Active' ? 'Access Granted' : 'Access Revoked' }}
+                </button>
+              </td>
+
+              <td class="p-3.5 text-right space-x-2">
+                <button 
+                  @click="openEditModal(user)"
+                  class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  <Edit3 :size="14" class="inline mr-1" /> Edit
+                </button>
+
+                <button 
+                  @click="openDeleteModal(user)"
+                  class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  <Trash2 :size="14" class="inline mr-1" /> Remove
+                </button>
+              </td>
+            </tr>
+
+            <tr v-if="filteredUsers.length === 0">
+              <td colspan="5" class="p-12 text-center text-slate-400 font-medium text-xs">
+                <Users class="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                <p class="font-bold text-slate-700 text-sm">No User Accounts Found</p>
+                <p class="text-xs text-slate-400 mt-1">No registered users match your search query or role filter.</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ADD USER MODAL -->
+      <div v-if="showAddModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-slate-200 overflow-hidden">
+          <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <UserPlus class="text-emerald-700" :size="18" /> Create New System Account
+            </h3>
+            <button @click="showAddModal = false" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+              <X :size="18" />
+            </button>
+          </div>
+
+          <div class="space-y-3.5 text-xs">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Full Name</label>
+              <input 
+                v-model="form.name" 
+                placeholder="e.g. Percival Banting" 
+                class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold" 
+              />
+              <p v-if="formErrors.name" class="text-[11px] text-rose-600 mt-1 font-semibold">{{ formErrors.name }}</p>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Email Address</label>
+              <input 
+                v-model="form.email" 
+                type="email" 
+                placeholder="e.g. p.banting@bma.edu.ph" 
+                class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold" 
+              />
+              <p v-if="formErrors.email" class="text-[11px] text-rose-600 mt-1 font-semibold">{{ formErrors.email }}</p>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Initial Password</label>
+              <input 
+                v-model="form.password" 
+                type="password" 
+                placeholder="••••••••" 
+                class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold" 
+              />
+              <p v-if="formErrors.password" class="text-[11px] text-rose-600 mt-1 font-semibold">{{ formErrors.password }}</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">System Role</label>
+                <select v-model="form.role" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-slate-50 focus:bg-white font-bold text-slate-800 cursor-pointer">
+                  <option v-for="r in rolesList" :key="r" :value="r">{{ r }}</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">Department</label>
+                <select v-model="form.department" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-slate-50 focus:bg-white font-bold text-slate-800 cursor-pointer">
+                  <option v-for="d in departmentList" :key="d" :value="d">{{ d }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Access Authorization Status</label>
+              <select v-model="form.status" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-slate-50 focus:bg-white font-bold text-slate-800 cursor-pointer">
+                <option value="Active">Active (System Access Granted)</option>
+                <option value="Inactive">Inactive (System Access Revoked)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <button @click="showAddModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer">
+              Cancel
+            </button>
+            <button @click="handleCreateUser" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer">
+              Create & Grant Access
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- EDIT USER MODAL -->
+      <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-slate-200 overflow-hidden">
+          <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Edit3 class="text-emerald-700" :size="18" /> Edit User Account
+            </h3>
+            <button @click="showEditModal = false" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+              <X :size="18" />
+            </button>
+          </div>
+
+          <div class="space-y-3.5 text-xs">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Full Name</label>
+              <input v-model="form.name" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold" />
+              <p v-if="formErrors.name" class="text-[11px] text-rose-600 mt-1 font-semibold">{{ formErrors.name }}</p>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Email Address</label>
+              <input v-model="form.email" type="email" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold" />
+              <p v-if="formErrors.email" class="text-[11px] text-rose-600 mt-1 font-semibold">{{ formErrors.email }}</p>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Reset Password (Optional)</label>
+              <input v-model="form.password" type="password" placeholder="Leave blank to keep current password" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">System Role</label>
+                <select v-model="form.role" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-slate-50 focus:bg-white font-bold text-slate-800 cursor-pointer">
+                  <option v-for="r in rolesList" :key="r" :value="r">{{ r }}</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">Department</label>
+                <select v-model="form.department" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-slate-50 focus:bg-white font-bold text-slate-800 cursor-pointer">
+                  <option v-for="d in departmentList" :key="d" :value="d">{{ d }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Access Authorization Status</label>
+              <select v-model="form.status" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-slate-50 focus:bg-white font-bold text-slate-800 cursor-pointer">
+                <option value="Active">Active (System Access Granted)</option>
+                <option value="Inactive">Inactive (System Access Revoked)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <button @click="showEditModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer">
+              Cancel
+            </button>
+            <button @click="handleUpdateUser" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer">
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DELETE USER MODAL -->
+      <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4 text-center border border-slate-200 overflow-hidden">
+          <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
+            <AlertTriangle :size="24" />
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Remove User Account</h3>
+            <p class="text-xs text-slate-500 mt-1">
+              Are you sure you want to delete <strong class="text-slate-800">{{ selectedUser?.name }}</strong>?
+            </p>
+          </div>
+
+          <div class="flex gap-2 pt-2">
+            <button @click="showDeleteModal = false" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer">
+              Cancel
+            </button>
+            <button @click="handleDeleteUser" class="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer">
+              Confirm Removal
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</template>
+
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { 
@@ -8,7 +349,6 @@ import {
   Trash2, 
   CheckCircle2, 
   XCircle, 
-  RefreshCw,
   X,
   AlertTriangle,
   Mail,
@@ -21,7 +361,7 @@ const auth = useAuthStore()
 
 // State
 const users = ref([])
-const isLoading = ref(false)
+const isLoading = ref(true)
 const searchQuery = ref('')
 const selectedRoleFilter = ref('All')
 
@@ -75,11 +415,11 @@ async function fetchFromEndpoints(path, options = {}) {
 }
 
 onMounted(() => {
+  isLoading.value = true
   loadUsers()
 })
 
 async function loadUsers() {
-  isLoading.value = true
   const localSaved = JSON.parse(localStorage.getItem('cams_users_list') || '[]')
 
   try {
@@ -308,304 +648,3 @@ async function handleDeleteUser() {
   selectedUser.value = null
 }
 </script>
-
-<template>
-  <div class="p-6 max-w-7xl mx-auto space-y-6 font-sans text-slate-800">
-    
-    <!-- Top Header -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-      <div>
-        <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
-          <Users class="text-emerald-600" :size="24" /> User Access & Authorization
-        </h1>
-        <p class="text-xs text-slate-500 mt-1">
-          Manage system privileges, edit accounts, and grant or revoke access rights across BMA departments.
-        </p>
-      </div>
-
-      <div class="flex items-center gap-2 shrink-0">
-        <button 
-          @click="loadUsers"
-          class="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl transition cursor-pointer"
-          title="Refresh User List"
-        >
-          <RefreshCw :class="['w-4 h-4', { 'animate-spin': isLoading }]" />
-        </button>
-
-        <button 
-          @click="openAddModal"
-          class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
-        >
-          <UserPlus :size="16" /> Add New Account
-        </button>
-      </div>
-    </div>
-
-    <!-- Filter Toolbar -->
-    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center gap-3">
-      <div class="relative flex-1 w-full">
-        <Search class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-        <input 
-          v-model="searchQuery"
-          type="text"
-          placeholder="Search by name, email, or department..."
-          class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
-        />
-      </div>
-
-      <select v-model="selectedRoleFilter" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none cursor-pointer">
-        <option value="All">All Roles</option>
-        <option v-for="r in rolesList" :key="r" :value="r">{{ r }}</option>
-      </select>
-    </div>
-
-    <!-- User Data Table -->
-    <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-      <table class="w-full text-left border-collapse">
-        <thead>
-          <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
-            <th class="p-3.5">User Details</th>
-            <th class="p-3.5">Assigned Role</th>
-            <th class="p-3.5">Department</th>
-            <th class="p-3.5">System Access</th>
-            <th class="p-3.5 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100 text-xs text-slate-700">
-          <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-slate-50/80 transition-colors">
-            
-            <td class="p-3.5">
-              <div class="font-bold text-slate-900">{{ user.name }}</div>
-              <div class="text-[11px] text-slate-400 font-mono">{{ user.email }}</div>
-            </td>
-
-            <td class="p-3.5">
-              <span :class="[
-                'px-2.5 py-1 rounded-full text-[11px] font-bold border',
-                user.role === 'Admin' ? 'bg-purple-50 text-purple-800 border-purple-200' :
-                user.role === 'Assessment Officer' ? 'bg-blue-50 text-blue-800 border-blue-200' :
-                user.role === 'Instructor' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                'bg-slate-100 text-slate-700 border-slate-200'
-              ]">
-                {{ user.role }}
-              </span>
-            </td>
-
-            <td class="p-3.5 font-medium text-slate-800">{{ user.department || 'ICT' }}</td>
-
-            <td class="p-3.5">
-              <button 
-                @click="toggleUserAccess(user)"
-                :class="[
-                  'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold transition cursor-pointer border',
-                  (user.status || 'Active') === 'Active' 
-                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200' 
-                    : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
-                ]"
-                title="Click to toggle system access permission"
-              >
-                <CheckCircle2 v-if="(user.status || 'Active') === 'Active'" :size="12" />
-                <XCircle v-else :size="12" />
-                {{ (user.status || 'Active') === 'Active' ? 'Access Granted' : 'Access Revoked' }}
-              </button>
-            </td>
-
-            <td class="p-3.5 text-right space-x-2">
-              <button 
-                @click="openEditModal(user)"
-                class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer"
-              >
-                <Edit3 :size="14" class="inline mr-1" /> Edit
-              </button>
-
-              <button 
-                @click="openDeleteModal(user)"
-                class="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold transition cursor-pointer"
-              >
-                <Trash2 :size="14" class="inline mr-1" /> Remove
-              </button>
-            </td>
-          </tr>
-
-          <tr v-if="filteredUsers.length === 0">
-            <td colspan="5" class="p-8 text-center text-slate-400 font-medium text-xs">
-              No matching user accounts found.
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- ADD USER MODAL -->
-    <div v-if="showAddModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 border border-slate-200">
-        <div class="flex justify-between items-center pb-2 border-b border-slate-100">
-          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-            <UserPlus class="text-emerald-600" :size="18" /> Create New System Account
-          </h3>
-          <button @click="showAddModal = false" class="text-slate-400 hover:text-slate-600 cursor-pointer">
-            <X :size="18" />
-          </button>
-        </div>
-
-        <div class="space-y-3 text-xs">
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">Full Name</label>
-            <input 
-              v-model="form.name" 
-              placeholder="e.g. Percival Banting" 
-              class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" 
-            />
-            <p v-if="formErrors.name" class="text-[11px] text-rose-600 mt-1 font-medium">{{ formErrors.name }}</p>
-          </div>
-
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">Email Address</label>
-            <input 
-              v-model="form.email" 
-              type="email" 
-              placeholder="e.g. p.banting@bma.edu.ph" 
-              class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" 
-            />
-            <p v-if="formErrors.email" class="text-[11px] text-rose-600 mt-1 font-medium">{{ formErrors.email }}</p>
-          </div>
-
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">Initial Password</label>
-            <input 
-              v-model="form.password" 
-              type="password" 
-              placeholder="••••••••" 
-              class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" 
-            />
-            <p v-if="formErrors.password" class="text-[11px] text-rose-600 mt-1 font-medium">{{ formErrors.password }}</p>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block font-bold text-slate-700 mb-1">System Role</label>
-              <select v-model="form.role" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800 cursor-pointer">
-                <option v-for="r in rolesList" :key="r" :value="r">{{ r }}</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block font-bold text-slate-700 mb-1">Department</label>
-              <select v-model="form.department" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800 cursor-pointer">
-                <option v-for="d in departmentList" :key="d" :value="d">{{ d }}</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">Access Authorization Status</label>
-            <select v-model="form.status" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800 cursor-pointer">
-              <option value="Active">Active (System Access Granted)</option>
-              <option value="Inactive">Inactive (System Access Revoked)</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
-          <button @click="showAddModal = false" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer">
-            Cancel
-          </button>
-          <button @click="handleCreateUser" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer">
-            Create & Grant Access
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- EDIT USER MODAL -->
-    <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 border border-slate-200">
-        <div class="flex justify-between items-center pb-2 border-b border-slate-100">
-          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-            <Edit3 class="text-emerald-600" :size="18" /> Edit User Account
-          </h3>
-          <button @click="showEditModal = false" class="text-slate-400 hover:text-slate-600 cursor-pointer">
-            <X :size="18" />
-          </button>
-        </div>
-
-        <div class="space-y-3 text-xs">
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">Full Name</label>
-            <input v-model="form.name" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
-            <p v-if="formErrors.name" class="text-[11px] text-rose-600 mt-1 font-medium">{{ formErrors.name }}</p>
-          </div>
-
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">Email Address</label>
-            <input v-model="form.email" type="email" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
-            <p v-if="formErrors.email" class="text-[11px] text-rose-600 mt-1 font-medium">{{ formErrors.email }}</p>
-          </div>
-
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">Reset Password (Optional)</label>
-            <input v-model="form.password" type="password" placeholder="Leave blank to keep current password" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block font-bold text-slate-700 mb-1">System Role</label>
-              <select v-model="form.role" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800 cursor-pointer">
-                <option v-for="r in rolesList" :key="r" :value="r">{{ r }}</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block font-bold text-slate-700 mb-1">Department</label>
-              <select v-model="form.department" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800 cursor-pointer">
-                <option v-for="d in departmentList" :key="d" :value="d">{{ d }}</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">Access Authorization Status</label>
-            <select v-model="form.status" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-white font-semibold text-slate-800 cursor-pointer">
-              <option value="Active">Active (System Access Granted)</option>
-              <option value="Inactive">Inactive (System Access Revoked)</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
-          <button @click="showEditModal = false" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer">
-            Cancel
-          </button>
-          <button @click="handleUpdateUser" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer">
-            Save Changes
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- DELETE USER MODAL -->
-    <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4 text-center border border-slate-200">
-        <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
-          <AlertTriangle :size="24" />
-        </div>
-        <div>
-          <h3 class="text-base font-bold text-slate-900">Remove User Account</h3>
-          <p class="text-xs text-slate-500 mt-1">
-            Are you sure you want to delete <strong class="text-slate-800">{{ selectedUser?.name }}</strong>?
-          </p>
-        </div>
-
-        <div class="flex gap-2 pt-2">
-          <button @click="showDeleteModal = false" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer">
-            Cancel
-          </button>
-          <button @click="handleDeleteUser" class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer">
-            Confirm Removal
-          </button>
-        </div>
-      </div>
-    </div>
-
-  </div>
-</template>

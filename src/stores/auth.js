@@ -33,13 +33,23 @@ export const useAuthStore = defineStore('auth', () => {
   const isCadet = computed(() => userRole.value === 'cadet')
 
   const userInitials = computed(() => {
-    if (!user.value?.name) return '--'
+    if (!user.value?.name) return 'ST'
     const parts = user.value.name.trim().split(' ')
     if (parts.length >= 2) {
       return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
     }
     return user.value.name.slice(0, 2).toUpperCase()
   })
+
+  function setUserSession(userData, authToken) {
+    user.value = userData
+    token.value = authToken
+
+    localStorage.setItem('cams_user', JSON.stringify(userData))
+    localStorage.setItem('user', JSON.stringify(userData))
+    localStorage.setItem('cams_token', authToken)
+    localStorage.setItem('token', authToken)
+  }
 
   /**
    * Authenticates user and persists standardized keys to LocalStorage
@@ -66,16 +76,23 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     const authToken = `token-${Date.now()}`
+    setUserSession(userData, authToken)
 
-    user.value = userData
-    token.value = authToken
+    return true
+  }
 
-    // Save under standardized & legacy keys for full compatibility
-    localStorage.setItem('cams_user', JSON.stringify(userData))
-    localStorage.setItem('user', JSON.stringify(userData))
-    localStorage.setItem('cams_token', authToken)
-    localStorage.setItem('token', authToken)
-
+  /**
+   * Creates an instant guest cadet session without credentials
+   */
+  async function loginAsStudent() {
+    const studentData = {
+      name: 'Cadet Candidate',
+      email: 'student.portal@bma.edu.ph',
+      role: 'Cadet',
+      department: 'BSMT'
+    }
+    const studentToken = `guest-student-token-${Date.now()}`
+    setUserSession(studentData, studentToken)
     return true
   }
 
@@ -104,6 +121,7 @@ export const useAuthStore = defineStore('auth', () => {
     isCadet,
     userInitials,
     login,
+    loginAsStudent,
     logout
   }
 })

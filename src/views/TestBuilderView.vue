@@ -1,6 +1,938 @@
+<template>
+  <div class="p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans text-slate-800 antialiased relative min-h-screen bg-slate-50">
+    
+    <!-- BRANDED SYSTEM PRELOADER CARD -->
+    <transition
+      enter-active-class="transition ease-out duration-300"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition ease-in duration-200"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div 
+        v-if="isLoading" 
+        class="min-h-125 w-full bg-white/90 backdrop-blur-xs border border-slate-100 rounded-3xl p-12 flex flex-col items-center justify-center text-center space-y-5 shadow-xs"
+      >
+        <!-- CAMS Emblem with Radar Pulse Effect -->
+        <div class="relative flex items-center justify-center">
+          <div class="absolute w-20 h-20 bg-emerald-500/10 rounded-full animate-ping"></div>
+          <div class="absolute w-16 h-16 bg-[#123524]/10 rounded-full animate-pulse"></div>
+          
+          <div class="w-14 h-14 bg-[#123524] rounded-2xl flex items-center justify-center font-black text-white text-2xl tracking-wider shadow-xl relative z-10">
+            C
+          </div>
+        </div>
+
+        <!-- Branding Text & Progress Bar -->
+        <div class="space-y-1.5 max-w-xs">
+          <h3 class="text-base font-bold text-slate-900 tracking-tight">CAMS STCW Portal</h3>
+          <p class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">Synchronizing Exam Builder...</p>
+        </div>
+
+        <div class="w-48 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+          <div class="bg-[#123524] h-full rounded-full animate-pulse w-3/4"></div>
+        </div>
+
+        <p class="text-[10px] text-slate-400 font-mono">Baliwag Maritime Academy System</p>
+      </div>
+    </transition>
+
+    <!-- MAIN VIEW CONTENT -->
+    <div v-show="!isLoading" class="space-y-6">
+
+      <!-- Header Hero Banner -->
+      <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-xs">
+        <div class="space-y-1">
+          <h1 class="text-xl font-bold flex items-center gap-2 text-white tracking-tight">
+            <FileText class="text-emerald-400" :size="22" />
+            Assessment Examination Builder
+          </h1>
+          <p class="text-xs text-slate-200 font-normal">
+            Assemble examinations and auto-populate blueprints directly from accurate Question Bank data.
+          </p>
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0">
+          <button 
+            v-if="activeTab === 'builder'"
+            @click="isAiModalOpen = true"
+            class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-2 transition shadow-xs cursor-pointer"
+          >
+            <Sparkles :size="14" />
+            <span>AI Auto-Assemble</span>
+          </button>
+
+          <button 
+            v-if="activeTab === 'builder'"
+            @click="saveTest"
+            class="px-4 py-2.5 bg-[#123524] hover:bg-[#0e2a1d] text-white text-xs font-bold rounded-xl flex items-center gap-2 transition shadow-xs border border-emerald-500/30 cursor-pointer"
+          >
+            <Save :size="14" />
+            <span>Save Test Blueprint</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs Bar -->
+      <div class="flex items-center gap-3 border-b border-slate-200 pb-3">
+        <button 
+          @click="activeTab = 'builder'"
+          :class="[
+            'px-5 py-2.5 rounded-full font-bold text-xs flex items-center gap-2 transition-all cursor-pointer',
+            activeTab === 'builder' 
+              ? 'bg-[#123524] text-white shadow-xs' 
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-xs'
+          ]"
+        >
+          <FileText :size="15" />
+          <span>Test Builder</span>
+        </button>
+
+        <button 
+          @click="activeTab = 'saved'"
+          :class="[
+            'px-5 py-2.5 rounded-full font-bold text-xs flex items-center gap-2 transition-all cursor-pointer',
+            activeTab === 'saved' 
+              ? 'bg-[#123524] text-white shadow-xs' 
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-xs'
+          ]"
+        >
+          <List :size="15" />
+          <span>Saved Tests Preview</span>
+          <span 
+            :class="[
+              'px-2 py-0.5 text-[10px] rounded-full font-mono font-bold ml-0.5',
+              activeTab === 'saved' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
+            ]"
+          >
+            {{ savedTests.length }}
+          </span>
+        </button>
+      </div>
+
+      <!-- TAB 1: TEST BUILDER PAGE -->
+      <div v-show="activeTab === 'builder'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left: Exam Parameters -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-5">
+          <div class="border-b border-slate-100 pb-3">
+            <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2 tracking-tight">
+              <Sliders :size="18" class="text-emerald-700" /> Exam Parameters
+            </h2>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Target Program</label>
+              <select 
+                v-model="examConfig.program" 
+                @change="onProgramChange"
+                class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer text-slate-900"
+              >
+                <option value="" disabled selected>Select Program</option>
+                <option value="BSMT">BSMT (Bachelor of Science in Marine Transportation)</option>
+                <option value="BSMarE">BSMarE (Bachelor of Science in Marine Engineering)</option>
+              </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Academic Year</label>
+                <select 
+                  v-model="examConfig.academicYear" 
+                  @change="updateExamTitle"
+                  class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer text-slate-900"
+                >
+                  <option value="" disabled selected>Select Academic Year</option>
+                  <option v-for="ay in academicYears" :key="ay" :value="ay">AY {{ ay }}</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Semester</label>
+                <select 
+                  v-model="examConfig.semester" 
+                  @change="updateExamTitle"
+                  class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer text-slate-900"
+                >
+                  <option value="" disabled selected>Select Semester</option>
+                  <option value="First Semester">First Semester</option>
+                  <option value="Second Semester">Second Semester</option>
+                  <option value="Summer Semester">Summer Semester</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Course / Subject</label>
+              <select 
+                v-model="examConfig.course" 
+                @change="onCourseChange"
+                :disabled="isLoadingCourses"
+                class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer disabled:opacity-50 text-slate-900"
+              >
+                <option value="" disabled selected>Select Course</option>
+                <option v-if="isLoadingCourses" value="" disabled>Loading registered courses...</option>
+                <option v-else-if="filteredCourses.length === 0" value="" disabled>No courses available</option>
+                <option v-for="c in filteredCourses" :key="c.id || c.code" :value="c.code">
+                  {{ c.code }} - {{ c.title }}
+                </option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Assessment Term</label>
+              <select 
+                v-model="examConfig.term" 
+                @change="updateExamTitle"
+                class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer text-slate-900"
+              >
+                <option value="" disabled selected>Select Term</option>
+                <option value="Midterm Exam">Midterm Exam</option>
+                <option value="Final Exam">Final Exam</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Assessment Title</label>
+              <input 
+                v-model="examConfig.title" 
+                type="text" 
+                placeholder="Select Course and Term to auto-generate title"
+                class="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-slate-900 bg-slate-50 focus:bg-white"
+              />
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Time Limit (Mins)</label>
+                <input 
+                  v-model.number="examConfig.durationMinutes" 
+                  type="number" 
+                  class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold text-center focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Passing Mark (%)</label>
+                <input 
+                  v-model.number="examConfig.passingScorePercent" 
+                  type="number" 
+                  class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold text-center focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white text-slate-900"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="border-t border-slate-100 pt-4 space-y-2.5 text-xs text-slate-600">
+            <div class="flex justify-between items-center">
+              <span class="font-semibold">Total Exam Items:</span>
+              <span class="font-bold text-slate-900 bg-slate-100 px-2.5 py-0.5 rounded-full font-mono text-[11px]">{{ totalItemsCount }} Questions</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="font-semibold">Total Points:</span>
+              <span class="font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 font-mono text-[11px]">{{ totalPoints }} Marks</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Blueprint List -->
+        <div class="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-col justify-between space-y-6">
+          <div class="space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div>
+                <h2 class="text-sm font-bold text-slate-900 tracking-tight">Assembled Test Blueprint</h2>
+                <p class="text-xs text-slate-500">
+                  Course: <span class="font-bold text-emerald-800">{{ examConfig.course || 'None Selected' }}</span> | 
+                  Term: <span class="font-bold text-slate-700">{{ examConfig.term || 'None Selected' }}</span>
+                </p>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button 
+                  @click="isQuestionModalOpen = true"
+                  :disabled="!examConfig.course"
+                  class="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed text-emerald-800 border border-emerald-300 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Plus :size="14" />
+                  <span>Add from Question Bank</span>
+                </button>
+
+                <span class="text-xs font-bold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl border border-slate-200">
+                  {{ totalItemsCount }} Selected
+                </span>
+              </div>
+            </div>
+
+            <div v-if="isLoadingQuestions" class="p-8 text-center text-slate-500 text-xs font-semibold animate-pulse">
+              Loading question bank items for {{ examConfig.course }}...
+            </div>
+
+            <div v-else-if="selectedItems.length === 0" class="p-8 text-center text-slate-400 text-xs italic bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+              No questions selected for this exam. Click "Add from Question Bank" or use AI Auto-Assemble.
+            </div>
+
+            <div v-else class="space-y-3">
+              <div 
+                v-for="(item, idx) in selectedItems" 
+                :key="item.id || idx"
+                class="p-4 border border-slate-200 rounded-2xl hover:border-emerald-300 transition-all flex items-start justify-between gap-4 bg-slate-50/40 shadow-xs"
+              >
+                <div class="space-y-2 flex-1">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs font-mono font-bold text-slate-400">#{{ idx + 1 }}</span>
+                    <span class="px-2 py-0.5 bg-[#123524] text-white font-mono text-[11px] font-bold rounded-md">
+                      {{ item.code }}
+                    </span>
+
+                    <span 
+                      :class="[
+                        'text-[11px] font-bold border px-2 py-0.5 rounded-md flex items-center gap-1 font-mono',
+                        item.co === 'Unassigned' 
+                          ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                          : 'bg-slate-100 text-slate-800 border-slate-200'
+                      ]"
+                    >
+                      <Target :size="11" :class="item.co === 'Unassigned' ? 'text-amber-600' : 'text-slate-600'" />
+                      <span>CO: {{ item.co }}</span>
+                    </span>
+
+                    <span 
+                      :class="[
+                        'text-[11px] font-bold border px-2 py-0.5 rounded-md flex items-center gap-1 font-mono',
+                        item.lo === 'Unassigned' 
+                          ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                          : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      ]"
+                    >
+                      <Layers :size="11" :class="item.lo === 'Unassigned' ? 'text-amber-600' : 'text-emerald-600'" />
+                      <span>LO: {{ item.lo }}</span>
+                    </span>
+
+                    <span class="text-[11px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md">
+                      {{ item.bloomLevel }}
+                    </span>
+
+                    <span class="text-[10px] font-bold text-slate-700 bg-slate-200 px-2 py-0.5 rounded-md uppercase">
+                      {{ item.type }}
+                    </span>
+                  </div>
+                  <p class="text-xs font-semibold text-slate-800 pt-0.5 leading-relaxed">{{ item.text }}</p>
+                  
+                  <!-- Attachment Image Preview in Builder List -->
+                  <div v-if="getQuestionImage(item)" class="pt-1">
+                    <img 
+                      :src="getQuestionImage(item)" 
+                      alt="Question attachment" 
+                      class="h-16 max-w-xs object-cover rounded-xl border border-slate-200 bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-3 shrink-0">
+                  <div class="text-right">
+                    <span class="text-[10px] block text-slate-400 font-bold uppercase">Points</span>
+                    <input 
+                      v-model.number="item.points" 
+                      type="number" 
+                      min="1" 
+                      class="w-14 border border-slate-200 rounded-xl text-center text-xs font-bold py-1 outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                    />
+                  </div>
+
+                  <button 
+                    @click="removeItem(idx)" 
+                    class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                    title="Remove Item"
+                  >
+                    <Trash2 :size="16" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-4 border-t border-slate-100 flex justify-end">
+            <button 
+              @click="saveTest" 
+              class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <Save :size="14" />
+              <span>Save Test Blueprint</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: SAVED TESTS PREVIEW PAGE -->
+      <div v-show="activeTab === 'saved'" class="space-y-6">
+        
+        <!-- Search, Filter & Sort Controls Bar -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+            
+            <div class="relative lg:col-span-2">
+              <Search :size="14" class="absolute left-3 top-3 text-slate-400" />
+              <input 
+                v-model="savedSearchQuery"
+                type="text"
+                placeholder="Search by title, course, or program..."
+                class="w-full text-xs pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800"
+              />
+            </div>
+
+            <div>
+              <select 
+                v-model="savedFilterProgram"
+                class="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              >
+                <option value="">All Programs</option>
+                <option v-for="p in uniqueSavedPrograms" :key="p" :value="p">{{ p }}</option>
+              </select>
+            </div>
+
+            <div>
+              <select 
+                v-model="savedFilterCourse"
+                class="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              >
+                <option value="">All Courses</option>
+                <option v-for="c in uniqueSavedCourses" :key="c" :value="c">{{ c }}</option>
+              </select>
+            </div>
+
+            <div>
+              <select 
+                v-model="savedSortBy"
+                class="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              >
+                <option value="newest">Sort: Newest First</option>
+                <option value="oldest">Sort: Oldest First</option>
+                <option value="title_asc">Sort: Title A-Z</option>
+                <option value="items_desc">Sort: Most Questions</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+            <span class="text-slate-500 font-medium">
+              Showing <strong class="text-slate-800 font-bold">{{ filteredSavedTests.length }}</strong> of {{ savedTests.length }} saved test(s)
+            </span>
+
+            <button 
+              v-if="savedSearchQuery || savedFilterProgram || savedFilterCourse || savedFilterTerm || savedSortBy !== 'newest'"
+              @click="resetSavedFilters"
+              class="text-emerald-800 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <RotateCcw :size="12" />
+              <span>Clear Filters</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div v-if="filteredSavedTests.length === 0" class="bg-white border border-slate-200 rounded-2xl p-12 text-center space-y-3 shadow-xs">
+          <div class="p-3 bg-slate-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto text-slate-400">
+            <List :size="24" />
+          </div>
+          <h3 class="text-sm font-bold text-slate-800">No Saved Tests Match Criteria</h3>
+          <p class="text-xs text-slate-500 max-w-sm mx-auto">
+            Try adjusting or clearing your search filters, or construct a new examination blueprint in the Test Builder.
+          </p>
+          <button 
+            @click="resetSavedFilters"
+            class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+          >
+            Reset Filters
+          </button>
+        </div>
+
+        <!-- Clean List View -->
+        <div v-else class="space-y-3">
+          <div 
+            v-for="test in filteredSavedTests" 
+            :key="test.id"
+            class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+          >
+            <div class="space-y-1.5 flex-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-2.5 py-0.5 bg-[#123524] text-white font-mono text-[10px] font-bold rounded-md">
+                  {{ test.program || 'GENERAL' }}
+                </span>
+                <span class="px-2.5 py-0.5 bg-emerald-50 text-emerald-800 font-bold text-[10px] rounded-md border border-emerald-200">
+                  {{ test.term || 'Exam' }}
+                </span>
+                <span class="text-[11px] font-bold text-slate-400 flex items-center gap-1 font-mono">
+                  <Calendar :size="12" />
+                  <span>Saved: {{ test.savedAt }}</span>
+                </span>
+              </div>
+
+              <h3 class="text-base font-bold text-slate-900 leading-snug">{{ test.title }}</h3>
+
+              <p class="text-xs text-slate-500 font-medium">
+                Course: <strong class="text-emerald-800 font-bold">{{ test.course }}</strong>
+                <span v-if="test.academicYear"> | AY: {{ test.academicYear }}</span>
+                <span v-if="test.semester"> ({{ test.semester }})</span>
+              </p>
+            </div>
+
+            <!-- Stats Metadata Pills -->
+            <div class="flex items-center gap-3 shrink-0 text-xs">
+              <div class="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-center">
+                <span class="block text-[10px] text-slate-400 font-bold uppercase">Items</span>
+                <span class="font-bold text-slate-800 font-mono text-xs">{{ test.totalItems }} Questions</span>
+              </div>
+
+              <div class="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-center">
+                <span class="block text-[10px] text-slate-400 font-bold uppercase">Marks</span>
+                <span class="font-bold text-emerald-800 font-mono text-xs">{{ test.totalPoints }} Points</span>
+              </div>
+
+              <div class="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-center">
+                <span class="block text-[10px] text-slate-400 font-bold uppercase">Time</span>
+                <span class="font-bold text-slate-800 text-xs">{{ test.durationMinutes }} Mins</span>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-2 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-4 shrink-0">
+              <button 
+                @click="viewSavedTestDetails(test)"
+                class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                title="Open Exam Preview Modal"
+              >
+                <Eye :size="14" />
+                <span>Exam Preview</span>
+              </button>
+
+              <button 
+                @click="loadTestToBuilder(test)"
+                class="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                title="Edit in Test Builder"
+              >
+                <FileText :size="14" />
+                <span>Load Builder</span>
+              </button>
+
+              <button 
+                @click="deleteSavedTest(test.id)"
+                class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
+                title="Delete Test Blueprint"
+              >
+                <Trash2 :size="16" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BULK QUESTION SELECTION MODAL -->
+    <div v-if="isQuestionModalOpen" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+        
+        <div class="p-5 bg-[#123524] text-white flex justify-between items-center">
+          <div class="flex items-center gap-2.5">
+            <BookOpen :size="20" class="text-emerald-400" />
+            <div>
+              <h3 class="text-base font-bold text-white">Select Questions from Question Bank</h3>
+              <p class="text-xs text-slate-200">
+                Course: <span class="font-bold text-emerald-300">{{ examConfig.course }}</span> (Approved Only)
+              </p>
+            </div>
+          </div>
+          <button @click="isQuestionModalOpen = false" class="text-slate-300 hover:text-white transition cursor-pointer">
+            <X :size="20" />
+          </button>
+        </div>
+
+        <div class="p-4 bg-slate-50 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div class="relative lg:col-span-2">
+            <Search :size="14" class="absolute left-3 top-3 text-slate-400" />
+            <input 
+              v-model="searchQuery"
+              type="text"
+              placeholder="Search code, text, CO, or LO..."
+              class="w-full text-xs pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+            />
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Course Outcome</label>
+            <select 
+              v-model="filterCO"
+              class="w-full text-xs py-1.5 px-2 bg-white border border-slate-200 rounded-xl outline-none font-bold focus:ring-2 focus:ring-emerald-500 cursor-pointer text-slate-800"
+            >
+              <option value="">All Course Outcomes</option>
+              <option v-for="co in availableCOs" :key="co" :value="co">{{ co }}</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Learning Outcome</label>
+            <select 
+              v-model="filterLO"
+              class="w-full text-xs py-1.5 px-2 bg-white border border-slate-200 rounded-xl outline-none font-bold focus:ring-2 focus:ring-emerald-500 cursor-pointer text-slate-800"
+            >
+              <option value="">All Learning Outcomes</option>
+              <option v-for="lo in availableLOs" :key="lo" :value="lo">{{ lo }}</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Question Type</label>
+            <select 
+              v-model="filterType"
+              class="w-full text-xs py-1.5 px-2 bg-white border border-slate-200 rounded-xl outline-none font-bold focus:ring-2 focus:ring-emerald-500 cursor-pointer text-slate-800"
+            >
+              <option value="">All Question Types</option>
+              <option v-for="t in availableTypes" :key="t" :value="t">{{ t }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="px-5 py-2.5 bg-white border-b border-slate-100 flex items-center justify-between text-xs">
+          <button 
+            @click="toggleSelectAllFiltered"
+            class="flex items-center gap-2 font-bold text-slate-700 hover:text-emerald-800 cursor-pointer"
+          >
+            <CheckSquare v-if="isAllFilteredSelected" :size="16" class="text-emerald-600" />
+            <Square v-else :size="16" class="text-slate-400" />
+            <span>Select All Filtered Items ({{ filteredQuestionBank.length }})</span>
+          </button>
+
+          <div class="flex items-center gap-2">
+            <span class="text-slate-400 font-medium">Sort by:</span>
+            <select v-model="sortBy" class="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer text-slate-800">
+              <option value="code_asc">Code (Ascending)</option>
+              <option value="code_desc">Code (Descending)</option>
+              <option value="co">Course Outcome (CO)</option>
+              <option value="lo">Learning Outcome (LO)</option>
+              <option value="type">Question Type</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="p-5 overflow-y-auto flex-1 space-y-3 bg-slate-50/50">
+          <div v-if="filteredQuestionBank.length === 0" class="p-10 text-center text-slate-400 text-xs italic">
+            No approved questions found in the Question Bank matching your criteria.
+          </div>
+
+          <div 
+            v-for="q in filteredQuestionBank" 
+            :key="q.id"
+            @click="togglePickerItem(q.id)"
+            :class="[
+              'p-4 border rounded-2xl transition-all cursor-pointer flex items-start gap-3',
+              pickerSelectedIds.includes(q.id) 
+                ? 'bg-emerald-50/80 border-emerald-300 shadow-xs' 
+                : 'bg-white border-slate-200 hover:border-slate-300'
+            ]"
+          >
+            <div class="pt-0.5">
+              <CheckSquare v-if="pickerSelectedIds.includes(q.id)" :size="18" class="text-emerald-600" />
+              <Square v-else :size="18" class="text-slate-300" />
+            </div>
+
+            <div class="space-y-2 flex-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-2 py-0.5 bg-[#123524] text-white font-mono text-xs font-bold rounded-md">
+                  {{ q.code }}
+                </span>
+
+                <span 
+                  :class="[
+                    'text-[11px] font-bold border px-2 py-0.5 rounded-md flex items-center gap-1 font-mono',
+                    q.co === 'Unassigned' 
+                      ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                      : 'bg-slate-100 text-slate-800 border-slate-200'
+                  ]"
+                >
+                  <Target :size="11" :class="q.co === 'Unassigned' ? 'text-amber-600' : 'text-slate-600'" />
+                  <span>CO: {{ q.co }}</span>
+                </span>
+
+                <span 
+                  :class="[
+                    'text-[11px] font-bold border px-2 py-0.5 rounded-md flex items-center gap-1 font-mono',
+                    q.lo === 'Unassigned' 
+                      ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                      : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  ]"
+                >
+                  <Layers :size="11" :class="q.lo === 'Unassigned' ? 'text-amber-600' : 'text-emerald-600'" />
+                  <span>LO: {{ q.lo }}</span>
+                </span>
+
+                <span class="text-[11px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md">
+                  {{ q.bloomLevel }}
+                </span>
+
+                <span class="text-[10px] font-bold text-slate-700 bg-slate-200 px-2 py-0.5 rounded-md uppercase">
+                  {{ q.type }}
+                </span>
+              </div>
+
+              <p class="text-xs font-semibold text-slate-800 leading-relaxed">
+                {{ q.text }}
+              </p>
+
+              <div v-if="getQuestionImage(q)" class="pt-1">
+                <img 
+                  :src="getQuestionImage(q)" 
+                  alt="Attachment preview" 
+                  class="h-14 max-w-xs object-cover rounded-xl border border-slate-200 bg-white"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-4 bg-white border-t border-slate-200 flex justify-between items-center">
+          <span class="text-xs font-bold text-slate-700">
+            {{ pickerSelectedIds.length }} question(s) checked
+          </span>
+
+          <div class="flex gap-2">
+            <button 
+              @click="isQuestionModalOpen = false"
+              class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button 
+              @click="importSelectedQuestions"
+              :disabled="pickerSelectedIds.length === 0"
+              class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
+            >
+              <Plus :size="14" />
+              <span>Add Selected to Blueprint</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SAVED TEST FULL EXAM PREVIEW MODAL -->
+    <div v-if="isPreviewModalOpen && selectedTestPreview" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+        
+        <!-- Modal Header -->
+        <div class="p-5 bg-[#123524] text-white flex justify-between items-center">
+          <div>
+            <h3 class="text-base font-bold text-white">{{ selectedTestPreview.title }}</h3>
+            <p class="text-xs text-slate-200">
+              Course: <span class="font-bold text-emerald-300">{{ selectedTestPreview.course }}</span> | 
+              Total Items: <span class="font-bold text-emerald-300">{{ selectedTestPreview.totalItems }} Questions</span> ({{ selectedTestPreview.totalPoints }} Points)
+            </p>
+          </div>
+          <button @click="isPreviewModalOpen = false" class="text-slate-300 hover:text-white transition cursor-pointer">
+            <X :size="20" />
+          </button>
+        </div>
+
+        <!-- Exam Questions Body -->
+        <div class="p-5 overflow-y-auto flex-1 space-y-5 bg-slate-50">
+          <div 
+            v-for="(item, idx) in selectedTestPreview.items" 
+            :key="item.id || idx"
+            class="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-xs"
+          >
+            <!-- Item Meta Header -->
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs font-mono font-bold text-slate-400">#{{ idx + 1 }}</span>
+              <span class="px-2 py-0.5 bg-[#123524] text-white font-mono text-xs font-bold rounded-md">
+                {{ item.code }}
+              </span>
+              <span class="text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200 px-2 py-0.5 rounded-md font-mono">
+                CO: {{ item.co }}
+              </span>
+              <span class="text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md font-mono">
+                LO: {{ item.lo }}
+              </span>
+              <span class="text-[11px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md">
+                {{ item.bloomLevel }}
+              </span>
+              <span class="text-[10px] font-bold text-slate-700 bg-slate-200 px-2 py-0.5 rounded-md uppercase">
+                {{ item.type }}
+              </span>
+              <span class="text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md ml-auto">
+                {{ item.points || 1 }} Marks
+              </span>
+            </div>
+
+            <!-- Question Prompt Text -->
+            <p class="text-xs font-bold text-slate-900 leading-relaxed">{{ item.text }}</p>
+
+            <!-- Question Attachment Image -->
+            <div v-if="getQuestionImage(item)" class="my-2">
+              <img 
+                :src="getQuestionImage(item)" 
+                alt="Question diagram or visual attachment" 
+                class="rounded-2xl border border-slate-200 max-h-60 object-contain bg-slate-50 p-1"
+              />
+            </div>
+
+            <!-- MATCHING PAIRS DISPLAY GRID -->
+            <div v-if="getMatchingPairs(item).length > 0" class="my-3 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers :size="13" class="text-emerald-700" />
+                  Matching Pairs & Correct Answers ({{ getMatchingPairs(item).length }} Pairs)
+                </span>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div 
+                  v-for="(pair, pIdx) in getMatchingPairs(item)" 
+                  :key="pair.id || pIdx"
+                  class="p-2.5 bg-slate-50/80 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs"
+                >
+                  <!-- Prompt / Left Item -->
+                  <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <span class="font-bold text-slate-400 font-mono text-[11px]">#{{ pIdx + 1 }}</span>
+                    <img 
+                      v-if="pair.leftImage" 
+                      :src="pair.leftImage" 
+                      alt="Pair visual" 
+                      class="w-12 h-12 object-cover rounded-lg border border-slate-200 bg-white shrink-0"
+                    />
+                    <span class="font-semibold text-slate-800 truncate">{{ pair.leftText }}</span>
+                  </div>
+
+                  <ArrowRight :size="14" class="text-emerald-700 shrink-0" />
+
+                  <!-- Correct Match / Right Item -->
+                  <div class="flex items-center gap-2 flex-1 justify-end min-w-0">
+                    <span class="font-bold text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-300 truncate font-mono text-[11px]">
+                      {{ pair.rightText }}
+                    </span>
+                    <img 
+                      v-if="pair.rightImage" 
+                      :src="pair.rightImage" 
+                      alt="Target visual" 
+                      class="w-12 h-12 object-cover rounded-lg border border-slate-200 bg-white shrink-0"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- MULTIPLE CHOICE OPTIONS LIST -->
+            <div v-else-if="getQuestionOptions(item).length > 0" class="space-y-1.5 pl-2 border-l-2 border-slate-200 my-2">
+              <div 
+                v-for="(opt, optIdx) in getQuestionOptions(item)" 
+                :key="optIdx"
+                :class="[
+                  'text-xs p-2.5 rounded-xl flex items-start gap-2 font-medium transition-colors border',
+                  isOptionCorrect(item, optIdx) 
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold' 
+                    : 'bg-slate-50 border-slate-200 text-slate-700'
+                ]"
+              >
+                <span class="font-bold text-slate-500">{{ String.fromCharCode(65 + optIdx) }}.</span>
+                <span class="flex-1">{{ opt.text }}</span>
+                <span v-if="isOptionCorrect(item, optIdx)" class="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-md">
+                  Correct Choice
+                </span>
+              </div>
+            </div>
+
+            <!-- EXPLICIT CORRECT ANSWER KEY BANNER -->
+            <div class="p-2.5 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-900">
+              <div class="flex items-center gap-1.5 font-bold">
+                <CheckCircle2 :size="15" class="text-emerald-700" />
+                <span>Correct Answer Key:</span>
+              </div>
+              <span class="font-bold font-mono text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-300">
+                {{ getCorrectAnswer(item) }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="p-4 bg-white border-t border-slate-200 flex justify-end">
+          <button 
+            @click="isPreviewModalOpen = false"
+            class="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+          >
+            Close Preview
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Blueprint Auto-Assemble Modal -->
+    <div v-if="isAiModalOpen" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 border border-slate-200">
+        <div class="flex items-center gap-3 text-emerald-800">
+          <div class="p-2.5 bg-emerald-100 rounded-2xl text-emerald-800">
+            <Sparkles :size="24" />
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">AI Blueprint Builder</h3>
+            <p class="text-xs text-slate-500">Automatically select balanced items from approved questions.</p>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Target Item Count</label>
+            <input 
+              v-model.number="aiBlueprint.targetTotalItems" 
+              type="number" 
+              class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white text-slate-900"
+            />
+          </div>
+
+          <div class="space-y-1.5">
+            <span class="block text-xs font-bold text-slate-700">Cognitive Balance (Bloom's Taxonomy)</span>
+            <div class="grid grid-cols-3 gap-2 text-center text-xs">
+              <div class="bg-slate-50 border border-slate-200 p-2.5 rounded-2xl">
+                <span class="block text-slate-500 text-[11px] font-medium">Easy</span>
+                <span class="font-bold text-emerald-900 text-xs">{{ aiBlueprint.easyPercent }}%</span>
+              </div>
+              <div class="bg-slate-50 border border-slate-200 p-2.5 rounded-2xl">
+                <span class="block text-slate-500 text-[11px] font-medium">Medium</span>
+                <span class="font-bold text-emerald-900 text-xs">{{ aiBlueprint.mediumPercent }}%</span>
+              </div>
+              <div class="bg-slate-50 border border-slate-200 p-2.5 rounded-2xl">
+                <span class="block text-slate-500 text-[11px] font-medium">Hard</span>
+                <span class="font-bold text-emerald-900 text-xs">{{ aiBlueprint.hardPercent }}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
+          <button 
+            @click="isAiModalOpen = false" 
+            class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button 
+            @click="autoAssembleTest" 
+            :disabled="isAutoBuilding"
+            class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+          >
+            <Sparkles :size="14" :class="{ 'animate-spin': isAutoBuilding }" />
+            <span>{{ isAutoBuilding ? 'Assembling...' : 'Assemble Items' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</template>
+
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+
 import { 
   Sparkles, 
   Sliders, 
@@ -24,34 +956,36 @@ import {
   ArrowRight
 } from 'lucide-vue-next'
 
-const router = useRouter()
+// PURGE LEGACY STORAGE KEY TO PREVENT MOCK COURSE DESYNC
+localStorage.removeItem('cams_courses')
 
-// Active Tab State ('builder' | 'saved')
+// STATE
 const activeTab = ref('builder')
+const isLoading = ref(true)
 
-// Master Registries
+// MASTER REGISTRIES
 const masterCourseOutcomes = ref([])
 const masterLearningOutcomes = ref([])
 
-// Courses & Question Bank State
+// COURSES & QUESTION BANK STATE
 const courses = ref([])
 const availableQuestionBank = ref([])
 const isLoadingCourses = ref(false)
 const isLoadingQuestions = ref(false)
 
-// Saved Tests State
+// SAVED TESTS STATE
 const savedTests = ref([])
 const selectedTestPreview = ref(null)
 const isPreviewModalOpen = ref(false)
 
-// Tab 2: Saved Tests Search, Filter & Sort State
+// SEARCH & FILTER STATE
 const savedSearchQuery = ref('')
 const savedFilterProgram = ref('')
 const savedFilterCourse = ref('')
 const savedFilterTerm = ref('')
 const savedSortBy = ref('newest')
 
-// Academic Years Generator
+// ACADEMIC YEARS
 const currentYear = new Date().getFullYear()
 const academicYears = computed(() => {
   const years = []
@@ -63,7 +997,7 @@ const academicYears = computed(() => {
   return years
 })
 
-// Exam Configuration Form State
+// EXAM CONFIG
 const examConfig = ref({
   program: '',
   academicYear: '',
@@ -75,12 +1009,12 @@ const examConfig = ref({
   passingScorePercent: 75
 })
 
-// Modals State
+// MODALS STATE
 const isAiModalOpen = ref(false)
 const isAutoBuilding = ref(false)
 const isQuestionModalOpen = ref(false)
 
-// Question Picker Filter & Selection State
+// QUESTION PICKER STATE
 const searchQuery = ref('')
 const filterCO = ref('')
 const filterLO = ref('')
@@ -95,16 +1029,14 @@ const aiBlueprint = ref({
   hardPercent: 20
 })
 
-// Selected Questions in current Exam Blueprint
 const selectedItems = ref([])
 
 const totalPoints = computed(() => selectedItems.value.reduce((sum, item) => sum + Number(item.points || 0), 0))
 const totalItemsCount = computed(() => selectedItems.value.length)
 
-// Unified API Helper with Multi-port Fallbacks
+// PROXY-AWARE API HELPER
 async function fetchFromEndpoints(path, options = {}) {
-  const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://127.0.0.1:8080/api', 'http://localhost:8000/api']
-  const token = localStorage.getItem('token') || ''
+  const token = localStorage.getItem('cams_token') || localStorage.getItem('token') || ''
   
   const headers = {
     'Content-Type': 'application/json',
@@ -113,21 +1045,18 @@ async function fetchFromEndpoints(path, options = {}) {
     ...(options.headers || {})
   }
 
-  for (const baseUrl of ports) {
-    try {
-      const res = await fetch(`${baseUrl}${path}`, { ...options, headers })
-      if (res.ok) {
-        const json = await res.json()
-        return json?.data ?? json
-      }
-    } catch (e) {
-      // Try next port
+  try {
+    const res = await fetch(`/api${path}`, { ...options, headers })
+    if (res.ok) {
+      const json = await res.json()
+      return json?.data ?? json
     }
+  } catch (e) {
+    // Local fallback
   }
   throw new Error(`Endpoint ${path} unreachable`)
 }
 
-// Image URL Resolver for Backend Storage / Relative Paths
 function resolveImageUrl(path) {
   if (!path || typeof path !== 'string') return null
   const clean = path.trim()
@@ -139,14 +1068,12 @@ function resolveImageUrl(path) {
   return `${window.location.origin}/${relativePath}`
 }
 
-// Question Main Image Resolution Helper
 function getQuestionImage(item) {
   if (!item) return null
   const raw = item.image || item.image_url || item.imageUrl || item.picture || item.media_url || item.media || item.attachment || item.attachment_url || item.file_path || item.question_image || item.img
   return resolveImageUrl(raw)
 }
 
-// Extract Matching Type Pairs and Images
 function getMatchingPairs(item) {
   if (!item) return []
 
@@ -219,7 +1146,6 @@ function getMatchingPairs(item) {
   return []
 }
 
-// Multiple Choice Options helper
 function getQuestionOptions(item) {
   if (!item) return []
   const opts = item.options || item.choices || item.answers || item.question_options
@@ -241,7 +1167,6 @@ function getQuestionOptions(item) {
   return []
 }
 
-// Checks whether an option index is correct
 function isOptionCorrect(item, optIdx) {
   if (!item) return false
   const opts = getQuestionOptions(item)
@@ -262,7 +1187,6 @@ function isOptionCorrect(item, optIdx) {
   return false
 }
 
-// Correct Answer Display Helper
 function getCorrectAnswer(item) {
   if (!item) return 'N/A'
 
@@ -332,7 +1256,6 @@ function safeParseStorage(key) {
   }
 }
 
-// Load Master Outcomes Registries safely
 async function loadOutcomeMasters() {
   try {
     const coData = await fetchFromEndpoints('/course-outcomes')
@@ -351,7 +1274,6 @@ async function loadOutcomeMasters() {
   }
 }
 
-// Load Saved Tests from localStorage
 function loadSavedTests() {
   const loaded = safeParseStorage('cams_saved_tests')
   if (loaded && Array.isArray(loaded)) {
@@ -705,19 +1627,41 @@ async function loadCourses() {
   isLoadingCourses.value = true
   try {
     const data = await fetchFromEndpoints('/courses')
-    courses.value = Array.isArray(data) ? data : (data?.data || [])
+    let rawCourses = []
+    if (Array.isArray(data)) {
+      rawCourses = data
+    } else {
+      const saved = safeParseStorage('cams_courses_data')
+      rawCourses = saved && Array.isArray(saved) ? saved : []
+    }
+    courses.value = rawCourses.filter(c => {
+      if (!c || typeof c !== 'object') return false
+      const code = c.code || c.course_code || c.courseCode
+      const title = c.title || c.course_title || c.courseTitle || c.name
+      return !!(code && String(code).trim() && title && String(title).trim())
+    })
   } catch (err) {
     const saved = safeParseStorage('cams_courses_data')
-    courses.value = saved ? (Array.isArray(saved) ? saved : (saved.data || [])) : []
+    const rawCourses = saved && Array.isArray(saved) ? saved : []
+    courses.value = rawCourses.filter(c => {
+      if (!c || typeof c !== 'object') return false
+      const code = c.code || c.course_code || c.courseCode
+      const title = c.title || c.course_title || c.courseTitle || c.name
+      return !!(code && String(code).trim() && title && String(title).trim())
+    })
   } finally {
     isLoadingCourses.value = false
   }
 }
 
 onMounted(async () => {
+  isLoading.value = true
   await loadOutcomeMasters()
   await loadCourses()
   loadSavedTests()
+  setTimeout(() => {
+    isLoading.value = false
+  }, 400)
 })
 
 function autoAssembleTest() {
@@ -847,890 +1791,3 @@ function viewSavedTestDetails(test) {
   isPreviewModalOpen.value = true
 }
 </script>
-
-<template>
-  <div class="p-6 md:p-8 space-y-6 min-h-screen bg-[#f4f6f9] text-slate-800 font-sans">
-    <!-- Header Banner -->
-    <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-sm">
-      <div class="space-y-1">
-        <h1 class="text-xl font-bold flex items-center gap-2 text-white tracking-tight">
-          Exam Builder
-        </h1>
-        <p class="text-xs text-white/80 font-normal">
-          Assemble examinations and auto-populate blueprints directly from accurate Question Bank data.
-        </p>
-      </div>
-
-      <div class="flex items-center gap-2 shrink-0">
-        <button 
-          v-if="activeTab === 'builder'"
-          @click="isAiModalOpen = true"
-          class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl flex items-center gap-2 transition shadow-sm cursor-pointer"
-        >
-          <Sparkles :size="14" />
-          <span>AI Auto-Assemble</span>
-        </button>
-
-        <button 
-          v-if="activeTab === 'builder'"
-          @click="saveTest"
-          class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl flex items-center gap-2 transition shadow-sm border border-emerald-500/30 cursor-pointer"
-        >
-          <Save :size="14" />
-          <span>Save Test</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Navigation Tabs Bar -->
-    <div class="flex items-center gap-3 border-b border-slate-200 pb-3">
-      <button 
-        @click="activeTab = 'builder'"
-        :class="[
-          'px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-2 transition cursor-pointer',
-          activeTab === 'builder' 
-            ? 'bg-[#123524] text-white shadow-sm' 
-            : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-        ]"
-      >
-        <FileText :size="15" />
-        <span>Test Builder</span>
-      </button>
-
-      <button 
-        @click="activeTab = 'saved'"
-        :class="[
-          'px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-2 transition cursor-pointer',
-          activeTab === 'saved' 
-            ? 'bg-[#123524] text-white shadow-sm' 
-            : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-        ]"
-      >
-        <List :size="15" />
-        <span>Saved Tests Preview</span>
-        <span 
-          :class="[
-            'px-2 py-0.5 text-[10px] rounded-full font-mono font-bold',
-            activeTab === 'saved' ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-700'
-          ]"
-        >
-          {{ savedTests.length }}
-        </span>
-      </button>
-    </div>
-
-    <!-- TAB 1: TEST BUILDER PAGE -->
-    <div v-if="activeTab === 'builder'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Left: Exam Parameters -->
-      <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-5">
-        <div class="border-b pb-3">
-          <h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
-            <Sliders :size="18" class="text-emerald-700" /> Exam Parameters
-          </h2>
-        </div>
-
-        <div class="space-y-4">
-          <div>
-            <label class="block text-xs font-bold text-gray-700 mb-1">Target Program</label>
-            <select 
-              v-model="examConfig.program" 
-              @change="onProgramChange"
-              class="w-full text-xs p-2.5 border border-slate-300 rounded-lg font-bold bg-slate-50 focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"
-            >
-              <option value="" disabled selected>Select Program</option>
-              <option value="BSMT">BSMT (Bachelor of Science in Marine Transportation)</option>
-              <option value="BSMarE">BSMarE (Bachelor of Science in Marine Engineering)</option>
-            </select>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-bold text-gray-700 mb-1">Academic Year</label>
-              <select 
-                v-model="examConfig.academicYear" 
-                @change="updateExamTitle"
-                class="w-full text-xs p-2.5 border border-slate-300 rounded-lg font-bold bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"
-              >
-                <option value="" disabled selected>Select Academic Year</option>
-                <option v-for="ay in academicYears" :key="ay" :value="ay">AY {{ ay }}</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-xs font-bold text-gray-700 mb-1">Semester</label>
-              <select 
-                v-model="examConfig.semester" 
-                @change="updateExamTitle"
-                class="w-full text-xs p-2.5 border border-slate-300 rounded-lg font-bold bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"
-              >
-                <option value="" disabled selected>Select Semester</option>
-                <option value="First Semester">First Semester</option>
-                <option value="Second Semester">Second Semester</option>
-                <option value="Summer Semester">Summer Semester</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-bold text-gray-700 mb-1">Course / Subject</label>
-            <select 
-              v-model="examConfig.course" 
-              @change="onCourseChange"
-              :disabled="isLoadingCourses"
-              class="w-full text-xs p-2.5 border border-slate-300 rounded-lg font-bold bg-slate-50 focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer disabled:opacity-50"
-            >
-              <option value="" disabled selected>Select Course</option>
-              <option v-if="isLoadingCourses" value="" disabled>Loading registered courses...</option>
-              <option v-else-if="filteredCourses.length === 0" value="" disabled>No courses available</option>
-              <option v-for="c in filteredCourses" :key="c.id || c.code" :value="c.code">
-                {{ c.code }} - {{ c.title }}
-              </option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-bold text-gray-700 mb-1">Assessment Term</label>
-            <select 
-              v-model="examConfig.term" 
-              @change="updateExamTitle"
-              class="w-full text-xs p-2.5 border border-slate-300 rounded-lg font-bold bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"
-            >
-              <option value="" disabled selected>Select Term</option>
-              <option value="Midterm Exam">Midterm Exam</option>
-              <option value="Final Exam">Final Exam</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-bold text-gray-700 mb-1">Assessment Title</label>
-            <input 
-              v-model="examConfig.title" 
-              type="text" 
-              placeholder="Select Course and Term to auto-generate title"
-              class="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none font-semibold text-slate-900"
-            />
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-bold text-gray-700 mb-1">Time Limit (Mins)</label>
-              <input 
-                v-model.number="examConfig.durationMinutes" 
-                type="number" 
-                class="w-full text-xs p-2.5 border border-slate-300 rounded-lg font-bold text-center focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-            </div>
-
-            <div>
-              <label class="block text-xs font-bold text-gray-700 mb-1">Passing Mark (%)</label>
-              <input 
-                v-model.number="examConfig.passingScorePercent" 
-                type="number" 
-                class="w-full text-xs p-2.5 border border-slate-300 rounded-lg font-bold text-center focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div class="border-t border-slate-200 pt-4 space-y-2.5 text-xs text-slate-600">
-          <div class="flex justify-between items-center">
-            <span class="font-medium">Total Exam Items:</span>
-            <span class="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded font-mono">{{ totalItemsCount }} Questions</span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="font-medium">Total Points:</span>
-            <span class="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-mono">{{ totalPoints }} Marks</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right: Blueprint List -->
-      <div class="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col justify-between space-y-6">
-        <div class="space-y-4">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3">
-            <div>
-              <h2 class="text-base font-bold text-gray-900">Assembled Test Blueprint</h2>
-              <p class="text-xs text-slate-500">
-                Course: <span class="font-bold text-emerald-800">{{ examConfig.course || 'None Selected' }}</span> | 
-                Term: <span class="font-bold text-slate-700">{{ examConfig.term || 'None Selected' }}</span>
-              </p>
-            </div>
-
-            <div class="flex items-center gap-2">
-              <button 
-                @click="isQuestionModalOpen = true"
-                :disabled="!examConfig.course"
-                class="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed text-emerald-800 border border-emerald-200 font-bold text-xs rounded-lg transition flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus :size="14" />
-                <span>Add from Question Bank</span>
-              </button>
-
-              <span class="text-xs font-bold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200">
-                {{ totalItemsCount }} Selected
-              </span>
-            </div>
-          </div>
-
-          <div v-if="isLoadingQuestions" class="p-8 text-center text-slate-500 text-xs font-semibold animate-pulse">
-            Loading question bank items for {{ examConfig.course }}...
-          </div>
-
-          <div v-else-if="selectedItems.length === 0" class="p-8 text-center text-slate-400 text-xs italic bg-slate-50 rounded-xl border border-dashed border-slate-200">
-            No questions selected for this exam. Click "Add from Question Bank" or use AI Auto-Assemble.
-          </div>
-
-          <div v-else class="space-y-3">
-            <div 
-              v-for="(item, idx) in selectedItems" 
-              :key="item.id || idx"
-              class="p-4 border border-slate-200 rounded-xl hover:border-emerald-300 transition-all flex items-start justify-between gap-4 bg-slate-50/50"
-            >
-              <div class="space-y-2 flex-1">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="text-xs font-mono font-bold text-slate-500">#{{ idx + 1 }}</span>
-                  <span class="px-2 py-0.5 bg-slate-800 text-white font-mono text-xs font-bold rounded">
-                    {{ item.code }}
-                  </span>
-
-                  <span 
-                    :class="[
-                      'text-[11px] font-bold border px-2 py-0.5 rounded flex items-center gap-1 font-mono',
-                      item.co === 'Unassigned' 
-                        ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                        : 'bg-blue-50 text-blue-700 border-blue-200'
-                    ]"
-                  >
-                    <Target :size="11" :class="item.co === 'Unassigned' ? 'text-amber-500' : 'text-blue-500'" />
-                    <span>CO: {{ item.co }}</span>
-                  </span>
-
-                  <span 
-                    :class="[
-                      'text-[11px] font-bold border px-2 py-0.5 rounded flex items-center gap-1 font-mono',
-                      item.lo === 'Unassigned' 
-                        ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                        : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                    ]"
-                  >
-                    <Layers :size="11" :class="item.lo === 'Unassigned' ? 'text-amber-500' : 'text-indigo-500'" />
-                    <span>LO: {{ item.lo }}</span>
-                  </span>
-
-                  <span class="text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full">
-                    {{ item.bloomLevel }}
-                  </span>
-
-                  <span class="text-[10px] font-bold text-slate-600 bg-slate-200 px-2 py-0.5 rounded">
-                    {{ item.type }}
-                  </span>
-                </div>
-                <p class="text-xs font-semibold text-slate-800 pt-0.5 leading-relaxed">{{ item.text }}</p>
-                
-                <!-- Attachment Image Preview in Builder List -->
-                <div v-if="getQuestionImage(item)" class="pt-1">
-                  <img 
-                    :src="getQuestionImage(item)" 
-                    alt="Question attachment" 
-                    class="h-16 max-w-xs object-cover rounded-lg border border-slate-200 bg-white"
-                  />
-                </div>
-              </div>
-
-              <div class="flex items-center gap-3 shrink-0">
-                <div class="text-right">
-                  <span class="text-[10px] block text-slate-400 font-bold uppercase">Points</span>
-                  <input 
-                    v-model.number="item.points" 
-                    type="number" 
-                    min="1" 
-                    class="w-14 border border-slate-300 rounded-lg text-center text-xs font-bold py-1 outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                  />
-                </div>
-
-                <button 
-                  @click="removeItem(idx)" 
-                  class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                  title="Remove Item"
-                >
-                  <Trash2 :size="16" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="pt-4 border-t border-slate-100 flex justify-end">
-          <button 
-            @click="saveTest" 
-            class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer"
-          >
-            <Save :size="14" />
-            <span>Save Test Blueprint</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB 2: SAVED TESTS PREVIEW PAGE -->
-    <div v-if="activeTab === 'saved'" class="space-y-6">
-      
-      <!-- Search, Filter & Sort Controls Bar -->
-      <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-          
-          <div class="relative lg:col-span-2">
-            <Search :size="14" class="absolute left-3 top-3 text-slate-400" />
-            <input 
-              v-model="savedSearchQuery"
-              type="text"
-              placeholder="Search by title, course, or program..."
-              class="w-full text-xs pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
-            />
-          </div>
-
-          <div>
-            <select 
-              v-model="savedFilterProgram"
-              class="w-full text-xs p-2 bg-slate-50 border border-slate-300 rounded-xl outline-none font-semibold focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-            >
-              <option value="">All Programs</option>
-              <option v-for="p in uniqueSavedPrograms" :key="p" :value="p">{{ p }}</option>
-            </select>
-          </div>
-
-          <div>
-            <select 
-              v-model="savedFilterCourse"
-              class="w-full text-xs p-2 bg-slate-50 border border-slate-300 rounded-xl outline-none font-semibold focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-            >
-              <option value="">All Courses</option>
-              <option v-for="c in uniqueSavedCourses" :key="c" :value="c">{{ c }}</option>
-            </select>
-          </div>
-
-          <div>
-            <select 
-              v-model="savedSortBy"
-              class="w-full text-xs p-2 bg-slate-50 border border-slate-300 rounded-xl outline-none font-semibold focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-            >
-              <option value="newest">Sort: Newest First</option>
-              <option value="oldest">Sort: Oldest First</option>
-              <option value="title_asc">Sort: Title A-Z</option>
-              <option value="items_desc">Sort: Most Questions</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
-          <span class="text-slate-500 font-medium">
-            Showing <strong class="text-slate-800 font-bold">{{ filteredSavedTests.length }}</strong> of {{ savedTests.length }} saved test(s)
-          </span>
-
-          <button 
-            v-if="savedSearchQuery || savedFilterProgram || savedFilterCourse || savedFilterTerm || savedSortBy !== 'newest'"
-            @click="resetSavedFilters"
-            class="text-emerald-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
-          >
-            <RotateCcw :size="12" />
-            <span>Clear Filters</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Empty State -->
-      <div v-if="filteredSavedTests.length === 0" class="bg-white border border-slate-200 rounded-2xl p-12 text-center space-y-3 shadow-sm">
-        <div class="p-3 bg-slate-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto text-slate-400">
-          <List :size="24" />
-        </div>
-        <h3 class="text-sm font-bold text-slate-800">No Saved Tests Match Criteria</h3>
-        <p class="text-xs text-slate-500 max-w-sm mx-auto">
-          Try adjusting or clearing your search filters, or construct a new examination blueprint in the Test Builder.
-        </p>
-        <button 
-          @click="resetSavedFilters"
-          class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
-        >
-          Reset Filters
-        </button>
-      </div>
-
-      <!-- Clean List View -->
-      <div v-else class="space-y-3">
-        <div 
-          v-for="test in filteredSavedTests" 
-          :key="test.id"
-          class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
-        >
-          <div class="space-y-1.5 flex-1">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="px-2.5 py-0.5 bg-slate-900 text-white font-mono text-[10px] font-bold rounded">
-                {{ test.program || 'GENERAL' }}
-              </span>
-              <span class="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded border border-emerald-200">
-                {{ test.term || 'Exam' }}
-              </span>
-              <span class="text-[11px] font-bold text-slate-400 flex items-center gap-1 font-mono">
-                <Calendar :size="12" />
-                <span>Saved: {{ test.savedAt }}</span>
-              </span>
-            </div>
-
-            <h3 class="text-base font-bold text-slate-900 leading-snug">{{ test.title }}</h3>
-
-            <p class="text-xs text-slate-500 font-medium">
-              Course: <strong class="text-emerald-800 font-bold">{{ test.course }}</strong>
-              <span v-if="test.academicYear"> | AY: {{ test.academicYear }}</span>
-              <span v-if="test.semester"> ({{ test.semester }})</span>
-            </p>
-          </div>
-
-          <!-- Stats Metadata Pills -->
-          <div class="flex items-center gap-3 shrink-0 text-xs">
-            <div class="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-center">
-              <span class="block text-[10px] text-slate-400 font-bold uppercase">Items</span>
-              <span class="font-bold text-slate-800 font-mono text-xs">{{ test.totalItems }} Questions</span>
-            </div>
-
-            <div class="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-center">
-              <span class="block text-[10px] text-slate-400 font-bold uppercase">Marks</span>
-              <span class="font-bold text-emerald-700 font-mono text-xs">{{ test.totalPoints }} Points</span>
-            </div>
-
-            <div class="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-center">
-              <span class="block text-[10px] text-slate-400 font-bold uppercase">Time</span>
-              <span class="font-bold text-slate-800 text-xs">{{ test.durationMinutes }} Mins</span>
-            </div>
-          </div>
-
-          <!-- Actions -->
-          <div class="flex items-center gap-2 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-4 shrink-0">
-            <button 
-              @click="viewSavedTestDetails(test)"
-              class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-              title="Open Exam Preview Modal"
-            >
-              <Eye :size="14" />
-              <span>Exam Preview</span>
-            </button>
-
-            <button 
-              @click="loadTestToBuilder(test)"
-              class="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer"
-              title="Edit in Test Builder"
-            >
-              <FileText :size="14" />
-              <span>Load Builder</span>
-            </button>
-
-            <button 
-              @click="deleteSavedTest(test.id)"
-              class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer"
-              title="Delete Test Blueprint"
-            >
-              <Trash2 :size="16" />
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- BULK QUESTION SELECTION MODAL -->
-    <div v-if="isQuestionModalOpen" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 overflow-hidden">
-        
-        <div class="p-5 bg-slate-900 text-white flex justify-between items-center">
-          <div class="flex items-center gap-2.5">
-            <BookOpen :size="20" class="text-emerald-400" />
-            <div>
-              <h3 class="text-base font-bold text-white">Select Questions from Question Bank</h3>
-              <p class="text-xs text-slate-300">
-                Course: <span class="font-bold text-emerald-400">{{ examConfig.course }}</span> (Approved Only)
-              </p>
-            </div>
-          </div>
-          <button @click="isQuestionModalOpen = false" class="text-slate-400 hover:text-white transition cursor-pointer">
-            <X :size="20" />
-          </button>
-        </div>
-
-        <div class="p-4 bg-slate-50 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          <div class="relative lg:col-span-2">
-            <Search :size="14" class="absolute left-3 top-3 text-slate-400" />
-            <input 
-              v-model="searchQuery"
-              type="text"
-              placeholder="Search code, text, CO, or LO..."
-              class="w-full text-xs pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
-
-          <div>
-            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Course Outcome</label>
-            <select 
-              v-model="filterCO"
-              class="w-full text-xs py-1.5 px-2 bg-white border border-slate-300 rounded-lg outline-none font-semibold focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-            >
-              <option value="">All Course Outcomes</option>
-              <option v-for="co in availableCOs" :key="co" :value="co">{{ co }}</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Learning Outcome</label>
-            <select 
-              v-model="filterLO"
-              class="w-full text-xs py-1.5 px-2 bg-white border border-slate-300 rounded-lg outline-none font-semibold focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-            >
-              <option value="">All Learning Outcomes</option>
-              <option v-for="lo in availableLOs" :key="lo" :value="lo">{{ lo }}</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Question Type</label>
-            <select 
-              v-model="filterType"
-              class="w-full text-xs py-1.5 px-2 bg-white border border-slate-300 rounded-lg outline-none font-semibold focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-            >
-              <option value="">All Question Types</option>
-              <option v-for="t in availableTypes" :key="t" :value="t">{{ t }}</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="px-5 py-2.5 bg-white border-b border-slate-100 flex items-center justify-between text-xs">
-          <button 
-            @click="toggleSelectAllFiltered"
-            class="flex items-center gap-2 font-bold text-slate-700 hover:text-emerald-700 cursor-pointer"
-          >
-            <CheckSquare v-if="isAllFilteredSelected" :size="16" class="text-emerald-600" />
-            <Square v-else :size="16" class="text-slate-400" />
-            <span>Select All Filtered Items ({{ filteredQuestionBank.length }})</span>
-          </button>
-
-          <div class="flex items-center gap-2">
-            <span class="text-slate-400 font-medium">Sort by:</span>
-            <select v-model="sortBy" class="bg-slate-50 border rounded px-2 py-1 text-xs font-semibold outline-none cursor-pointer">
-              <option value="code_asc">Code (Ascending)</option>
-              <option value="code_desc">Code (Descending)</option>
-              <option value="co">Course Outcome (CO)</option>
-              <option value="lo">Learning Outcome (LO)</option>
-              <option value="type">Question Type</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="p-5 overflow-y-auto flex-1 space-y-3 bg-slate-50/50">
-          <div v-if="filteredQuestionBank.length === 0" class="p-10 text-center text-slate-400 text-xs italic">
-            No approved questions found in the Question Bank matching your criteria.
-          </div>
-
-          <div 
-            v-for="q in filteredQuestionBank" 
-            :key="q.id"
-            @click="togglePickerItem(q.id)"
-            :class="[
-              'p-4 border rounded-xl transition-all cursor-pointer flex items-start gap-3',
-              pickerSelectedIds.includes(q.id) 
-                ? 'bg-emerald-50/80 border-emerald-400 shadow-xs' 
-                : 'bg-white border-slate-200 hover:border-slate-300'
-            ]"
-          >
-            <div class="pt-0.5">
-              <CheckSquare v-if="pickerSelectedIds.includes(q.id)" :size="18" class="text-emerald-600" />
-              <Square v-else :size="18" class="text-slate-300" />
-            </div>
-
-            <div class="space-y-2 flex-1">
-              <div class="flex items-center gap-2 flex-wrap">
-                <span class="px-2 py-0.5 bg-slate-800 text-white font-mono text-xs font-bold rounded">
-                  {{ q.code }}
-                </span>
-
-                <span 
-                  :class="[
-                    'text-[11px] font-bold border px-2 py-0.5 rounded flex items-center gap-1 font-mono',
-                    q.co === 'Unassigned' 
-                      ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                      : 'bg-blue-50 text-blue-700 border-blue-200'
-                  ]"
-                >
-                  <Target :size="11" :class="q.co === 'Unassigned' ? 'text-amber-500' : 'text-blue-500'" />
-                  <span>CO: {{ q.co }}</span>
-                </span>
-
-                <span 
-                  :class="[
-                    'text-[11px] font-bold border px-2 py-0.5 rounded flex items-center gap-1 font-mono',
-                    q.lo === 'Unassigned' 
-                      ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                      : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                  ]"
-                >
-                  <Layers :size="11" :class="q.lo === 'Unassigned' ? 'text-amber-500' : 'text-indigo-500'" />
-                  <span>LO: {{ q.lo }}</span>
-                </span>
-
-                <span class="text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full">
-                  {{ q.bloomLevel }}
-                </span>
-
-                <span class="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">
-                  {{ q.type }}
-                </span>
-              </div>
-
-              <p class="text-xs font-semibold text-slate-800 leading-relaxed">
-                {{ q.text }}
-              </p>
-
-              <div v-if="getQuestionImage(q)" class="pt-1">
-                <img 
-                  :src="getQuestionImage(q)" 
-                  alt="Attachment preview" 
-                  class="h-14 max-w-xs object-cover rounded border border-slate-200 bg-white"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="p-4 bg-white border-t border-slate-200 flex justify-between items-center">
-          <span class="text-xs font-bold text-slate-700">
-            {{ pickerSelectedIds.length }} question(s) checked
-          </span>
-
-          <div class="flex gap-2">
-            <button 
-              @click="isQuestionModalOpen = false"
-              class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-300 transition cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button 
-              @click="importSelectedQuestions"
-              :disabled="pickerSelectedIds.length === 0"
-              class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-sm transition cursor-pointer flex items-center gap-1.5"
-            >
-              <Plus :size="14" />
-              <span>Add Selected to Blueprint</span>
-            </button>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- SAVED TEST FULL EXAM PREVIEW MODAL -->
-    <div v-if="isPreviewModalOpen && selectedTestPreview" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 overflow-hidden">
-        
-        <!-- Modal Header -->
-        <div class="p-5 bg-slate-900 text-white flex justify-between items-center">
-          <div>
-            <h3 class="text-base font-bold text-white">{{ selectedTestPreview.title }}</h3>
-            <p class="text-xs text-slate-300">
-              Course: <span class="font-bold text-emerald-400">{{ selectedTestPreview.course }}</span> | 
-              Total Items: <span class="font-bold text-emerald-400">{{ selectedTestPreview.totalItems }} Questions</span> ({{ selectedTestPreview.totalPoints }} Points)
-            </p>
-          </div>
-          <button @click="isPreviewModalOpen = false" class="text-slate-400 hover:text-white transition cursor-pointer">
-            <X :size="20" />
-          </button>
-        </div>
-
-        <!-- Exam Questions Body -->
-        <div class="p-5 overflow-y-auto flex-1 space-y-5 bg-slate-50">
-          <div 
-            v-for="(item, idx) in selectedTestPreview.items" 
-            :key="item.id || idx"
-            class="p-4 bg-white border border-slate-200 rounded-xl space-y-3 shadow-xs"
-          >
-            <!-- Item Meta Header -->
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-xs font-mono font-bold text-slate-500">#{{ idx + 1 }}</span>
-              <span class="px-2 py-0.5 bg-slate-800 text-white font-mono text-xs font-bold rounded">
-                {{ item.code }}
-              </span>
-              <span class="text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded font-mono">
-                CO: {{ item.co }}
-              </span>
-              <span class="text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded font-mono">
-                LO: {{ item.lo }}
-              </span>
-              <span class="text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full">
-                {{ item.bloomLevel }}
-              </span>
-              <span class="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">
-                {{ item.type }}
-              </span>
-              <span class="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded ml-auto">
-                {{ item.points || 1 }} Marks
-              </span>
-            </div>
-
-            <!-- Question Prompt Text -->
-            <p class="text-xs font-bold text-slate-900 leading-relaxed">{{ item.text }}</p>
-
-            <!-- Question Attachment Image -->
-            <div v-if="getQuestionImage(item)" class="my-2">
-              <img 
-                :src="getQuestionImage(item)" 
-                alt="Question diagram or visual attachment" 
-                class="rounded-xl border border-slate-200 max-h-60 object-contain bg-slate-50 p-1"
-              />
-            </div>
-
-            <!-- MATCHING PAIRS DISPLAY GRID -->
-            <div v-if="getMatchingPairs(item).length > 0" class="my-3 space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
-                  <Layers :size="13" class="text-emerald-600" />
-                  Matching Pairs & Correct Answers ({{ getMatchingPairs(item).length }} Pairs)
-                </span>
-              </div>
-
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div 
-                  v-for="(pair, pIdx) in getMatchingPairs(item)" 
-                  :key="pair.id || pIdx"
-                  class="p-2.5 bg-slate-50/80 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs"
-                >
-                  <!-- Prompt / Left Item -->
-                  <div class="flex items-center gap-2 flex-1 min-w-0">
-                    <span class="font-bold text-slate-400 font-mono text-[11px]">#{{ pIdx + 1 }}</span>
-                    <img 
-                      v-if="pair.leftImage" 
-                      :src="pair.leftImage" 
-                      alt="Pair visual" 
-                      class="w-12 h-12 object-cover rounded-lg border border-slate-200 bg-white shrink-0"
-                    />
-                    <span class="font-semibold text-slate-800 truncate">{{ pair.leftText }}</span>
-                  </div>
-
-                  <ArrowRight :size="14" class="text-emerald-600 shrink-0" />
-
-                  <!-- Correct Match / Right Item -->
-                  <div class="flex items-center gap-2 flex-1 justify-end min-w-0">
-                    <span class="font-bold text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-300 truncate font-mono text-[11px]">
-                      {{ pair.rightText }}
-                    </span>
-                    <img 
-                      v-if="pair.rightImage" 
-                      :src="pair.rightImage" 
-                      alt="Target visual" 
-                      class="w-12 h-12 object-cover rounded-lg border border-slate-200 bg-white shrink-0"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- MULTIPLE CHOICE OPTIONS LIST -->
-            <div v-else-if="getQuestionOptions(item).length > 0" class="space-y-1.5 pl-2 border-l-2 border-slate-200 my-2">
-              <div 
-                v-for="(opt, optIdx) in getQuestionOptions(item)" 
-                :key="optIdx"
-                :class="[
-                  'text-xs p-2 rounded-lg flex items-start gap-2 font-medium transition-colors',
-                  isOptionCorrect(item, optIdx) 
-                    ? 'bg-emerald-50 border border-emerald-300 text-emerald-900 font-semibold' 
-                    : 'bg-slate-50 border border-slate-100 text-slate-700'
-                ]"
-              >
-                <span class="font-bold text-slate-500">{{ String.fromCharCode(65 + optIdx) }}.</span>
-                <span class="flex-1">{{ opt.text }}</span>
-                <span v-if="isOptionCorrect(item, optIdx)" class="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-md">
-                  Correct Choice
-                </span>
-              </div>
-            </div>
-
-            <!-- EXPLICIT CORRECT ANSWER KEY BANNER -->
-            <div class="p-2.5 bg-emerald-50/80 border border-emerald-200 rounded-lg flex items-center justify-between text-xs text-emerald-900">
-              <div class="flex items-center gap-1.5 font-bold">
-                <CheckCircle2 :size="15" class="text-emerald-600" />
-                <span>Correct Answer Key:</span>
-              </div>
-              <span class="font-bold font-mono text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded border border-emerald-300">
-                {{ getCorrectAnswer(item) }}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Modal Footer -->
-        <div class="p-4 bg-white border-t border-slate-200 flex justify-end">
-          <button 
-            @click="isPreviewModalOpen = false"
-            class="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
-          >
-            Close Preview
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- AI Blueprint Auto-Assemble Modal -->
-    <div v-if="isAiModalOpen" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 border border-slate-100">
-        <div class="flex items-center gap-3 text-emerald-800">
-          <div class="p-2.5 bg-emerald-100 rounded-xl text-emerald-800">
-            <Sparkles :size="24" />
-          </div>
-          <div>
-            <h3 class="text-base font-bold text-slate-900">AI Blueprint Builder</h3>
-            <p class="text-xs text-slate-500">Automatically select balanced items from approved questions.</p>
-          </div>
-        </div>
-
-        <div class="space-y-4">
-          <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Target Item Count</label>
-            <input 
-              v-model.number="aiBlueprint.targetTotalItems" 
-              type="number" 
-              class="w-full text-xs p-2.5 border rounded-lg font-bold focus:ring-2 focus:ring-emerald-500 outline-none"
-            />
-          </div>
-
-          <div class="space-y-1.5">
-            <span class="block text-xs font-bold text-slate-700">Cognitive Balance (Bloom's Taxonomy)</span>
-            <div class="grid grid-cols-3 gap-2 text-center text-xs">
-              <div class="bg-slate-50 border border-slate-200 p-2.5 rounded-xl">
-                <span class="block text-slate-500 text-[11px] font-medium">Easy</span>
-                <span class="font-bold text-emerald-900 text-xs">{{ aiBlueprint.easyPercent }}%</span>
-              </div>
-              <div class="bg-slate-50 border border-slate-200 p-2.5 rounded-xl">
-                <span class="block text-slate-500 text-[11px] font-medium">Medium</span>
-                <span class="font-bold text-emerald-900 text-xs">{{ aiBlueprint.mediumPercent }}%</span>
-              </div>
-              <div class="bg-slate-50 border border-slate-200 p-2.5 rounded-xl">
-                <span class="block text-slate-500 text-[11px] font-medium">Hard</span>
-                <span class="font-bold text-emerald-900 text-xs">{{ aiBlueprint.hardPercent }}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
-          <button 
-            @click="isAiModalOpen = false" 
-            class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-300 transition cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button 
-            @click="autoAssembleTest" 
-            :disabled="isAutoBuilding"
-            class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-          >
-            <Sparkles :size="14" :class="{ 'animate-spin': isAutoBuilding }" />
-            <span>{{ isAutoBuilding ? 'Assembling...' : 'Assemble Items' }}</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>

@@ -1,965 +1,692 @@
 <template>
-  <div class="p-6 md:p-8 space-y-6 min-h-screen bg-[#f4f6f9] text-slate-800 font-sans">
+  <div class="p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans text-slate-800 antialiased relative min-h-screen bg-slate-50">
     
-    <!-- Dark Hero Banner -->
-    <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-sm">
-      <div class="space-y-1">
-        <h1 class="text-xl font-bold flex items-center gap-2 text-white tracking-tight">
-          Assessment Question Authoring
-        </h1>
-        <p class="text-xs text-emerald-100 font-normal">
-          Map items by Program, Term, Course Code, Outcomes, and Bloom's Taxonomy.
-        </p>
-      </div>
-    </div>
-
-    <!-- Navigation Tabs -->
-    <div class="flex items-center gap-3">
-      <button 
-        @click="activeTab = 'repository'"
-        :class="[
-          'px-5 py-2.5 rounded-full font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer',
-          activeTab === 'repository' 
-            ? 'bg-[#123524] text-white shadow-sm' 
-            : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80 shadow-2xs'
-        ]"
+    <!-- BRANDED SYSTEM PRELOADER CARD -->
+    <transition
+      enter-active-class="transition ease-out duration-300"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition ease-in duration-200"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div 
+        v-if="isLoading" 
+        class="min-h-125 w-full bg-white/90 backdrop-blur-xs border border-slate-100 rounded-3xl p-12 flex flex-col items-center justify-center text-center space-y-5 shadow-xs"
       >
-        <Database :size="14" :class="activeTab === 'repository' ? 'text-white' : 'text-slate-500'"></Database> 
-        Question Bank Repository
-        <span 
-          :class="activeTab === 'repository' ? 'bg-[#00c068] text-white' : 'bg-slate-100 text-slate-600'"
-          class="text-[10px] px-2 py-0.5 rounded-full font-bold ml-0.5"
-        >
-          {{ questions.length }}
-        </span>
-      </button>
-
-      <button 
-        @click="activeTab = 'create'"
-        :class="[
-          'px-5 py-2.5 rounded-full font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer',
-          activeTab === 'create' 
-            ? 'bg-[#123524] text-white shadow-sm' 
-            : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80 shadow-2xs'
-        ]"
-      >
-        <PlusCircle :size="14" :class="activeTab === 'create' ? 'text-white' : 'text-slate-500'"></PlusCircle> 
-        Create New Question
-      </button>
-
-      <button 
-        @click="activeTab = 'report'"
-        :class="[
-          'px-5 py-2.5 rounded-full font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer',
-          activeTab === 'report' 
-            ? 'bg-[#123524] text-white shadow-sm' 
-            : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80 shadow-2xs'
-        ]"
-      >
-        <FileText :size="14" :class="activeTab === 'report' ? 'text-white' : 'text-slate-500'"></FileText> 
-        Course Reports & Audits
-      </button>
-    </div>
-
-    <!-- TAB 1: QUESTION BANK REPOSITORY -->
-    <div v-show="activeTab === 'repository'" class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-5">
-      <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        <div>
-          <div class="flex items-center gap-2.5">
-            <h2 class="text-base font-bold text-slate-900 tracking-tight">Question Bank Repository</h2>
-            <span class="bg-emerald-100 text-emerald-800 text-[11px] px-2.5 py-0.5 rounded-full font-semibold border border-emerald-200/60">
-              {{ filteredQuestions.length }} items
-            </span>
+        <!-- CAMS Emblem with Radar Pulse Effect -->
+        <div class="relative flex items-center justify-center">
+          <div class="absolute w-20 h-20 bg-emerald-500/10 rounded-full animate-ping"></div>
+          <div class="absolute w-16 h-16 bg-[#123524]/10 rounded-full animate-pulse"></div>
+          
+          <div class="w-14 h-14 bg-[#123524] rounded-2xl flex items-center justify-center font-black text-white text-2xl tracking-wider shadow-xl relative z-10">
+            C
           </div>
-          <p class="text-xs text-slate-500 mt-0.5">
-            Review, approve/disapprove, or apply AI cognitive suggestions organized by Course Code and Title.
+        </div>
+
+        <!-- Branding Text & Progress Bar -->
+        <div class="space-y-1.5 max-w-xs">
+          <h3 class="text-base font-bold text-slate-900 tracking-tight">CAMS STCW Portal</h3>
+          <p class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">Synchronizing Question Bank Items...</p>
+        </div>
+
+        <div class="w-48 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+          <div class="bg-[#123524] h-full rounded-full animate-pulse w-3/4"></div>
+        </div>
+
+        <p class="text-[10px] text-slate-400 font-mono">Baliwag Maritime Academy System</p>
+      </div>
+    </transition>
+
+    <!-- MAIN VIEW CONTENT -->
+    <div v-show="!isLoading" class="space-y-6">
+
+      <!-- Hero Banner Header with Branding Icon -->
+      <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-xs">
+        <div class="space-y-1">
+          <h1 class="text-xl font-bold flex items-center gap-2 text-white tracking-tight">
+            <HelpCircle :size="22" class="text-emerald-400" />
+            Assessment Question Authoring & Item Bank
+          </h1>
+          <p class="text-xs text-slate-200 font-normal">
+            Map items by Program, Term, Course Code, Outcomes, and Bloom's Taxonomy.
           </p>
         </div>
-
-        <!-- Right Side Filter & Sort Controls -->
-        <div class="flex flex-col items-end gap-2 w-full lg:w-auto">
-          <div class="w-full lg:w-64">
-            <input 
-              v-model="searchQuery" 
-              placeholder="Search questions..." 
-              class="w-full px-3 py-1.5 border border-slate-300/80 rounded-lg bg-white text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400 placeholder-slate-400 shadow-2xs"
-            />
-          </div>
-          
-          <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-            <select v-model="filterStatus" class="px-2.5 py-1.5 border border-slate-300/80 rounded-lg bg-white text-xs text-slate-700 font-medium outline-none cursor-pointer shadow-2xs">
-              <option value="All">All Statuses</option>
-              <option value="Pending">Pending</option>
-              <option value="Approved">Approved</option>
-              <option value="Disapproved">Disapproved</option>
-            </select>
-
-            <select v-model="filterProgram" class="px-2.5 py-1.5 border border-slate-300/80 rounded-lg bg-white text-xs text-slate-700 font-medium outline-none cursor-pointer shadow-2xs">
-              <option value="All">All Programs</option>
-              <option value="BSMT">BSMT</option>
-              <option value="BSMarE">BSMarE</option>
-              <option value="Both">Both</option>
-            </select>
-
-            <select v-model="filterType" class="px-2.5 py-1.5 border border-slate-300/80 rounded-lg bg-white text-xs text-slate-700 font-medium outline-none cursor-pointer shadow-2xs">
-              <option value="All">All Types</option>
-              <option value="multiple_choice">Multiple Choice</option>
-              <option value="matching">Matching Type</option>
-              <option value="true_false">True / False</option>
-              <option value="short_answer">Short Answer</option>
-            </select>
-
-            <select v-model="sortBy" class="px-2.5 py-1.5 border border-slate-300/80 rounded-lg bg-slate-100 text-xs text-slate-800 font-bold outline-none cursor-pointer shadow-2xs border-slate-400">
-              <option value="default">Sort: Default</option>
-              <option value="code">Sort by Course Code</option>
-              <option value="newest">Sort by Newest</option>
-              <option value="oldest">Sort by Oldest</option>
-            </select>
-          </div>
-        </div>
       </div>
 
-      <!-- Bulk Actions Bar & Select All Button -->
-      <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200/90 text-xs">
-        <div class="flex items-center gap-3">
-          <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-700 select-none">
-            <input 
-              type="checkbox" 
-              :checked="isAllSelected" 
-              @change="toggleSelectAll" 
-              class="h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer" 
-            />
-            <span>Select All Visible ({{ filteredQuestions.length }})</span>
-          </label>
-          <span v-if="selectedQuestionIds.length > 0" class="text-slate-500 font-semibold">
-            ({{ selectedQuestionIds.length }} selected)
-          </span>
-        </div>
-
-        <div v-if="selectedQuestionIds.length > 0" class="flex items-center gap-2">
-          <button @click="bulkUpdateStatus('Approved')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer">
-            <CheckCircle :size="13"></CheckCircle> Bulk Approve
-          </button>
-          <button @click="bulkUpdateStatus('Disapproved')" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer">
-            <XCircle :size="13"></XCircle> Bulk Disapprove
-          </button>
-          <button @click="bulkDeleteQuestions" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer">
-            <Trash2 :size="13"></Trash2> Bulk Delete
-          </button>
-        </div>
-      </div>
-
-      <hr class="border-slate-200/80" />
-
-      <!-- Questions List Empty State -->
-      <div v-if="groupedQuestions.length === 0" class="text-center py-20 text-slate-400 text-xs font-normal">
-        No questions found matching selected criteria.
-      </div>
-
-      <!-- Collapsible Course Groups Loop -->
-      <div v-else class="space-y-4">
-        <div 
-          v-for="group in groupedQuestions" 
-          :key="group.courseKey" 
-          class="border border-slate-200/80 rounded-xl bg-slate-50/50 overflow-hidden shadow-2xs"
+      <!-- Navigation Tabs -->
+      <div class="flex items-center gap-3">
+        <button 
+          @click="activeTab = 'repository'"
+          :class="[
+            'px-5 py-2.5 rounded-full font-bold text-xs flex items-center gap-2 transition-all cursor-pointer',
+            activeTab === 'repository' 
+              ? 'bg-[#123524] text-white shadow-xs' 
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-xs'
+          ]"
         >
-          <!-- Collapsible Header -->
-          <div 
-            @click="toggleCourseCollapse(group.courseKey)"
-            class="flex items-center justify-between p-4 bg-slate-100/80 hover:bg-slate-100 cursor-pointer select-none transition border-b border-slate-200/80"
+          <Database :size="14" :class="activeTab === 'repository' ? 'text-white' : 'text-slate-500'"></Database> 
+          Question Bank Repository
+          <span 
+            :class="activeTab === 'repository' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'"
+            class="text-[10px] px-2 py-0.5 rounded-full font-bold ml-0.5"
           >
-            <div class="flex items-center gap-3">
-              <component :is="collapsedCourses[group.courseKey] ? ChevronRight : ChevronDown" :size="16" class="text-slate-600"></component>
-              <div>
-                <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2">
-                  <span class="bg-[#123524] text-white px-2.5 py-0.5 rounded text-[11px] font-mono tracking-wide">{{ group.code }}</span>
-                  <span>{{ group.title }}</span>
-                </h3>
-              </div>
-            </div>
-            <span class="bg-slate-200/80 text-slate-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border border-slate-300/50">
-              {{ group.questions.length }} {{ group.questions.length === 1 ? 'item' : 'items' }}
-            </span>
-          </div>
+            {{ questions.length }}
+          </span>
+        </button>
 
-          <!-- Collapsible Group Content -->
-          <div v-show="!collapsedCourses[group.courseKey]" class="p-4 space-y-4 bg-white">
-            <div 
-              v-for="(q, idx) in group.questions" 
-              :key="q.id || idx" 
-              class="border border-slate-200 rounded-xl p-4 bg-slate-50/40 hover:bg-white hover:shadow-sm transition space-y-3"
-            >
-              <!-- Checkbox, Badges & Controls -->
-              <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-200/60 pb-2.5">
-                <div class="flex flex-wrap items-center gap-2 text-[11px] font-bold">
-                  <input 
-                    type="checkbox" 
-                    :checked="selectedQuestionIds.includes(q.id)" 
-                    @change="toggleQuestionSelection(q.id)" 
-                    class="h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer mr-1" 
-                  />
-                  <span class="bg-slate-800 text-white px-2 py-0.5 rounded">{{ q.program || 'Both' }}</span>
-                  <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{{ q.term || 'Midterm' }}</span>
-                  <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded">{{ q.courseId || 'Unassigned' }}</span>
-                  <span v-if="q.courseOutcomeId" class="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">CO: {{ q.courseOutcomeId }}</span>
-                  <span v-if="q.learningOutcomeId" class="bg-teal-100 text-teal-800 px-2 py-0.5 rounded">LO: {{ q.learningOutcomeId }}</span>
-                  <span class="bg-amber-100 text-amber-900 px-2 py-0.5 rounded">Bloom's: {{ q.bloomLevel || 'Understanding' }}</span>
-                  <span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded uppercase">{{ q.type }}</span>
-                </div>
+        <button 
+          @click="activeTab = 'create'"
+          :class="[
+            'px-5 py-2.5 rounded-full font-bold text-xs flex items-center gap-2 transition-all cursor-pointer',
+            activeTab === 'create' 
+              ? 'bg-[#123524] text-white shadow-xs' 
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-xs'
+          ]"
+        >
+          <PlusCircle :size="14" :class="activeTab === 'create' ? 'text-white' : 'text-slate-500'"></PlusCircle> 
+          Create New Question
+        </button>
 
-                <!-- Status & Action Buttons -->
-                <div class="flex items-center gap-1.5">
-                  <span :class="{
-                    'bg-amber-100 text-amber-800 border-amber-300': (q.status || 'Pending') === 'Pending',
-                    'bg-emerald-100 text-emerald-800 border-emerald-300': q.status === 'Approved',
-                    'bg-red-100 text-red-800 border-red-300': q.status === 'Disapproved'
-                  }" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border mr-1">
-                    {{ q.status || 'Pending' }}
-                  </span>
-
-                  <template v-if="q.status !== 'Approved'">
-                    <button @click="updateQuestionStatus(q.id, 'Approved')" title="Approve Question" class="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg border border-emerald-200 transition cursor-pointer">
-                      <CheckCircle :size="15"></CheckCircle>
-                    </button>
-
-                    <button @click="updateQuestionStatus(q.id, 'Disapproved')" title="Disapprove Question" class="p-1.5 bg-red-50 text-red-700 hover:bg-red-600 hover:text-white rounded-lg border border-red-200 transition cursor-pointer">
-                      <XCircle :size="15"></XCircle>
-                    </button>
-
-                    <button @click="editQuestion(q)" title="Edit / Revise Item" class="p-1.5 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white rounded-lg border border-blue-200 transition cursor-pointer">
-                      <Edit :size="15"></Edit>
-                    </button>
-                  </template>
-
-                  <button @click="deleteQuestion(q.id)" title="Delete Item" class="p-1.5 bg-slate-100 text-slate-500 hover:bg-slate-200 rounded-lg transition cursor-pointer">
-                    <Trash2 :size="15"></Trash2>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Stem -->
-              <div>
-                <p class="text-xs font-semibold text-slate-800">{{ q.text }}</p>
-                <img 
-                  v-if="q.imageUrl" 
-                  :src="q.imageUrl" 
-                  @click="openLightbox(q.imageUrl, 'Question Stem Image')" 
-                  title="Click to view full size"
-                  class="mt-2 h-28 object-cover rounded-lg border shadow-2xs cursor-pointer hover:opacity-90 transition" 
-                />
-              </div>
-
-              <!-- Multiple Choice Options -->
-              <div v-if="q.options && q.options.length > 0 && q.type === 'multiple_choice'" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div v-for="(opt, oIdx) in q.options" :key="oIdx" class="p-2 rounded-lg border text-[11px] flex flex-col gap-1" :class="(Array.isArray(q.correctAnswer) && q.correctAnswer.includes(oIdx)) || q.correctAnswer === oIdx ? 'bg-emerald-50 border-emerald-300 font-bold text-emerald-900' : 'bg-white text-slate-700'">
-                  <div>
-                    <span class="font-bold mr-1">{{ String.fromCharCode(65 + oIdx) }}.</span> {{ typeof opt === 'string' ? opt : opt.text }}
-                  </div>
-                  <img 
-                    v-if="opt.imageUrl" 
-                    :src="opt.imageUrl" 
-                    @click="openLightbox(opt.imageUrl, `Option ${String.fromCharCode(65 + oIdx)} Image`)" 
-                    title="Click to view full size"
-                    class="h-16 w-16 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
-                  />
-                </div>
-              </div>
-
-              <!-- Matching Type Pairs -->
-              <div v-if="q.type === 'matching' && q.matchingPairs" class="space-y-2 text-xs">
-                <div v-for="(pair, pIdx) in q.matchingPairs" :key="pIdx" class="p-2.5 rounded-lg border bg-white flex items-center justify-between text-[11px]">
-                  <div class="flex items-center gap-2">
-                    <span class="font-bold text-slate-500">{{ pIdx + 1 }}.</span>
-                    <span>{{ pair.leftText }}</span>
-                    <img 
-                      v-if="pair.leftImageUrl" 
-                      :src="pair.leftImageUrl" 
-                      @click="openLightbox(pair.leftImageUrl, `Pair #${pIdx + 1} Premise Image`)" 
-                      title="Click to view full size"
-                      class="h-10 w-10 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
-                    />
-                  </div>
-                  <span class="font-bold text-slate-400">⟶</span>
-                  <div class="flex items-center gap-2">
-                    <span>{{ pair.rightText }}</span>
-                    <img 
-                      v-if="pair.rightImageUrl" 
-                      :src="pair.rightImageUrl" 
-                      @click="openLightbox(pair.rightImageUrl, `Pair #${pIdx + 1} Match Image`)" 
-                      title="Click to view full size"
-                      class="h-10 w-10 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <!-- AI Audit Bar -->
-              <div
-                v-for="ai in [generateAiSuggestion(q)]"
-                :key="'ai-' + q.id"
-                class="p-3 rounded-xl text-xs border"
-                :class="{
-                  'bg-amber-50/80 border-amber-200 text-amber-900': ai.type === 'warning',
-                  'bg-blue-50/80 border-blue-200 text-blue-900': ai.type === 'info',
-                  'bg-emerald-50/50 border-emerald-200 text-emerald-900': ai.type === 'success'
-                }"
-              >
-                <div class="flex items-start gap-2">
-                  <Sparkles :size="16" class="mt-0.5 shrink-0 text-amber-600"></Sparkles>
-
-                  <div class="flex-1 min-w-0">
-                    <span class="font-bold block text-[11px] mb-2">
-                      AI Validation & Suggestion:
-                    </span>
-
-                    <div class="space-y-1.5 text-[11px] leading-relaxed">
-                      <div>{{ ai.bloom }}</div>
-                      <div>{{ ai.loAlignment }}</div>
-                      <div>{{ ai.coAlignment }}</div>
-                      <div>{{ ai.construction }}</div>
-                      <div>{{ ai.answer }}</div>
-
-                      <div v-if="ai.suggestions.length" class="pt-1.5">
-                        <span class="font-semibold">💡 AI Suggestion:</span>
-                        <span>{{ ai.suggestions.slice(0, 2).join(' ') }}</span>
-                      </div>
-
-                      <div v-else class="pt-1.5">
-                        <span class="font-semibold">💡 AI Suggestion:</span>
-                        <span>No major revision is recommended based on the current validation.</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  v-if="ai.type === 'warning' && q.status !== 'Approved'"
-                  class="flex items-center gap-2 mt-3 ml-6"
-                >
-                  <button
-                    @click="useAiRefinement(q)"
-                    type="button"
-                    class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition shadow-2xs flex items-center gap-1 cursor-pointer"
-                  >
-                    <Sparkles :size="12"></Sparkles>
-                    Use AI Refinement
-                  </button>
-
-                  <button
-                    @click="retainOriginalSettings(q)"
-                    type="button"
-                    class="px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white font-bold text-[10px] rounded-lg transition shadow-2xs flex items-center gap-1 cursor-pointer"
-                  >
-                    <RotateCcw :size="12"></RotateCcw>
-                    Retain Original
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <button 
+          @click="activeTab = 'report'"
+          :class="[
+            'px-5 py-2.5 rounded-full font-bold text-xs flex items-center gap-2 transition-all cursor-pointer',
+            activeTab === 'report' 
+              ? 'bg-[#123524] text-white shadow-xs' 
+              : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-xs'
+          ]"
+        >
+          <FileText :size="14" :class="activeTab === 'report' ? 'text-white' : 'text-slate-500'"></FileText> 
+          Course Reports & Audits
+        </button>
       </div>
-    </div>
 
-    <!-- TAB 2: AUTHORING FORM -->
-    <div v-show="activeTab === 'create'" class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-6">
-      <!-- 1. PROGRAM & CURRICULUM MAPPING -->
-      <div class="space-y-4">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <h2 class="text-base font-bold text-slate-900 flex items-center gap-2 tracking-tight">
-            1. Program & Curriculum Mapping
-          </h2>
+      <!-- TAB 1: QUESTION BANK REPOSITORY -->
+      <div v-show="activeTab === 'repository'" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-5">
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div>
+            <div class="flex items-center gap-2.5">
+              <h2 class="text-base font-bold text-slate-900 tracking-tight">Question Bank Repository</h2>
+              <span class="bg-emerald-50 text-emerald-800 text-[11px] px-2.5 py-0.5 rounded-full font-bold border border-emerald-200">
+                {{ filteredQuestions.length }} items
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Review, approve/disapprove, or apply AI cognitive suggestions organized by Course Code and Title.
+            </p>
+          </div>
 
-          <div class="flex items-center gap-2 shrink-0">
-            <button 
-              @click="downloadCSVTemplate" 
-              type="button" 
-              class="px-4 py-2.5 bg-white hover:bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-xl border border-emerald-500 flex items-center gap-2 transition shadow-sm cursor-pointer"
-            >
-              <Download :size="14" class="text-emerald-600"></Download> 
-              Download CSV Template
-            </button>
-
-            <label 
-              class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-900 text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-sm"
-            >
-              <Upload :size="14"></Upload> 
-              <span>{{ isUploadingBulk ? 'Uploading...' : 'Bulk Upload CSV' }}</span>
-              
+          <!-- Filter & Sort Controls -->
+          <div class="flex flex-col items-end gap-2 w-full lg:w-auto">
+            <div class="w-full lg:w-64">
               <input 
-                ref="bulkFileInput" 
-                type="file" 
-                accept=".csv" 
-                @change="handleBulkCSVUpload" 
-                :disabled="isUploadingBulk" 
-                class="hidden" 
+                v-model="searchQuery" 
+                placeholder="Search questions..." 
+                class="w-full px-3 py-1.5 border border-slate-200 rounded-xl bg-slate-50 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-400 shadow-xs"
               />
-            </label>
-          </div>
-        </div>
-
-        <!-- Curriculum Mapping Fields -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs">
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Program</label>
-            <select 
-              v-model="form.program" 
-              @change="handleProgramChange" 
-              class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-            >
-              <option value="Both">Both (BSMT & BSMarE)</option>
-              <option value="BSMT">BSMT</option>
-              <option value="BSMarE">BSMarE</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Academic Term</label>
-            <select 
-              v-model="form.term" 
-              @change="handleTermChange"
-              class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-            >
-              <option value="Midterm">Midterm</option>
-              <option value="Final">Final</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Course / Subject</label>
-            <select 
-              v-model="form.courseId" 
-              @change="handleCourseChange" 
-              class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-            >
-              <option value="" disabled>Select Course / Subject...</option>
-              <option 
-                v-for="c in filteredCourses" 
-                :key="c.id" 
-                :value="c.code || c.id"
-              >
-                {{ c.code }} — {{ c.title }}
-              </option>
-            </select>
-          </div>
-
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Course Outcome (CO)</label>
-            <select 
-              v-model="form.courseOutcomeId" 
-              @change="handleCourseOutcomeChange" 
-              class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-            >
-              <option value="" disabled>Select Course Outcome...</option>
-              <option 
-                v-for="co in availableCourseOutcomes" 
-                :key="co.id || co.code" 
-                :value="co.id || co.code"
-              >
-                {{ co.code }}: {{ co.description || co.title }}
-              </option>
-            </select>
-          </div>
-
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Learning Outcome (LO)</label>
-            <select 
-              v-model="form.learningOutcomeId" 
-              class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-            >
-              <option value="" disabled>Select Learning Outcome...</option>
-              <option 
-                v-for="lo in availableLearningOutcomes" 
-                :key="lo.id || lo.code" 
-                :value="lo.id || lo.code"
-              >
-                {{ lo.code }}: {{ lo.description || lo.title }}
-              </option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <!-- 2. ITEM CLASSIFICATION -->
-      <div>
-        <h2 class="text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200 pb-2 mb-4">
-          2. ITEM CLASSIFICATION
-        </h2>
-
-        <div class="space-y-4">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div>
-              <label class="font-bold text-slate-700 block mb-1">Bloom's Taxonomy</label>
-              <select v-model="form.bloomLevel" class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
-                <option value="Remembering">Remembering</option>
-                <option value="Understanding">Understanding</option>
-                <option value="Application">Application</option>
-                <option value="Analysis">Analysis</option>
-                <option value="Evaluation">Evaluation</option>
-              </select>
             </div>
+            
+            <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+              <select v-model="filterStatus" class="px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-50 text-xs text-slate-700 font-bold outline-none cursor-pointer shadow-xs">
+                <option value="All">All Statuses</option>
+                <option value="Pending">Pending</option>
+                <option value="Approved">Approved</option>
+                <option value="Disapproved">Disapproved</option>
+              </select>
 
-            <div>
-              <label class="font-bold text-slate-700 block mb-1">Question Type</label>
-              <select v-model="form.type" class="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none">
+              <select v-model="filterProgram" class="px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-50 text-xs text-slate-700 font-bold outline-none cursor-pointer shadow-xs">
+                <option value="All">All Programs</option>
+                <option value="BSMT">BSMT</option>
+                <option value="BSMarE">BSMarE</option>
+                <option value="Both">Both</option>
+              </select>
+
+              <select v-model="filterType" class="px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-50 text-xs text-slate-700 font-bold outline-none cursor-pointer shadow-xs">
+                <option value="All">All Types</option>
                 <option value="multiple_choice">Multiple Choice</option>
                 <option value="matching">Matching Type</option>
                 <option value="true_false">True / False</option>
                 <option value="short_answer">Short Answer</option>
               </select>
+
+              <select v-model="sortBy" class="px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-100 text-xs text-slate-800 font-bold outline-none cursor-pointer shadow-xs">
+                <option value="default">Sort: Default</option>
+                <option value="code">Sort by Course Code</option>
+                <option value="newest">Sort by Newest</option>
+                <option value="oldest">Sort by Oldest</option>
+              </select>
             </div>
           </div>
+        </div>
 
-          <div>
-            <label class="font-bold text-xs text-slate-700 block mb-1">Question Stem</label>
-            <textarea 
-              v-model="form.text" 
-              rows="3" 
-              placeholder="Enter question statement..." 
-              class="w-full p-3 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none"
-            ></textarea>
-          </div>
-
-          <div class="border border-dashed border-slate-300 rounded-xl p-3 text-xs bg-slate-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <span class="font-bold text-slate-700 block">Question Image (Optional)</span>
-              <input type="file" accept="image/*" @change="e => handleImageUpload(e, form, 'imageUrl')" class="text-xs mt-1 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer" />
-            </div>
-            <div v-if="form.imageUrl" class="relative shrink-0">
-              <img 
-                :src="form.imageUrl" 
-                @click="openLightbox(form.imageUrl, 'Question Stem Preview')" 
-                title="Click to view full size"
-                class="h-16 w-16 object-cover rounded-lg border shadow-2xs cursor-pointer hover:opacity-90 transition" 
+        <!-- Bulk Actions Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+          <div class="flex items-center gap-3">
+            <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-700 select-none">
+              <input 
+                type="checkbox" 
+                :checked="isAllSelected" 
+                @change="toggleSelectAll" 
+                class="h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer" 
               />
-              <button @click="removeImage(form, 'imageUrl')" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-2xs">
-                <X :size="10"></X>
-              </button>
+              <span>Select All Visible ({{ filteredQuestions.length }})</span>
+            </label>
+            <span v-if="selectedQuestionIds.length > 0" class="text-slate-500 font-semibold">
+              ({{ selectedQuestionIds.length }} selected)
+            </span>
+          </div>
+
+          <div v-if="selectedQuestionIds.length > 0" class="flex items-center gap-2">
+            <button @click="bulkUpdateStatus('Approved')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+              <CheckCircle :size="13"></CheckCircle> Bulk Approve
+            </button>
+            <button @click="bulkUpdateStatus('Disapproved')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+              <XCircle :size="13"></XCircle> Bulk Disapprove
+            </button>
+            <button @click="bulkDeleteQuestions" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+              <Trash2 :size="13"></Trash2> Bulk Delete
+            </button>
+          </div>
+        </div>
+
+        <hr class="border-slate-100" />
+
+        <!-- Questions Empty State -->
+        <div v-if="groupedQuestions.length === 0" class="text-center py-20 text-slate-400 text-xs font-normal">
+          No questions found in the Question Bank matching selected criteria.
+        </div>
+
+        <!-- Collapsible Course Groups Loop -->
+        <div v-else class="space-y-4">
+          <div 
+            v-for="group in groupedQuestions" 
+            :key="group.courseKey" 
+            class="border border-slate-200 rounded-2xl bg-slate-50/50 overflow-hidden shadow-xs"
+          >
+            <!-- Header -->
+            <div 
+              @click="toggleCourseCollapse(group.courseKey)"
+              class="flex items-center justify-between p-4 bg-slate-100/80 hover:bg-slate-100 cursor-pointer select-none transition border-b border-slate-200"
+            >
+              <div class="flex items-center gap-3">
+                <component :is="collapsedCourses[group.courseKey] ? ChevronRight : ChevronDown" :size="16" class="text-slate-600"></component>
+                <div>
+                  <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2">
+                    <span class="bg-[#123524] text-white px-2.5 py-0.5 rounded-md text-[11px] font-mono tracking-wide">{{ group.code }}</span>
+                    <span>{{ group.title }}</span>
+                  </h3>
+                </div>
+              </div>
+              <span class="bg-slate-200/80 text-slate-700 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-slate-300/50">
+                {{ group.questions.length }} {{ group.questions.length === 1 ? 'item' : 'items' }}
+              </span>
+            </div>
+
+            <!-- Group Content -->
+            <div v-show="!collapsedCourses[group.courseKey]" class="p-4 space-y-4 bg-white">
+              <div 
+                v-for="(q, idx) in group.questions" 
+                :key="q.id || idx" 
+                class="border border-slate-200 rounded-2xl p-4 bg-slate-50/40 hover:bg-white transition space-y-3 shadow-xs"
+              >
+                <!-- Badges & Controls -->
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-100 pb-2.5">
+                  <div class="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+                    <input 
+                      type="checkbox" 
+                      :checked="selectedQuestionIds.includes(q.id)" 
+                      @change="toggleQuestionSelection(q.id)" 
+                      class="h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer mr-1" 
+                    />
+                    <span class="bg-[#123524] text-white px-2 py-0.5 rounded-md">{{ q.program || 'Both' }}</span>
+                    <span class="bg-slate-100 text-slate-800 px-2 py-0.5 rounded-md">{{ q.term || 'Midterm' }}</span>
+                    <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">{{ q.courseId || 'Unassigned' }}</span>
+                    <span v-if="q.courseOutcomeId" class="bg-slate-100 text-slate-800 px-2 py-0.5 rounded-md">CO: {{ q.courseOutcomeId }}</span>
+                    <span v-if="q.learningOutcomeId" class="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md">LO: {{ q.learningOutcomeId }}</span>
+                    <span class="bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md">Bloom's: {{ q.bloomLevel || 'Understanding' }}</span>
+                    <span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md uppercase">{{ q.type }}</span>
+                  </div>
+
+                  <!-- Status & Action Buttons -->
+                  <div class="flex items-center gap-1.5">
+                    <span :class="{
+                      'bg-amber-100 text-amber-800 border-amber-300': (q.status || 'Pending') === 'Pending',
+                      'bg-emerald-100 text-emerald-800 border-emerald-300': q.status === 'Approved',
+                      'bg-rose-100 text-rose-800 border-rose-300': q.status === 'Disapproved'
+                    }" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border mr-1">
+                      {{ q.status || 'Pending' }}
+                    </span>
+
+                    <template v-if="q.status !== 'Approved'">
+                      <button @click="updateQuestionStatus(q.id, 'Approved')" title="Approve Question" class="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg border border-emerald-200 transition cursor-pointer">
+                        <CheckCircle :size="15"></CheckCircle>
+                      </button>
+
+                      <button @click="updateQuestionStatus(q.id, 'Disapproved')" title="Disapprove Question" class="p-1.5 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white rounded-lg border border-rose-200 transition cursor-pointer">
+                        <XCircle :size="15"></XCircle>
+                      </button>
+
+                      <button @click="editQuestion(q)" title="Edit / Revise Item" class="p-1.5 bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white rounded-lg border border-amber-200 transition cursor-pointer">
+                        <Edit :size="15"></Edit>
+                      </button>
+                    </template>
+
+                    <button @click="deleteQuestion(q.id)" title="Delete Item" class="p-1.5 bg-slate-100 text-slate-500 hover:bg-slate-200 rounded-lg transition cursor-pointer">
+                      <Trash2 :size="15"></Trash2>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Stem -->
+                <div>
+                  <p class="text-xs font-semibold text-slate-800">{{ q.text }}</p>
+                  <img 
+                    v-if="q.imageUrl" 
+                    :src="q.imageUrl" 
+                    @click="openLightbox(q.imageUrl, 'Question Stem Image')" 
+                    title="Click to view full size"
+                    class="mt-2 h-28 object-cover rounded-xl border border-slate-200 shadow-xs cursor-pointer hover:opacity-90 transition" 
+                  />
+                </div>
+
+                <!-- Multiple Choice Options -->
+                <div v-if="q.options && q.options.length > 0 && q.type === 'multiple_choice'" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div v-for="(opt, oIdx) in q.options" :key="oIdx" class="p-2.5 rounded-xl border border-slate-200 text-[11px] flex flex-col gap-1" :class="(Array.isArray(q.correctAnswer) && q.correctAnswer.includes(oIdx)) || q.correctAnswer === oIdx ? 'bg-emerald-50 border-emerald-300 font-bold text-emerald-900' : 'bg-white text-slate-700'">
+                    <div>
+                      <span class="font-bold mr-1">{{ String.fromCharCode(65 + oIdx) }}.</span> {{ typeof opt === 'string' ? opt : opt.text }}
+                    </div>
+                    <img 
+                      v-if="opt.imageUrl" 
+                      :src="opt.imageUrl" 
+                      @click="openLightbox(opt.imageUrl, `Option ${String.fromCharCode(65 + oIdx)} Image`)" 
+                      title="Click to view full size"
+                      class="h-16 w-16 object-cover rounded-lg border border-slate-200 cursor-pointer hover:opacity-90 transition" 
+                    />
+                  </div>
+                </div>
+
+                <!-- Matching Type Pairs -->
+                <div v-if="q.type === 'matching' && q.matchingPairs" class="space-y-2 text-xs">
+                  <div v-for="(pair, pIdx) in q.matchingPairs" :key="pIdx" class="p-2.5 rounded-xl border border-slate-200 bg-white flex items-center justify-between text-[11px]">
+                    <div class="flex items-center gap-2">
+                      <span class="font-bold text-slate-500">{{ pIdx + 1 }}.</span>
+                      <span>{{ pair.leftText }}</span>
+                      <img 
+                        v-if="pair.leftImageUrl" 
+                        :src="pair.leftImageUrl" 
+                        @click="openLightbox(pair.leftImageUrl, `Pair #${pIdx + 1} Premise Image`)" 
+                        title="Click to view full size"
+                        class="h-10 w-10 object-cover rounded-lg border border-slate-200 cursor-pointer hover:opacity-90 transition" 
+                      />
+                    </div>
+                    <span class="font-bold text-slate-400">⟶</span>
+                    <div class="flex items-center gap-2">
+                      <span>{{ pair.rightText }}</span>
+                      <img 
+                        v-if="pair.rightImageUrl" 
+                        :src="pair.rightImageUrl" 
+                        @click="openLightbox(pair.rightImageUrl, `Pair #${pIdx + 1} Match Image`)" 
+                        title="Click to view full size"
+                        class="h-10 w-10 object-cover rounded-lg border border-slate-200 cursor-pointer hover:opacity-90 transition" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- AI Audit Bar -->
+                <div
+                  v-for="ai in [generateAiSuggestion(q)]"
+                  :key="'ai-' + q.id"
+                  class="p-3 rounded-xl text-xs border"
+                  :class="{
+                    'bg-amber-50/80 border-amber-200 text-amber-900': ai.type === 'warning',
+                    'bg-slate-50 border-slate-200 text-slate-900': ai.type === 'info',
+                    'bg-emerald-50/50 border-emerald-200 text-emerald-900': ai.type === 'success'
+                  }"
+                >
+                  <div class="flex items-start gap-2">
+                    <Sparkles :size="16" class="mt-0.5 shrink-0 text-amber-600"></Sparkles>
+
+                    <div class="flex-1 min-w-0">
+                      <span class="font-bold block text-[11px] mb-2">
+                        AI Validation & Suggestion:
+                      </span>
+
+                      <div class="space-y-1.5 text-[11px] leading-relaxed">
+                        <div>{{ ai.bloom }}</div>
+                        <div>{{ ai.loAlignment }}</div>
+                        <div>{{ ai.coAlignment }}</div>
+                        <div>{{ ai.construction }}</div>
+                        <div>{{ ai.answer }}</div>
+
+                        <div v-if="ai.suggestions.length" class="pt-1.5">
+                          <span class="font-semibold">💡 AI Suggestion:</span>
+                          <span>{{ ai.suggestions.slice(0, 2).join(' ') }}</span>
+                        </div>
+
+                        <div v-else class="pt-1.5">
+                          <span class="font-semibold">💡 AI Suggestion:</span>
+                          <span>No major revision is recommended based on the current validation.</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    v-if="ai.type === 'warning' && q.status !== 'Approved'"
+                    class="flex items-center gap-2 mt-3 ml-6"
+                  >
+                    <button
+                      @click="useAiRefinement(q)"
+                      type="button"
+                      class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition shadow-xs flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles :size="12"></Sparkles>
+                      Use AI Refinement
+                    </button>
+
+                    <button
+                      @click="retainOriginalSettings(q)"
+                      type="button"
+                      class="px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white font-bold text-[10px] rounded-lg transition shadow-xs flex items-center gap-1 cursor-pointer"
+                    >
+                      <RotateCcw :size="12"></RotateCcw>
+                      Retain Original
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 3. OPTIONS & CORRECT ANSWERS -->
-      <div>
-        <h2 class="text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200 pb-2 mb-4">
-          3. OPTIONS & CORRECT ANSWERS
-        </h2>
+      <!-- TAB 2: AUTHORING FORM -->
+      <div v-show="activeTab === 'create'" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-6">
+        <!-- 1. PROGRAM & CURRICULUM MAPPING -->
+        <div class="space-y-4">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-100 pb-4">
+            <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2 tracking-tight">
+              1. Program & Curriculum Mapping
+            </h2>
 
-        <!-- MULTIPLE CHOICE OPTIONS -->
-        <div v-if="form.type === 'multiple_choice'" class="space-y-3 border border-slate-200 p-4 rounded-xl bg-slate-50/30">
-          <div class="flex justify-between items-center mb-1">
-            <span class="text-xs font-bold text-slate-700">Options & Correct Answer(s) (Check all that apply)</span>
-            <button @click="addOption" type="button" class="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 cursor-pointer">
-              <Plus :size="14"></Plus> Add Option
-            </button>
-          </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button 
+                @click="downloadCSVTemplate" 
+                type="button" 
+                class="px-3.5 py-2 bg-white hover:bg-emerald-50 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-300 flex items-center gap-2 transition shadow-xs cursor-pointer"
+              >
+                <Download :size="14" class="text-emerald-700"></Download> 
+                Download CSV Template
+              </button>
 
-          <div v-for="(opt, idx) in form.options" :key="idx" class="flex flex-col sm:flex-row sm:items-center gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-            <div class="flex items-center gap-3 flex-1">
-              <input type="checkbox" v-model="opt.isCorrect" title="Mark as correct answer" class="h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 shrink-0 cursor-pointer" />
-              <input v-model="opt.text" :placeholder="`Option ${idx + 1} text...`" class="flex-1 p-2 border border-slate-300 rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500" />
-            </div>
-
-            <div class="flex items-center gap-2 self-end sm:self-auto">
-              <label class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300/80 cursor-pointer flex items-center gap-1.5 transition">
-                <ImageIcon :size="14" class="text-slate-500"></ImageIcon>
-                <span>Image</span>
-                <input type="file" accept="image/*" @change="e => handleImageUpload(e, opt, 'imageUrl')" class="hidden" />
-              </label>
-
-              <div v-if="opt.imageUrl" class="relative">
-                <img 
-                  :src="opt.imageUrl" 
-                  @click="openLightbox(opt.imageUrl, `Option #${idx + 1} Preview`)" 
-                  title="Click to view full size"
-                  class="h-8 w-8 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
+              <label 
+                class="px-3.5 py-2 bg-[#123524] hover:bg-[#0e2a1d] text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-xs"
+              >
+                <Upload :size="14"></Upload> 
+                <span>{{ isUploadingBulk ? 'Uploading...' : 'Bulk Upload CSV' }}</span>
+                
+                <input 
+                  ref="bulkFileInput" 
+                  type="file" 
+                  accept=".csv" 
+                  @change="handleBulkCSVUpload" 
+                  :disabled="isUploadingBulk" 
+                  class="hidden" 
                 />
-                <button @click="removeImage(opt, 'imageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600">
-                  <X :size="8"></X>
-                </button>
-              </div>
-
-              <button v-if="form.options.length > 2" @click="removeOption(idx)" title="Remove option" class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition cursor-pointer">
-                <Trash2 :size="16"></Trash2>
-              </button>
+              </label>
             </div>
           </div>
-        </div>
 
-        <!-- MATCHING TYPE PAIRS -->
-        <div v-if="form.type === 'matching'" class="space-y-3 border border-slate-200 p-4 rounded-xl bg-slate-50/30">
-          <div class="flex justify-between items-center mb-1">
-            <span class="text-xs font-bold text-slate-700">Matching Pairs (Item ⟶ Correct Match)</span>
-            <button @click="addMatchingPair" type="button" class="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 cursor-pointer">
-              <Plus :size="14"></Plus> Add Matching Pair
-            </button>
-          </div>
-
-          <div v-for="(pair, idx) in form.matchingPairs" :key="idx" class="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="font-bold text-xs text-slate-600">Pair #{{ idx + 1 }}</span>
-              <button v-if="form.matchingPairs.length > 2" @click="removeMatchingPair(idx)" title="Remove Pair" class="text-red-500 hover:bg-red-50 p-1 rounded cursor-pointer">
-                <Trash2 :size="14"></Trash2>
-              </button>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-              <div class="space-y-2 border p-2.5 rounded-lg bg-slate-50/50">
-                <span class="font-bold text-[11px] text-slate-500">Premise Item / Question</span>
-                <input v-model="pair.leftText" placeholder="Left item text..." class="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none bg-white" />
-                
-                <div class="flex items-center justify-between">
-                  <label class="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-semibold rounded border cursor-pointer flex items-center gap-1">
-                    <ImageIcon :size="12"></ImageIcon> Image
-                    <input type="file" accept="image/*" @change="e => handleImageUpload(e, pair, 'leftImageUrl')" class="hidden" />
-                  </label>
-                  <div v-if="pair.leftImageUrl" class="relative">
-                    <img 
-                      :src="pair.leftImageUrl" 
-                      @click="openLightbox(pair.leftImageUrl, `Pair #${idx + 1} Left Preview`)" 
-                      title="Click to view full size"
-                      class="h-8 w-8 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
-                    />
-                    <button @click="removeImage(pair, 'leftImageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5">
-                      <X :size="8"></X>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="space-y-2 border p-2.5 rounded-lg bg-slate-50/50">
-                <span class="font-bold text-[11px] text-slate-500">Matching Target / Answer</span>
-                <input v-model="pair.rightText" placeholder="Right matching text..." class="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none bg-white" />
-                
-                <div class="flex items-center justify-between">
-                  <label class="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-semibold rounded border cursor-pointer flex items-center gap-1">
-                    <ImageIcon :size="12"></ImageIcon> Image
-                    <input type="file" accept="image/*" @change="e => handleImageUpload(e, pair, 'rightImageUrl')" class="hidden" />
-                  </label>
-                  <div v-if="pair.rightImageUrl" class="relative">
-                    <img 
-                      :src="pair.rightImageUrl" 
-                      @click="openLightbox(pair.rightImageUrl, `Pair #${idx + 1} Right Preview`)" 
-                      title="Click to view full size"
-                      class="h-8 w-8 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
-                    />
-                    <button @click="removeImage(pair, 'rightImageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5">
-                      <X :size="8"></X>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- TRUE / FALSE -->
-        <div v-if="form.type === 'true_false'" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
-          <label class="font-bold text-xs text-slate-700 block">Select Correct Answer</label>
-          <div class="flex gap-6 text-xs font-bold text-slate-800">
-            <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2.5 rounded-xl border border-slate-300 hover:border-emerald-500">
-              <input type="radio" value="true" v-model="form.tfCorrect" name="tf_answer" class="text-emerald-600" /> True
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2.5 rounded-xl border border-slate-300 hover:border-emerald-500">
-              <input type="radio" value="false" v-model="form.tfCorrect" name="tf_answer" class="text-emerald-600" /> False
-            </label>
-          </div>
-        </div>
-
-        <!-- SHORT ANSWER -->
-        <div v-if="form.type === 'short_answer'" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
-          <label class="font-bold text-xs text-slate-700 block">Expected Answer Keywords (Comma Separated)</label>
-          <input v-model="form.shortAnswerKeywords" placeholder="e.g. ECDIS, navigation, chart" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs bg-white outline-none focus:ring-1 focus:ring-emerald-500" />
-        </div>
-      </div>
-
-      <!-- Save Button Block -->
-      <div class="pt-4">
-        <button 
-          @click="saveQuestion" 
-          :disabled="isSubmitting" 
-          class="w-full py-3.5 bg-[#00c068] hover:bg-[#00a358] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <Save :size="16"></Save> 
-          <span>{{ isSubmitting ? 'Saving...' : 'Save Question Item' }}</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- TAB 3: COURSE REPORTS & AUDITS -->
-    <div v-show="activeTab === 'report'" class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-6">
-      <div class="flex flex-col md:flex-row justify-between md:items-center border-b pb-4 gap-4">
-        <div>
-          <h2 class="text-base font-bold text-slate-900 flex items-center gap-2 tracking-tight">
-            <BarChart2 class="text-emerald-600" :size="20"></BarChart2> Course Question Changes & Audit Report
-          </h2>
-          <p class="text-xs text-slate-500">View question counts, approval status, accepted AI suggestions, and AI overrides grouped per course.</p>
-        </div>
-
-        <button @click="exportCourseReportCSV" type="button" class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-900 text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-sm">
-          <Download :size="14"></Download> Export Report CSV
-        </button>
-      </div>
-
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-        <div class="bg-slate-50 border p-3 rounded-xl">
-          <span class="text-[10px] font-bold text-slate-500 block uppercase">Total Questions</span>
-          <span class="text-lg font-extrabold text-slate-900">{{ overallReportSummary.total }}</span>
-        </div>
-        <div class="bg-emerald-50 border border-emerald-100 p-3 rounded-xl">
-          <span class="text-[10px] font-bold text-emerald-700 block uppercase">Approved</span>
-          <span class="text-lg font-extrabold text-emerald-800">{{ overallReportSummary.approved }}</span>
-        </div>
-        <div class="bg-amber-50 border border-amber-100 p-3 rounded-xl">
-          <span class="text-[10px] font-bold text-amber-700 block uppercase">Pending Review</span>
-          <span class="text-lg font-extrabold text-amber-800">{{ overallReportSummary.pending }}</span>
-        </div>
-        <div class="bg-red-50 border border-red-100 p-3 rounded-xl">
-          <span class="text-[10px] font-bold text-red-700 block uppercase">Disapproved</span>
-          <span class="text-lg font-extrabold text-red-800">{{ overallReportSummary.disapproved }}</span>
-        </div>
-        <div class="bg-teal-50 border border-teal-100 p-3 rounded-xl">
-          <span class="text-[10px] font-bold text-teal-700 block uppercase">AI Accepted</span>
-          <span class="text-lg font-extrabold text-teal-800">{{ overallReportSummary.acceptedAi }}</span>
-        </div>
-        <div class="bg-blue-50 border border-blue-100 p-3 rounded-xl">
-          <span class="text-[10px] font-bold text-blue-700 block uppercase">AI Retained</span>
-          <span class="text-lg font-extrabold text-blue-800">{{ overallReportSummary.retainedAi }}</span>
-        </div>
-      </div>
-
-      <div class="overflow-x-auto border rounded-xl">
-        <table class="w-full text-left text-xs">
-          <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b">
-            <tr>
-              <th class="p-3">Course Code</th>
-              <th class="p-3">Course Title</th>
-              <th class="p-3">Program</th>
-              <th class="p-3 text-center">Total Items</th>
-              <th class="p-3 text-center">Approved</th>
-              <th class="p-3 text-center">Pending</th>
-              <th class="p-3 text-center">Disapproved</th>
-              <th class="p-3 text-center">AI Accepted</th>
-              <th class="p-3 text-center">AI Overrides</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100 font-medium text-slate-800">
-            <tr v-for="report in courseReports" :key="report.code" class="hover:bg-slate-50/80">
-              <td class="p-3 font-mono font-bold text-slate-900">{{ report.code }}</td>
-              <td class="p-3 font-bold">{{ report.title }}</td>
-              <td class="p-3"><span class="bg-slate-100 px-2 py-0.5 rounded text-[11px] font-semibold">{{ report.program }}</span></td>
-              <td class="p-3 text-center font-bold">{{ report.total }}</td>
-              <td class="p-3 text-center">
-                <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.approved }}</span>
-              </td>
-              <td class="p-3 text-center">
-                <span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.pending }}</span>
-              </td>
-              <td class="p-3 text-center">
-                <span class="bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.disapproved }}</span>
-              </td>
-              <td class="p-3 text-center">
-                <span class="bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.acceptedAi }}</span>
-              </td>
-              <td class="p-3 text-center">
-                <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.retainedAi }}</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- EDIT QUESTION MODAL -->
-    <div v-if="editingQuestion" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div class="bg-white border border-slate-200 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-5 my-8 max-h-[90vh] overflow-y-auto">
-        <div class="flex items-center justify-between border-b pb-3">
-          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-            <Edit class="text-blue-600" :size="18"></Edit> Edit / Revise Question Item
-          </h3>
-          <button @click="closeEditModal" class="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer">
-            <X :size="18"></X>
-          </button>
-        </div>
-
-        <div class="space-y-4 text-xs">
-          <!-- Mapping Metadata -->
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <!-- Curriculum Mapping Fields -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs">
             <div>
               <label class="font-bold text-slate-700 block mb-1">Program</label>
-              <select v-model="editingQuestion.program" class="w-full p-2 border rounded-lg bg-white">
-                <option value="Both">Both</option>
+              <select 
+                v-model="form.program" 
+                @change="handleProgramChange" 
+                class="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+              >
+                <option value="Both">Both (BSMT & BSMarE)</option>
                 <option value="BSMT">BSMT</option>
                 <option value="BSMarE">BSMarE</option>
               </select>
             </div>
+
             <div>
-              <label class="font-bold text-slate-700 block mb-1">Term</label>
-              <select v-model="editingQuestion.term" class="w-full p-2 border rounded-lg bg-white">
+              <label class="font-bold text-slate-700 block mb-1">Academic Term</label>
+              <select 
+                v-model="form.term" 
+                @change="handleTermChange"
+                class="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+              >
                 <option value="Midterm">Midterm</option>
                 <option value="Final">Final</option>
               </select>
             </div>
+
             <div>
-              <label class="font-bold text-slate-700 block mb-1">Course Code</label>
-              <select v-model="editingQuestion.courseId" @change="handleEditCourseChange" class="w-full p-2 border rounded-lg bg-white font-medium text-slate-900">
+              <label class="font-bold text-slate-700 block mb-1">Course / Subject</label>
+              <select 
+                v-model="form.courseId" 
+                @change="handleCourseChange" 
+                class="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+              >
                 <option value="" disabled>Select Course / Subject...</option>
-                <option v-for="c in courses" :key="c.id" :value="c.code || c.id">
+                <option 
+                  v-for="c in filteredCourses" 
+                  :key="c.id" 
+                  :value="c.code || c.id"
+                >
                   {{ c.code }} — {{ c.title }}
                 </option>
               </select>
             </div>
+
             <div>
               <label class="font-bold text-slate-700 block mb-1">Course Outcome (CO)</label>
-              <select v-model="editingQuestion.courseOutcomeId" @change="handleEditCourseOutcomeChange" class="w-full p-2 border rounded-lg bg-white font-medium text-slate-900">
-                <option value="">Select CO (Optional)</option>
-                <option v-for="co in editAvailableCourseOutcomes" :key="co.id || co.code" :value="co.id || co.code">
+              <select 
+                v-model="form.courseOutcomeId" 
+                @change="handleCourseOutcomeChange" 
+                class="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+              >
+                <option value="" disabled>Select Course Outcome...</option>
+                <option 
+                  v-for="co in availableCourseOutcomes" 
+                  :key="co.id || co.code" 
+                  :value="co.id || co.code"
+                >
                   {{ co.code }}: {{ co.description || co.title }}
                 </option>
               </select>
             </div>
+
             <div>
               <label class="font-bold text-slate-700 block mb-1">Learning Outcome (LO)</label>
-              <select v-model="editingQuestion.learningOutcomeId" class="w-full p-2 border rounded-lg bg-white font-medium text-slate-900">
-                <option value="">Select LO (Optional)</option>
-                <option v-for="lo in editAvailableLearningOutcomes" :key="lo.id || lo.code" :value="lo.id || lo.code">
+              <select 
+                v-model="form.learningOutcomeId" 
+                class="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+              >
+                <option value="" disabled>Select Learning Outcome...</option>
+                <option 
+                  v-for="lo in availableLearningOutcomes" 
+                  :key="lo.id || lo.code" 
+                  :value="lo.id || lo.code"
+                >
                   {{ lo.code }}: {{ lo.description || lo.title }}
                 </option>
               </select>
             </div>
-            <div>
-              <label class="font-bold text-slate-700 block mb-1">Bloom's Level</label>
-              <select v-model="editingQuestion.bloomLevel" class="w-full p-2 border rounded-lg bg-white">
-                <option value="Remembering">Remembering</option>
-                <option value="Understanding">Understanding</option>
-                <option value="Application">Application</option>
-                <option value="Analysis">Analysis</option>
-                <option value="Evaluation">Evaluation</option>
-              </select>
-            </div>
           </div>
+        </div>
 
-          <!-- Question Stem Text -->
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Question Stem</label>
-            <textarea v-model="editingQuestion.text" rows="3" class="w-full p-2.5 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-blue-500"></textarea>
-          </div>
+        <!-- 2. ITEM CLASSIFICATION -->
+        <div>
+          <h2 class="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2 mb-4">
+            2. ITEM CLASSIFICATION
+          </h2>
 
-          <!-- Question Image Upload / Preview -->
-          <div class="border border-dashed p-3 rounded-xl bg-slate-50/80 flex items-center justify-between">
-            <div>
-              <span class="font-bold text-slate-700 block">Stem Image</span>
-              <input type="file" accept="image/*" @change="e => handleImageUpload(e, editingQuestion, 'imageUrl')" class="text-xs mt-1 cursor-pointer" />
-            </div>
-            <div v-if="editingQuestion.imageUrl" class="relative">
-              <img 
-                :src="editingQuestion.imageUrl" 
-                @click="openLightbox(editingQuestion.imageUrl, 'Stem Image Preview')" 
-                title="Click to view full size"
-                class="h-14 w-14 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
-              />
-              <button @click="removeImage(editingQuestion, 'imageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 cursor-pointer">
-                <X :size="10"></X>
-              </button>
-            </div>
-          </div>
-
-          <!-- Edit Multiple Choice Options -->
-          <div v-if="editingQuestion.type === 'multiple_choice'" class="space-y-3 border p-3 rounded-xl bg-slate-50/50">
-            <div class="flex justify-between items-center">
-              <span class="font-bold text-slate-700">Multiple Choice Options</span>
-              <button @click="editingQuestion.options.push({ text: '', imageUrl: '' })" type="button" class="text-emerald-600 font-bold text-xs flex items-center gap-1 cursor-pointer">
-                <Plus :size="12"></Plus> Add Option
-              </button>
-            </div>
-
-            <div v-for="(opt, oIdx) in editingQuestion.options" :key="oIdx" class="p-2.5 bg-white border rounded-lg space-y-2 shadow-2xs">
-              <div class="flex items-center gap-2">
-                <input type="checkbox" :checked="Array.isArray(editingQuestion.correctAnswer) ? editingQuestion.correctAnswer.includes(oIdx) : editingQuestion.correctAnswer === oIdx" @change="toggleEditCorrectOption(oIdx)" class="h-4 w-4 text-emerald-600 rounded cursor-pointer" />
-                <input v-model="opt.text" class="flex-1 p-1.5 border rounded text-xs outline-none" :placeholder="`Option ${oIdx + 1} text...`" />
-                <button v-if="editingQuestion.options.length > 2" @click="editingQuestion.options.splice(oIdx, 1)" class="text-red-500 p-1 cursor-pointer">
-                  <Trash2 :size="14"></Trash2>
-                </button>
+          <div class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div>
+                <label class="font-bold text-slate-700 block mb-1">Bloom's Taxonomy</label>
+                <select v-model="form.bloomLevel" class="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none">
+                  <option value="Remembering">Remembering</option>
+                  <option value="Understanding">Understanding</option>
+                  <option value="Application">Application</option>
+                  <option value="Analysis">Analysis</option>
+                  <option value="Evaluation">Evaluation</option>
+                </select>
               </div>
 
-              <div class="flex items-center justify-between pt-1 border-t border-slate-100">
-                <label class="px-2 py-1 bg-slate-100 text-slate-700 text-[11px] font-semibold rounded cursor-pointer flex items-center gap-1">
-                  <ImageIcon :size="12"></ImageIcon> {{ opt.imageUrl ? 'Change Image' : 'Add Image' }}
+              <div>
+                <label class="font-bold text-slate-700 block mb-1">Question Type</label>
+                <select v-model="form.type" class="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none">
+                  <option value="multiple_choice">Multiple Choice</option>
+                  <option value="matching">Matching Type</option>
+                  <option value="true_false">True / False</option>
+                  <option value="short_answer">Short Answer</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="font-bold text-xs text-slate-700 block mb-1">Question Stem</label>
+              <textarea 
+                v-model="form.text" 
+                rows="3" 
+                placeholder="Enter question statement..." 
+                class="w-full p-3 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+              ></textarea>
+            </div>
+
+            <div class="border border-dashed border-slate-200 rounded-2xl p-3 text-xs bg-slate-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <span class="font-bold text-slate-700 block">Question Image (Optional)</span>
+                <input type="file" accept="image/*" @change="e => handleImageUpload(e, form, 'imageUrl')" class="text-xs mt-1 file:mr-3 file:py-1 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer" />
+              </div>
+              <div v-if="form.imageUrl" class="relative shrink-0">
+                <img 
+                  :src="form.imageUrl" 
+                  @click="openLightbox(form.imageUrl, 'Question Stem Preview')" 
+                  title="Click to view full size"
+                  class="h-16 w-16 object-cover rounded-xl border border-slate-200 shadow-xs cursor-pointer hover:opacity-90 transition" 
+                />
+                <button @click="removeImage(form, 'imageUrl')" class="absolute -top-2 -right-2 bg-rose-600 text-white rounded-full p-1 hover:bg-rose-700 shadow-xs">
+                  <X :size="10"></X>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. OPTIONS & CORRECT ANSWERS -->
+        <div>
+          <h2 class="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2 mb-4">
+            3. OPTIONS & CORRECT ANSWERS
+          </h2>
+
+          <!-- MULTIPLE CHOICE OPTIONS -->
+          <div v-if="form.type === 'multiple_choice'" class="space-y-3 border border-slate-200 p-4 rounded-2xl bg-slate-50/30">
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-xs font-bold text-slate-800">Options & Correct Answer(s) (Check all that apply)</span>
+              <button @click="addOption" type="button" class="text-xs text-emerald-800 font-bold hover:underline flex items-center gap-1 cursor-pointer">
+                <Plus :size="14"></Plus> Add Option
+              </button>
+            </div>
+
+            <div v-for="(opt, idx) in form.options" :key="idx" class="flex flex-col sm:flex-row sm:items-center gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
+              <div class="flex items-center gap-3 flex-1">
+                <input type="checkbox" v-model="opt.isCorrect" title="Mark as correct answer" class="h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 shrink-0 cursor-pointer" />
+                <input v-model="opt.text" :placeholder="`Option ${idx + 1} text...`" class="flex-1 p-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+
+              <div class="flex items-center gap-2 self-end sm:self-auto">
+                <label class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 cursor-pointer flex items-center gap-1.5 transition">
+                  <ImageIcon :size="14" class="text-slate-500"></ImageIcon>
+                  <span>Image</span>
                   <input type="file" accept="image/*" @change="e => handleImageUpload(e, opt, 'imageUrl')" class="hidden" />
                 </label>
+
                 <div v-if="opt.imageUrl" class="relative">
                   <img 
                     :src="opt.imageUrl" 
-                    @click="openLightbox(opt.imageUrl, `Option #${oIdx + 1} Image Preview`)" 
+                    @click="openLightbox(opt.imageUrl, `Option #${idx + 1} Preview`)" 
                     title="Click to view full size"
                     class="h-8 w-8 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
                   />
-                  <button @click="removeImage(opt, 'imageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 cursor-pointer">
+                  <button @click="removeImage(opt, 'imageUrl')" class="absolute -top-1 -right-1 bg-rose-600 text-white rounded-full p-0.5 hover:bg-rose-700">
                     <X :size="8"></X>
                   </button>
                 </div>
+
+                <button v-if="form.options.length > 2" @click="removeOption(idx)" title="Remove option" class="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer">
+                  <Trash2 :size="16"></Trash2>
+                </button>
               </div>
             </div>
           </div>
 
-          <!-- Edit Matching Type Pairs -->
-          <div v-if="editingQuestion.type === 'matching'" class="space-y-3 border p-3 rounded-xl bg-slate-50/50">
-            <div class="flex justify-between items-center">
-              <span class="font-bold text-slate-700">Matching Type Pairs</span>
-              <button @click="editingQuestion.matchingPairs.push({ leftText: '', leftImageUrl: '', rightText: '', rightImageUrl: '' })" type="button" class="text-emerald-600 font-bold text-xs flex items-center gap-1 cursor-pointer">
-                <Plus :size="12"></Plus> Add Pair
+          <!-- MATCHING TYPE PAIRS -->
+          <div v-if="form.type === 'matching'" class="space-y-3 border border-slate-200 p-4 rounded-2xl bg-slate-50/30">
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-xs font-bold text-slate-800">Matching Pairs (Item ⟶ Correct Match)</span>
+              <button @click="addMatchingPair" type="button" class="text-xs text-emerald-800 font-bold hover:underline flex items-center gap-1 cursor-pointer">
+                <Plus :size="14"></Plus> Add Matching Pair
               </button>
             </div>
 
-            <div v-for="(pair, pIdx) in editingQuestion.matchingPairs" :key="pIdx" class="p-2.5 bg-white border rounded-lg space-y-2 shadow-2xs">
+            <div v-for="(pair, idx) in form.matchingPairs" :key="idx" class="p-3 bg-white rounded-xl border border-slate-200 shadow-xs space-y-2">
               <div class="flex items-center justify-between">
-                <span class="font-bold text-slate-500">Pair #{{ pIdx + 1 }}</span>
-                <button v-if="editingQuestion.matchingPairs.length > 2" @click="editingQuestion.matchingPairs.splice(pIdx, 1)" class="text-red-500 p-1 cursor-pointer">
+                <span class="font-bold text-xs text-slate-600">Pair #{{ idx + 1 }}</span>
+                <button v-if="form.matchingPairs.length > 2" @click="removeMatchingPair(idx)" title="Remove Pair" class="text-rose-500 hover:bg-rose-50 p-1 rounded cursor-pointer">
                   <Trash2 :size="14"></Trash2>
                 </button>
               </div>
 
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div class="space-y-1 border p-2 rounded bg-slate-50/50">
-                  <span class="font-semibold text-[10px] text-slate-500">Left Item</span>
-                  <input v-model="pair.leftText" class="w-full p-1.5 border rounded text-xs bg-white outline-none" />
-                  <div class="flex items-center justify-between pt-1">
-                    <label class="px-2 py-0.5 bg-white border text-[10px] font-semibold rounded cursor-pointer flex items-center gap-1">
-                      <ImageIcon :size="10"></ImageIcon> Image
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div class="space-y-2 border border-slate-200 p-2.5 rounded-xl bg-slate-50/50">
+                  <span class="font-bold text-[11px] text-slate-500">Premise Item / Question</span>
+                  <input v-model="pair.leftText" placeholder="Left item text..." class="w-full p-2 border border-slate-200 rounded-lg text-xs outline-none bg-white" />
+                  
+                  <div class="flex items-center justify-between">
+                    <label class="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-semibold rounded-lg border border-slate-200 cursor-pointer flex items-center gap-1">
+                      <ImageIcon :size="12"></ImageIcon> Image
                       <input type="file" accept="image/*" @change="e => handleImageUpload(e, pair, 'leftImageUrl')" class="hidden" />
                     </label>
                     <div v-if="pair.leftImageUrl" class="relative">
                       <img 
                         :src="pair.leftImageUrl" 
-                        @click="openLightbox(pair.leftImageUrl, `Pair #${pIdx + 1} Left Preview`)" 
+                        @click="openLightbox(pair.leftImageUrl, `Pair #${idx + 1} Left Preview`)" 
                         title="Click to view full size"
-                        class="h-6 w-6 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
+                        class="h-8 w-8 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
                       />
-                      <button @click="removeImage(pair, 'leftImageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 cursor-pointer">
-                        <X :size="6"></X>
+                      <button @click="removeImage(pair, 'leftImageUrl')" class="absolute -top-1 -right-1 bg-rose-600 text-white rounded-full p-0.5">
+                        <X :size="8"></X>
                       </button>
                     </div>
                   </div>
                 </div>
 
-                <div class="space-y-1 border p-2 rounded bg-slate-50/50">
-                  <span class="font-semibold text-[10px] text-slate-500">Right Target</span>
-                  <input v-model="pair.rightText" class="w-full p-1.5 border rounded text-xs bg-white outline-none" />
-                  <div class="flex items-center justify-between pt-1">
-                    <label class="px-2 py-0.5 bg-white border text-[10px] font-semibold rounded cursor-pointer flex items-center gap-1">
-                      <ImageIcon :size="10"></ImageIcon> Image
+                <div class="space-y-2 border border-slate-200 p-2.5 rounded-xl bg-slate-50/50">
+                  <span class="font-bold text-[11px] text-slate-500">Matching Target / Answer</span>
+                  <input v-model="pair.rightText" placeholder="Right matching text..." class="w-full p-2 border border-slate-200 rounded-lg text-xs outline-none bg-white" />
+                  
+                  <div class="flex items-center justify-between">
+                    <label class="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-semibold rounded-lg border border-slate-200 cursor-pointer flex items-center gap-1">
+                      <ImageIcon :size="12"></ImageIcon> Image
                       <input type="file" accept="image/*" @change="e => handleImageUpload(e, pair, 'rightImageUrl')" class="hidden" />
                     </label>
                     <div v-if="pair.rightImageUrl" class="relative">
                       <img 
                         :src="pair.rightImageUrl" 
-                        @click="openLightbox(pair.rightImageUrl, `Pair #${pIdx + 1} Right Preview`)" 
+                        @click="openLightbox(pair.rightImageUrl, `Pair #${idx + 1} Right Preview`)" 
                         title="Click to view full size"
-                        class="h-6 w-6 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
+                        class="h-8 w-8 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
                       />
-                      <button @click="removeImage(pair, 'rightImageUrl')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 cursor-pointer">
-                        <X :size="6"></X>
+                      <button @click="removeImage(pair, 'rightImageUrl')" class="absolute -top-1 -right-1 bg-rose-600 text-white rounded-full p-0.5">
+                        <X :size="8"></X>
                       </button>
                     </div>
                   </div>
@@ -968,66 +695,382 @@
             </div>
           </div>
 
-          <!-- Edit True / False -->
-          <div v-if="editingQuestion.type === 'true_false'" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <label class="font-bold text-slate-700 block">Select Correct Answer</label>
-            <div class="flex gap-6 font-bold text-slate-800">
-              <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2.5 rounded-xl border border-slate-300 hover:border-emerald-500">
-                <input type="radio" value="true" v-model="editingQuestion.tfCorrect" name="edit_tf_answer" class="text-emerald-600" /> True
+          <!-- TRUE / FALSE -->
+          <div v-if="form.type === 'true_false'" class="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <label class="font-bold text-xs text-slate-700 block">Select Correct Answer</label>
+            <div class="flex gap-6 text-xs font-bold text-slate-800">
+              <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2.5 rounded-xl border border-slate-200 hover:border-emerald-500">
+                <input type="radio" value="true" v-model="form.tfCorrect" name="tf_answer" class="text-emerald-600" /> True
               </label>
-              <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2.5 rounded-xl border border-slate-300 hover:border-emerald-500">
-                <input type="radio" value="false" v-model="editingQuestion.tfCorrect" name="edit_tf_answer" class="text-emerald-600" /> False
+              <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2.5 rounded-xl border border-slate-200 hover:border-emerald-500">
+                <input type="radio" value="false" v-model="form.tfCorrect" name="tf_answer" class="text-emerald-600" /> False
               </label>
             </div>
           </div>
 
-          <!-- Edit Short Answer -->
-          <div v-if="editingQuestion.type === 'short_answer'" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <label class="font-bold text-slate-700 block">Expected Answer Keywords (Comma Separated)</label>
-            <input v-model="editingQuestion.shortAnswerText" placeholder="e.g. ECDIS, navigation, chart" class="w-full p-2.5 border border-slate-300 rounded-xl bg-white outline-none focus:ring-1 focus:ring-emerald-500" />
+          <!-- SHORT ANSWER -->
+          <div v-if="form.type === 'short_answer'" class="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <label class="font-bold text-xs text-slate-700 block">Expected Answer Keywords (Comma Separated)</label>
+            <input v-model="form.shortAnswerKeywords" placeholder="e.g. ECDIS, navigation, chart" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
         </div>
 
-        <div class="flex justify-end gap-2 pt-3 border-t">
-          <button @click="closeEditModal" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl cursor-pointer">
-            Cancel
-          </button>
-          <button @click="saveEditedQuestion" class="px-4 py-2 bg-[#00c068] hover:bg-[#00a358] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs">
-            <Save :size="14"></Save> Save Changes
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- OVERLAY MODAL LIGHTBOX -->
-    <Transition name="fade">
-      <div 
-        v-if="lightboxImage" 
-        class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4"
-        @click.self="closeLightbox"
-      >
-        <div class="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center justify-center">
+        <!-- Save Button Block -->
+        <div class="pt-4">
           <button 
-            @click="closeLightbox" 
-            class="absolute -top-10 right-0 p-1.5 text-white/80 hover:text-white bg-slate-800/80 hover:bg-slate-800 rounded-full transition cursor-pointer"
-            title="Close Lightbox (Esc)"
+            @click="saveQuestion" 
+            :disabled="isSubmitting" 
+            class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
           >
-            <X :size="20" />
+            <Save :size="16"></Save> 
+            <span>{{ isSubmitting ? 'Saving...' : 'Save Question Item' }}</span>
           </button>
+        </div>
+      </div>
 
-          <div class="bg-white/10 p-2 rounded-2xl border border-white/20 shadow-2xl overflow-hidden flex flex-col items-center max-h-[85vh]">
-            <img 
-              :src="lightboxImage.url" 
-              :alt="lightboxImage.caption || 'Enlarged Image'" 
-              class="max-h-[75vh] max-w-full object-contain rounded-xl select-none" 
-            />
-            <p v-if="lightboxImage.caption" class="text-xs font-semibold text-slate-100 mt-2 px-3 py-1 bg-slate-900/80 rounded-full border border-slate-700/50">
-              {{ lightboxImage.caption }}
-            </p>
+      <!-- TAB 3: COURSE REPORTS & AUDITS -->
+      <div v-show="activeTab === 'report'" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-6">
+        <div class="flex flex-col md:flex-row justify-between md:items-center border-b border-slate-100 pb-4 gap-4">
+          <div>
+            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2 tracking-tight">
+              <BarChart2 class="text-emerald-700" :size="20"></BarChart2> Course Question Changes & Audit Report
+            </h2>
+            <p class="text-xs text-slate-500">View question counts, approval status, accepted AI suggestions, and AI overrides grouped per course.</p>
+          </div>
+
+          <button @click="exportCourseReportCSV" type="button" class="px-3.5 py-2 bg-[#123524] hover:bg-[#0e2a1d] text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-xs">
+            <Download :size="14"></Download> Export Report CSV
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+          <div class="bg-slate-50 border border-slate-200 p-3 rounded-2xl">
+            <span class="text-[10px] font-bold text-slate-500 block uppercase">Total Questions</span>
+            <span class="text-lg font-extrabold text-slate-900">{{ overallReportSummary.total }}</span>
+          </div>
+          <div class="bg-emerald-50 border border-emerald-100 p-3 rounded-2xl">
+            <span class="text-[10px] font-bold text-emerald-800 block uppercase">Approved</span>
+            <span class="text-lg font-extrabold text-emerald-800">{{ overallReportSummary.approved }}</span>
+          </div>
+          <div class="bg-amber-50 border border-amber-100 p-3 rounded-2xl">
+            <span class="text-[10px] font-bold text-amber-800 block uppercase">Pending Review</span>
+            <span class="text-lg font-extrabold text-amber-800">{{ overallReportSummary.pending }}</span>
+          </div>
+          <div class="bg-rose-50 border border-rose-100 p-3 rounded-2xl">
+            <span class="text-[10px] font-bold text-rose-800 block uppercase">Disapproved</span>
+            <span class="text-lg font-extrabold text-rose-800">{{ overallReportSummary.disapproved }}</span>
+          </div>
+          <div class="bg-emerald-50/60 border border-emerald-100 p-3 rounded-2xl">
+            <span class="text-[10px] font-bold text-emerald-800 block uppercase">AI Accepted</span>
+            <span class="text-lg font-extrabold text-emerald-800">{{ overallReportSummary.acceptedAi }}</span>
+          </div>
+          <div class="bg-slate-100 border border-slate-200 p-3 rounded-2xl">
+            <span class="text-[10px] font-bold text-slate-700 block uppercase">AI Retained</span>
+            <span class="text-lg font-extrabold text-slate-800">{{ overallReportSummary.retainedAi }}</span>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto border border-slate-200 rounded-2xl">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-700 uppercase font-bold border-b border-slate-200">
+              <tr>
+                <th class="p-3">Course Code</th>
+                <th class="p-3">Course Title</th>
+                <th class="p-3">Program</th>
+                <th class="p-3 text-center">Total Items</th>
+                <th class="p-3 text-center">Approved</th>
+                <th class="p-3 text-center">Pending</th>
+                <th class="p-3 text-center">Disapproved</th>
+                <th class="p-3 text-center">AI Accepted</th>
+                <th class="p-3 text-center">AI Overrides</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 font-medium text-slate-800">
+              <tr v-for="report in courseReports" :key="report.code" class="hover:bg-slate-50 transition-colors">
+                <td class="p-3 font-mono font-bold text-slate-900">{{ report.code }}</td>
+                <td class="p-3 font-bold">{{ report.title }}</td>
+                <td class="p-3"><span class="bg-slate-100 px-2 py-0.5 rounded-md text-[11px] font-semibold">{{ report.program }}</span></td>
+                <td class="p-3 text-center font-bold">{{ report.total }}</td>
+                <td class="p-3 text-center">
+                  <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.approved }}</span>
+                </td>
+                <td class="p-3 text-center">
+                  <span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.pending }}</span>
+                </td>
+                <td class="p-3 text-center">
+                  <span class="bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.disapproved }}</span>
+                </td>
+                <td class="p-3 text-center">
+                  <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.acceptedAi }}</span>
+                </td>
+                <td class="p-3 text-center">
+                  <span class="bg-slate-100 text-slate-800 px-2 py-0.5 rounded-full font-bold text-[11px]">{{ report.retainedAi }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- EDIT QUESTION MODAL -->
+      <div v-if="editingQuestion" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+        <div class="bg-white border border-slate-200 rounded-3xl max-w-3xl w-full p-6 shadow-2xl space-y-5 my-8 max-h-[90vh] overflow-y-auto">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Edit class="text-amber-600" :size="18"></Edit> Edit / Revise Question Item
+            </h3>
+            <button @click="closeEditModal" class="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer">
+              <X :size="18"></X>
+            </button>
+          </div>
+
+          <div class="space-y-4 text-xs">
+            <!-- Mapping Metadata -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="font-bold text-slate-700 block mb-1">Program</label>
+                <select v-model="editingQuestion.program" class="w-full p-2 border border-slate-200 rounded-xl bg-slate-50">
+                  <option value="Both">Both</option>
+                  <option value="BSMT">BSMT</option>
+                  <option value="BSMarE">BSMarE</option>
+                </select>
+              </div>
+              <div>
+                <label class="font-bold text-slate-700 block mb-1">Term</label>
+                <select v-model="editingQuestion.term" class="w-full p-2 border border-slate-200 rounded-xl bg-slate-50">
+                  <option value="Midterm">Midterm</option>
+                  <option value="Final">Final</option>
+                </select>
+              </div>
+              <div>
+                <label class="font-bold text-slate-700 block mb-1">Course Code</label>
+                <select v-model="editingQuestion.courseId" @change="handleEditCourseChange" class="w-full p-2 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-900">
+                  <option value="" disabled>Select Course / Subject...</option>
+                  <option v-for="c in courses" :key="c.id" :value="c.code || c.id">
+                    {{ c.code }} — {{ c.title }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="font-bold text-slate-700 block mb-1">Course Outcome (CO)</label>
+                <select v-model="editingQuestion.courseOutcomeId" @change="handleEditCourseOutcomeChange" class="w-full p-2 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-900">
+                  <option value="">Select CO (Optional)</option>
+                  <option v-for="co in editAvailableCourseOutcomes" :key="co.id || co.code" :value="co.id || co.code">
+                    {{ co.code }}: {{ co.description || co.title }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="font-bold text-slate-700 block mb-1">Learning Outcome (LO)</label>
+                <select v-model="editingQuestion.learningOutcomeId" class="w-full p-2 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-900">
+                  <option value="">Select LO (Optional)</option>
+                  <option v-for="lo in editAvailableLearningOutcomes" :key="lo.id || lo.code" :value="lo.id || lo.code">
+                    {{ lo.code }}: {{ lo.description || lo.title }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="font-bold text-slate-700 block mb-1">Bloom's Level</label>
+                <select v-model="editingQuestion.bloomLevel" class="w-full p-2 border border-slate-200 rounded-xl bg-slate-50">
+                  <option value="Remembering">Remembering</option>
+                  <option value="Understanding">Understanding</option>
+                  <option value="Application">Application</option>
+                  <option value="Analysis">Analysis</option>
+                  <option value="Evaluation">Evaluation</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Stem Text -->
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Question Stem</label>
+              <textarea v-model="editingQuestion.text" rows="3" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white"></textarea>
+            </div>
+
+            <!-- Image Upload -->
+            <div class="border border-dashed border-slate-200 p-3 rounded-2xl bg-slate-50 flex items-center justify-between">
+              <div>
+                <span class="font-bold text-slate-700 block">Stem Image</span>
+                <input type="file" accept="image/*" @change="e => handleImageUpload(e, editingQuestion, 'imageUrl')" class="text-xs mt-1 cursor-pointer" />
+              </div>
+              <div v-if="editingQuestion.imageUrl" class="relative">
+                <img 
+                  :src="editingQuestion.imageUrl" 
+                  @click="openLightbox(editingQuestion.imageUrl, 'Stem Image Preview')" 
+                  title="Click to view full size"
+                  class="h-14 w-14 object-cover rounded-xl border border-slate-200 cursor-pointer hover:opacity-90 transition" 
+                />
+                <button @click="removeImage(editingQuestion, 'imageUrl')" class="absolute -top-1 -right-1 bg-rose-600 text-white rounded-full p-0.5 cursor-pointer">
+                  <X :size="10"></X>
+                </button>
+              </div>
+            </div>
+
+            <!-- Edit Multiple Choice Options -->
+            <div v-if="editingQuestion.type === 'multiple_choice'" class="space-y-3 border border-slate-200 p-3 rounded-2xl bg-slate-50/50">
+              <div class="flex justify-between items-center">
+                <span class="font-bold text-slate-700">Multiple Choice Options</span>
+                <button @click="editingQuestion.options.push({ text: '', imageUrl: '' })" type="button" class="text-emerald-800 font-bold text-xs flex items-center gap-1 cursor-pointer">
+                  <Plus :size="12"></Plus> Add Option
+                </button>
+              </div>
+
+              <div v-for="(opt, oIdx) in editingQuestion.options" :key="oIdx" class="p-2.5 bg-white border border-slate-200 rounded-xl space-y-2 shadow-xs">
+                <div class="flex items-center gap-2">
+                  <input type="checkbox" :checked="Array.isArray(editingQuestion.correctAnswer) ? editingQuestion.correctAnswer.includes(oIdx) : editingQuestion.correctAnswer === oIdx" @change="toggleEditCorrectOption(oIdx)" class="h-4 w-4 text-emerald-600 rounded cursor-pointer" />
+                  <input v-model="opt.text" class="flex-1 p-1.5 border border-slate-200 rounded-lg text-xs outline-none" :placeholder="`Option ${oIdx + 1} text...`" />
+                  <button v-if="editingQuestion.options.length > 2" @click="editingQuestion.options.splice(oIdx, 1)" class="text-rose-500 p-1 cursor-pointer">
+                    <Trash2 :size="14"></Trash2>
+                  </button>
+                </div>
+
+                <div class="flex items-center justify-between pt-1 border-t border-slate-100">
+                  <label class="px-2 py-1 bg-slate-100 text-slate-700 text-[11px] font-semibold rounded-lg cursor-pointer flex items-center gap-1">
+                    <ImageIcon :size="12"></ImageIcon> {{ opt.imageUrl ? 'Change Image' : 'Add Image' }}
+                    <input type="file" accept="image/*" @change="e => handleImageUpload(e, opt, 'imageUrl')" class="hidden" />
+                  </label>
+                  <div v-if="opt.imageUrl" class="relative">
+                    <img 
+                      :src="opt.imageUrl" 
+                      @click="openLightbox(opt.imageUrl, `Option #${oIdx + 1} Image Preview`)" 
+                      title="Click to view full size"
+                      class="h-8 w-8 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
+                    />
+                    <button @click="removeImage(opt, 'imageUrl')" class="absolute -top-1 -right-1 bg-rose-600 text-white rounded-full p-0.5 cursor-pointer">
+                      <X :size="8"></X>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Edit Matching Type Pairs -->
+            <div v-if="editingQuestion.type === 'matching'" class="space-y-3 border border-slate-200 p-3 rounded-2xl bg-slate-50/50">
+              <div class="flex justify-between items-center">
+                <span class="font-bold text-slate-700">Matching Type Pairs</span>
+                <button @click="editingQuestion.matchingPairs.push({ leftText: '', leftImageUrl: '', rightText: '', rightImageUrl: '' })" type="button" class="text-emerald-800 font-bold text-xs flex items-center gap-1 cursor-pointer">
+                  <Plus :size="12"></Plus> Add Pair
+                </button>
+              </div>
+
+              <div v-for="(pair, pIdx) in editingQuestion.matchingPairs" :key="pIdx" class="p-2.5 bg-white border border-slate-200 rounded-xl space-y-2 shadow-xs">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-slate-500">Pair #{{ pIdx + 1 }}</span>
+                  <button v-if="editingQuestion.matchingPairs.length > 2" @click="editingQuestion.matchingPairs.splice(pIdx, 1)" class="text-rose-500 p-1 cursor-pointer">
+                    <Trash2 :size="14"></Trash2>
+                  </button>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div class="space-y-1 border border-slate-200 p-2 rounded-lg bg-slate-50/50">
+                    <span class="font-semibold text-[10px] text-slate-500">Left Item</span>
+                    <input v-model="pair.leftText" class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white outline-none" />
+                    <div class="flex items-center justify-between pt-1">
+                      <label class="px-2 py-0.5 bg-white border text-[10px] font-semibold rounded-lg cursor-pointer flex items-center gap-1">
+                        <ImageIcon :size="10"></ImageIcon> Image
+                        <input type="file" accept="image/*" @change="e => handleImageUpload(e, pair, 'leftImageUrl')" class="hidden" />
+                      </label>
+                      <div v-if="pair.leftImageUrl" class="relative">
+                        <img 
+                          :src="pair.leftImageUrl" 
+                          @click="openLightbox(pair.leftImageUrl, `Pair #${pIdx + 1} Left Preview`)" 
+                          title="Click to view full size"
+                          class="h-6 w-6 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
+                        />
+                        <button @click="removeImage(pair, 'leftImageUrl')" class="absolute -top-1 -right-1 bg-rose-600 text-white rounded-full p-0.5 cursor-pointer">
+                          <X :size="6"></X>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="space-y-1 border border-slate-200 p-2 rounded-lg bg-slate-50/50">
+                    <span class="font-semibold text-[10px] text-slate-500">Right Target</span>
+                    <input v-model="pair.rightText" class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white outline-none" />
+                    <div class="flex items-center justify-between pt-1">
+                      <label class="px-2 py-0.5 bg-white border text-[10px] font-semibold rounded-lg cursor-pointer flex items-center gap-1">
+                        <ImageIcon :size="10"></ImageIcon> Image
+                        <input type="file" accept="image/*" @change="e => handleImageUpload(e, pair, 'rightImageUrl')" class="hidden" />
+                      </label>
+                      <div v-if="pair.rightImageUrl" class="relative">
+                        <img 
+                          :src="pair.rightImageUrl" 
+                          @click="openLightbox(pair.rightImageUrl, `Pair #${pIdx + 1} Right Preview`)" 
+                          title="Click to view full size"
+                          class="h-6 w-6 object-cover rounded border cursor-pointer hover:opacity-90 transition" 
+                        />
+                        <button @click="removeImage(pair, 'rightImageUrl')" class="absolute -top-1 -right-1 bg-rose-600 text-white rounded-full p-0.5 cursor-pointer">
+                          <X :size="6"></X>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Edit True / False -->
+            <div v-if="editingQuestion.type === 'true_false'" class="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+              <label class="font-bold text-slate-700 block">Select Correct Answer</label>
+              <div class="flex gap-6 font-bold text-slate-800">
+                <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2.5 rounded-xl border border-slate-200 hover:border-emerald-500">
+                  <input type="radio" value="true" v-model="editingQuestion.tfCorrect" name="edit_tf_answer" class="text-emerald-600" /> True
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2.5 rounded-xl border border-slate-200 hover:border-emerald-500">
+                  <input type="radio" value="false" v-model="editingQuestion.tfCorrect" name="edit_tf_answer" class="text-emerald-600" /> False
+                </label>
+              </div>
+            </div>
+
+            <!-- Edit Short Answer -->
+            <div v-if="editingQuestion.type === 'short_answer'" class="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+              <label class="font-bold text-slate-700 block">Expected Answer Keywords (Comma Separated)</label>
+              <input v-model="editingQuestion.shortAnswerText" placeholder="e.g. ECDIS, navigation, chart" class="w-full p-2.5 border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <button @click="closeEditModal" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl cursor-pointer">
+              Cancel
+            </button>
+            <button @click="saveEditedQuestion" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs">
+              <Save :size="14"></Save> Save Changes
+            </button>
           </div>
         </div>
       </div>
-    </Transition>
+
+      <!-- OVERLAY MODAL LIGHTBOX -->
+      <Transition name="fade">
+        <div 
+          v-if="lightboxImage" 
+          class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4"
+          @click.self="closeLightbox"
+        >
+          <div class="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center justify-center">
+            <button 
+              @click="closeLightbox" 
+              class="absolute -top-10 right-0 p-1.5 text-white/80 hover:text-white bg-slate-800/80 hover:bg-slate-800 rounded-full transition cursor-pointer"
+              title="Close Lightbox (Esc)"
+            >
+              <X :size="20" />
+            </button>
+
+            <div class="bg-white/10 p-2 rounded-2xl border border-white/20 shadow-2xl overflow-hidden flex flex-col items-center max-h-[85vh]">
+              <img 
+                :src="lightboxImage.url" 
+                :alt="lightboxImage.caption || 'Enlarged Image'" 
+                class="max-h-[75vh] max-w-full object-contain rounded-xl select-none" 
+              />
+              <p v-if="lightboxImage.caption" class="text-xs font-semibold text-slate-100 mt-2 px-3 py-1 bg-slate-900/80 rounded-full border border-slate-700/50">
+                {{ lightboxImage.caption }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </Transition>
+
+    </div>
 
   </div>
 </template>
@@ -1053,16 +1096,54 @@ import {
   Save,
   FileText,
   RotateCcw,
-  Edit
+  Edit,
+  HelpCircle
 } from 'lucide-vue-next'
 
-// API / STORAGE CONSTANTS
+// STORAGE KEYS
 const STORAGE_COURSES_KEY = 'cams_courses_data'
 const STORAGE_QUESTIONS_KEY = 'cams_questions_data'
 
-// REACTIVE STATE
+// DEFAULT STCW CURRICULUM COURSES SEED
+const DEFAULT_COURSES = [
+  {
+    id: 'course-nav-101',
+    program: 'BSMT',
+    code: 'NAV-101',
+    title: 'Terrestrial and Coastal Navigation',
+    courseOutcomes: [
+      {
+        id: 'CO1',
+        title: 'Demonstrate competence in maintaining a safe navigational watch and coastal navigation.',
+        learningOutcomes: [
+          { id: 'LO1.1', description: 'Apply COLREG Rules of the Road in navigational watch scenario', hours: 12 },
+          { id: 'LO1.2', description: 'Plot positions using compass bearings and nautical charts', hours: 15 }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'course-eng-201',
+    program: 'BSMarE',
+    code: 'ENG-201',
+    title: 'Marine Engineering Systems & Watchkeeping',
+    courseOutcomes: [
+      {
+        id: 'CO1',
+        title: 'Operate main propulsion machinery and auxiliary control systems safely.',
+        learningOutcomes: [
+          { id: 'LO1.1', description: 'Perform pre-start checks on diesel main engines', hours: 15 },
+          { id: 'LO1.2', description: 'Monitor temperature and pressure gauges during engine operation', hours: 10 }
+        ]
+      }
+    ]
+  }
+]
+
+// STATE
 const questions = ref([])
 const courses = ref([])
+const isLoading = ref(true)
 
 const isSubmitting = ref(false)
 const isUploadingBulk = ref(false)
@@ -1098,10 +1179,9 @@ function handleKeydown(e) {
   }
 }
 
-// MULTI-PORT RESILIENT API FETCH HELPER
+// PROXY-AWARE API HELPER
 async function fetchFromEndpoints(path, options = {}) {
-  const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://127.0.0.1:8080/api', 'http://localhost:8000/api']
-  const token = localStorage.getItem('token') || ''
+  const token = localStorage.getItem('cams_token') || localStorage.getItem('token') || ''
   
   const headers = {
     'Accept': 'application/json',
@@ -1109,18 +1189,15 @@ async function fetchFromEndpoints(path, options = {}) {
     ...(options.headers || {})
   }
 
-  let lastError = null
-  for (const baseUrl of ports) {
-    try {
-      const res = await fetch(`${baseUrl}${path}`, { ...options, headers })
-      if (res.ok || (res.status >= 400 && res.status < 500)) {
-        return res
-      }
-    } catch (e) {
-      lastError = e
+  try {
+    const res = await fetch(`/api${path}`, { ...options, headers })
+    if (res.ok || (res.status >= 400 && res.status < 500)) {
+      return res
     }
+  } catch (e) {
+    // Fall back to local storage
   }
-  throw lastError || new Error(`Endpoint ${path} unreachable`)
+  throw new Error(`Endpoint ${path} unreachable`)
 }
 
 // QUESTION FORM
@@ -1148,7 +1225,6 @@ const form = reactive({
   shortAnswerKeywords: ''
 })
 
-// API HELPERS
 async function getApiError(response) {
   let data = {}
   try {
@@ -1169,7 +1245,7 @@ async function getApiError(response) {
 
   if (response.status === 422 && data.errors) {
     const firstError = Object.values(data.errors).flat()[0]
-    return new Error(firstError || data.message || 'Please check the submitted information.')
+    return new Error(firstError || data.message || 'Please check submitted information.')
   }
 
   return new Error(data.message || `Request failed. HTTP ${response.status}`)
@@ -1183,7 +1259,6 @@ function getAuthHeaders(includeJson = false) {
   return headers
 }
 
-// FORM RESET
 function resetForm() {
   form.program = 'Both'
   form.term = 'Midterm'
@@ -1208,7 +1283,6 @@ function resetForm() {
   form.shortAnswerKeywords = ''
 }
 
-// COURSE COMPUTED PROPERTIES
 const filteredCourses = computed(() => {
   const currentProgram = form.program
 
@@ -1240,7 +1314,6 @@ const availableLearningOutcomes = computed(() => {
   return selectedCO?.learningOutcomes || []
 })
 
-// EDIT MODAL COMPUTED PROPERTIES
 const editAvailableCourseOutcomes = computed(() => {
   if (!editingQuestion.value) return []
   const selectedCourse = courses.value.find(
@@ -1259,7 +1332,6 @@ const editAvailableLearningOutcomes = computed(() => {
   return selectedCO?.learningOutcomes || []
 })
 
-// QUESTION FILTERING
 const filteredQuestions = computed(() => {
   let result = [...questions.value]
 
@@ -1307,7 +1379,6 @@ const filteredQuestions = computed(() => {
   return result
 })
 
-// SELECTION
 const isAllSelected = computed(() => {
   if (!filteredQuestions.value.length) return false
   return filteredQuestions.value.every(question => selectedQuestionIds.value.includes(question.id))
@@ -1329,7 +1400,6 @@ function toggleSelectAll() {
   selectedQuestionIds.value = filteredQuestions.value.map(question => question.id)
 }
 
-// LOCAL STORAGE
 function syncQuestionsStorage() {
   localStorage.setItem(STORAGE_QUESTIONS_KEY, JSON.stringify(questions.value))
 }
@@ -1338,7 +1408,6 @@ function syncCoursesStorage() {
   localStorage.setItem(STORAGE_COURSES_KEY, JSON.stringify(courses.value))
 }
 
-// NORMALIZATION
 function parseCorrectAnswer(value) {
   if (Array.isArray(value)) return value
   if (value === null || value === undefined || value === '') return null
@@ -1358,7 +1427,7 @@ function normalizeCourse(course) {
 
 function normalizeQuestion(question) {
   const course = courses.value.find(
-    c => String(c.id) === String(question.course_id || question.courseDbId)
+    c => String(c.id) === String(question.course_id || question.courseDbId) || String(c.code) === String(question.courseId)
   )
 
   let matchingPairs = question.matching_pairs || question.matchingPairs
@@ -1393,7 +1462,7 @@ function normalizeQuestion(question) {
   return {
     ...question,
     id: question.id,
-    courseId: course?.code || question.course_id || question.courseId || '',
+    courseId: course?.code || question.courseId || question.course_id || '',
     courseDbId: question.course_id || question.courseDbId || null,
     courseOutcomeId: question.course_outcome_id || question.courseOutcomeId || '',
     learningOutcomeId: question.learning_outcome_id || question.learningOutcomeId || '',
@@ -1409,7 +1478,6 @@ function normalizeQuestion(question) {
   }
 }
 
-// PAYLOAD FORMATTERS FOR API SAVES
 function formatQuestionOptionsPayload(opts) {
   if (!Array.isArray(opts)) return null
   return opts.map(opt => ({
@@ -1431,7 +1499,6 @@ function formatQuestionMatchingPairsPayload(pairs) {
   }))
 }
 
-// RESOLUTION HELPERS
 function resolveCourseId(courseValue) {
   const course = courses.value.find(
     c => String(c.id) === String(courseValue) || String(c.code) === String(courseValue)
@@ -1470,7 +1537,6 @@ function handleEditCourseOutcomeChange() {
   editingQuestion.value.learningOutcomeId = ''
 }
 
-// OPTIONS & PAIRS MANAGEMENT
 function addOption() {
   form.options.push({ text: '', imageUrl: '', isCorrect: false })
 }
@@ -1553,7 +1619,6 @@ function generateQuestionCode() {
   return `Q-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`
 }
 
-// AI VALIDATION & AUDIT LOGIC
 function generateAiSuggestion(q) {
   const issues = []
   let bloomAudit = `Bloom Level (${q.bloomLevel || 'Understanding'}): Aligned with question cognitive demand.`
@@ -1624,7 +1689,6 @@ function retainOriginalSettings(q) {
   alert('Original question settings retained.')
 }
 
-// SAVE NEW QUESTION
 async function saveQuestion() {
   if (!form.courseId || !form.text.trim()) {
     alert('Please select a Course / Subject and enter Question Stem.')
@@ -1727,7 +1791,6 @@ async function saveQuestion() {
     resetForm()
     activeTab.value = 'repository'
   } catch (err) {
-    console.error('Failed to save question:', err)
     if (err?.status === 422 && err?.duplicate) {
       const duplicate = err.existingQuestion
       alert(
@@ -1741,7 +1804,6 @@ async function saveQuestion() {
   }
 }
 
-// EDIT QUESTION MODAL
 function editQuestion(question) {
   let parsedCorrect = Array.isArray(question.correctAnswer)
     ? [...question.correctAnswer]
@@ -1893,12 +1955,10 @@ async function saveEditedQuestion() {
     closeEditModal()
     alert('Question updated successfully.')
   } catch (err) {
-    console.error('Failed to update question:', err)
     alert(err.message || 'Unable to update the question.')
   }
 }
 
-// STATUS UPDATES & DELETION
 async function updateQuestionStatus(id, status) {
   if (!id || !status) return
   if (!confirm(`Are you sure you want to mark this question as ${status}?`)) return
@@ -1949,7 +2009,6 @@ async function updateQuestionStatus(id, status) {
 
     syncQuestionsStorage()
   } catch (err) {
-    console.error('Failed to update question status:', err)
     alert(err.message || 'Unable to update question status.')
   }
 }
@@ -1972,7 +2031,6 @@ async function deleteQuestion(id) {
     syncQuestionsStorage()
     alert('Question deleted successfully.')
   } catch (err) {
-    console.error('Failed to delete question:', err)
     alert(err.message || 'Unable to delete the question.')
   }
 }
@@ -2029,7 +2087,6 @@ async function bulkUpdateStatus(status) {
     syncQuestionsStorage()
     alert(`Selected question(s) marked as ${status}.`)
   } catch (err) {
-    console.error('Bulk status update failed:', err)
     alert(err.message || 'Unable to update selected questions.')
   }
 }
@@ -2058,12 +2115,10 @@ async function bulkDeleteQuestions() {
     syncQuestionsStorage()
     alert('Selected questions deleted successfully.')
   } catch (err) {
-    console.error('Bulk delete failed:', err)
     alert(err.message || 'Unable to delete selected questions.')
   }
 }
 
-// GROUPING & COLLAPSE
 const groupedQuestions = computed(() => {
   const groups = {}
 
@@ -2093,7 +2148,6 @@ function toggleCourseCollapse(courseKey) {
   collapsedCourses.value[courseKey] = !collapsedCourses.value[courseKey]
 }
 
-// REPORTS
 const courseReports = computed(() => {
   const map = {}
 
@@ -2186,7 +2240,7 @@ function downloadCSVTemplate() {
 
   const sampleRows = [
     ['BSMT', 'Midterm', 'NAV-101', 'CO1', 'LO1.1', 'Understanding', 'multiple_choice', 'What is the primary function of ECDIS?', 'Electronic Chart Display', 'Radar Display', 'Sonar System', 'Radio', 'A'],
-    ['BSMarE', 'Final', 'ENG-101', 'CO2', 'LO2.1', 'Remembering', 'true_false', 'Is a diesel engine an internal combustion engine?', 'True', 'False', '', '', 'A']
+    ['BSMarE', 'Final', 'ENG-201', 'CO1', 'LO1.1', 'Remembering', 'true_false', 'Is a diesel engine an internal combustion engine?', 'True', 'False', '', '', 'A']
   ]
 
   const csvContent = [headers.join(','), ...sampleRows.map(r => r.map(f => `"${String(f).replace(/"/g, '""')}"`).join(','))].join('\n')
@@ -2200,7 +2254,6 @@ function downloadCSVTemplate() {
   document.body.removeChild(link)
 }
 
-// BULK CSV UPLOAD PARSER
 async function handleBulkCSVUpload(event) {
   const file = event.target.files?.[0]
   if (!file) return
@@ -2436,7 +2489,6 @@ async function handleBulkCSVUpload(event) {
     }
     alert(message)
   } catch (err) {
-    console.error('Bulk CSV upload failed:', err)
     alert(err.message || 'Unable to process the CSV file.')
   } finally {
     isUploadingBulk.value = false
@@ -2444,7 +2496,6 @@ async function handleBulkCSVUpload(event) {
   }
 }
 
-// DATA INITIALIZATION & CACHE LOAD
 async function loadCachedCourses() {
   const savedCourses = localStorage.getItem(STORAGE_COURSES_KEY)
   if (!savedCourses) return false
@@ -2454,7 +2505,6 @@ async function loadCachedCourses() {
     courses.value = parsed.map(normalizeCourse)
     return true
   } catch (err) {
-    console.warn('CAMS: Unable to read cached courses.', err)
     return false
   }
 }
@@ -2468,61 +2518,66 @@ async function loadCachedQuestions() {
     questions.value = parsed.map(normalizeQuestion)
     return true
   } catch (err) {
-    console.warn('CAMS: Unable to read cached questions.', err)
     return false
   }
 }
 
 async function fetchCourses() {
-  await loadCachedCourses()
+  const hasCached = await loadCachedCourses()
   try {
     const response = await fetchFromEndpoints('/courses', {
       method: 'GET',
       headers: getAuthHeaders()
     })
 
-    if (response.status === 401) throw new Error('Your session has expired. Please log in again.')
-    if (!response.ok) throw new Error(`Failed to load courses. HTTP ${response.status}`)
-
-    const data = await response.json()
-    if (!Array.isArray(data)) throw new Error('Invalid course data received.')
-
-    if (data.length > 0) {
-      courses.value = data.map(normalizeCourse)
-      syncCoursesStorage()
+    if (response.ok) {
+      const data = await response.json()
+      const rawList = Array.isArray(data) ? data : (data?.data || [])
+      if (rawList.length > 0) {
+        courses.value = rawList.map(normalizeCourse)
+        syncCoursesStorage()
+        return
+      }
     }
-  } catch (err) {
-    console.warn('CAMS: Fallback to cached courses due to error:', err.message)
+  } catch (err) {}
+
+  if (!hasCached || courses.value.length === 0) {
+    courses.value = DEFAULT_COURSES.map(normalizeCourse)
+    syncCoursesStorage()
   }
 }
 
 async function fetchQuestions() {
-  await loadCachedQuestions()
+  const hasCached = await loadCachedQuestions()
   try {
     const response = await fetchFromEndpoints('/questions', {
       method: 'GET',
       headers: getAuthHeaders()
     })
 
-    if (response.status === 401) throw new Error('Your session has expired. Please log in again.')
-    if (!response.ok) throw new Error(`Failed to load questions. HTTP ${response.status}`)
-
-    const data = await response.json()
-    if (!Array.isArray(data)) throw new Error('Invalid question data received.')
-
-    if (data.length > 0) {
-      questions.value = data.map(normalizeQuestion)
+    if (response.ok) {
+      const data = await response.json()
+      const rawList = Array.isArray(data) ? data : (data?.data || [])
+      questions.value = rawList.map(normalizeQuestion)
       syncQuestionsStorage()
+      return
     }
-  } catch (err) {
-    console.warn('CAMS: Fallback to cached questions due to error:', err.message)
+  } catch (err) {}
+
+  if (!hasCached) {
+    questions.value = []
+    syncQuestionsStorage()
   }
 }
 
 onMounted(async () => {
+  isLoading.value = true
   window.addEventListener('keydown', handleKeydown)
   await fetchCourses()
   await fetchQuestions()
+  setTimeout(() => {
+    isLoading.value = false
+  }, 400)
 })
 
 onUnmounted(() => {

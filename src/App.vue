@@ -11,13 +11,20 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
+// Dynamically resolve logo path from public folder
+const baseUrl = import.meta.env.BASE_URL || '/'
+const logoUrl = `${baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'}cams-logo.png`
+
 const isSidebarOpen = ref(true)
 const showUserMenu = ref(false)
 
-const isLoginPage = computed(() => route.path === '/login')
+// Hide sidebar and navigation layout on Login and Student Exam pages, or for Cadet sessions
+const isStandalonePage = computed(() => {
+  return ['/login', '/student-exam'].includes(route.path) || authStore.isCadet
+})
 
 const navigationItems = [
-  { name: 'Dashboard', path: '/', icon: LayoutDashboard, roles: ['Admin', 'Assessment Officer', 'Instructor', 'Cadet'] },
+  { name: 'Dashboard', path: '/', icon: LayoutDashboard, roles: ['Admin', 'Assessment Officer', 'Instructor'] },
   { name: 'Courses', path: '/courses', icon: BookOpen, roles: ['Admin', 'Assessment Officer', 'Instructor'] },
   { name: 'Question Bank', path: '/questions', icon: HelpCircle, roles: ['Admin', 'Assessment Officer', 'Instructor'] },
   { name: 'Test Builder', path: '/test-builder', icon: Wrench, roles: ['Admin', 'Assessment Officer', 'Instructor'] },
@@ -59,8 +66,9 @@ function handleLogout() {
 <template>
   <div class="min-h-screen bg-slate-50 flex text-slate-800 antialiased font-sans overflow-x-hidden">
     
+    <!-- Floating Menu Toggle (Hidden on Standalone Pages) -->
     <button 
-      v-if="!isLoginPage && !isSidebarOpen"
+      v-if="!isStandalonePage && !isSidebarOpen"
       @click="isSidebarOpen = true"
       class="fixed top-5 left-5 z-40 p-2.5 bg-white border border-slate-200 shadow-sm rounded-xl hover:bg-slate-50 text-slate-600 transition-all cursor-pointer group"
       title="Open Menu"
@@ -68,25 +76,25 @@ function handleLogout() {
       <Menu :size="20" />
     </button>
 
+    <!-- Navigation Sidebar (Hidden on Standalone Pages) -->
     <aside 
-      v-if="!isLoginPage"
+      v-if="!isStandalonePage"
       :class="[
         'bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 fixed inset-y-0 z-50 transition-all duration-300 ease-in-out shadow-xs',
-        isSidebarOpen ? 'w-64 translate-x-0' : '-translate-x-full w-64'
+        isSidebarOpen ? 'w-60 translate-x-0' : '-translate-x-full w-64'
       ]"
     >
-      <div class="p-5 space-y-8 overflow-y-auto custom-scrollbar">
-        <div class="flex items-start justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 bg-[#123524] rounded-xl flex items-center justify-center font-black text-white text-lg tracking-wider shadow-md">
-              C
-            </div>
-            <div>
-              <h1 class="font-bold text-slate-900 leading-tight">CAMS Portal</h1>
-              <p class="text-[10px] text-emerald-700 font-semibold tracking-wide">STCW Exam Engine v2.4</p>
-            </div>
+      <div class="p-4 space-y-4 overflow-y-auto custom-scrollbar">
+        <!-- Sidebar Header with CAMS Logo -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center">
+            <img 
+              :src="logoUrl" 
+              alt="CAMS Logo" 
+              class="h-20 ms-2 w-auto object-contain" 
+            />
           </div>
-          <button @click="isSidebarOpen = false" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">
+          <button @click="isSidebarOpen = false" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer">
             <ChevronLeft :size="18" />
           </button>
         </div>
@@ -97,7 +105,7 @@ function handleLogout() {
             :key="item.path"
             :to="item.path"
             :class="[
-              'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all group',
+              'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all group',
               route.path === item.path 
                 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/60 shadow-xs' 
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
@@ -105,7 +113,7 @@ function handleLogout() {
           >
             <component 
               :is="item.icon" 
-              :size="18" 
+              :size="20" 
               :class="route.path === item.path ? 'text-emerald-600' : 'text-slate-400 group-hover:text-slate-600'" 
             />
             <span>{{ item.name }}</span>
@@ -124,22 +132,22 @@ function handleLogout() {
         >
           <div 
             v-if="showUserMenu" 
-            class="absolute bottom-full left-4 mb-3 w-56 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-50 p-3 space-y-3"
+            class="absolute bottom-full left-5 mb-3 w-50 bg-white border border-slate-200 rounded-xl overflow-hidden z-50 p-3 space-y-3"
           >
             <div class="space-y-1">
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Account</p>
-              <p class="text-xs font-bold text-slate-800 truncate">{{ currentUser.name }}</p>
-              <p class="text-[11px] text-slate-500 truncate">{{ currentUser.email }}</p>
+              <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Account</p>
+              <p class="text-sm font-bold text-slate-800 truncate">{{ currentUser.name }}</p>
+              <p class="text-[12px] text-slate-500 truncate">{{ currentUser.email }}</p>
               <div class="mt-1 flex items-center gap-1">
                 <Shield :size="12" class="text-emerald-600" />
-                <span class="text-[11px] font-semibold text-emerald-700 capitalize">{{ currentUser.role }}</span>
+                <span class="text-[12px] font-semibold text-emerald-700 capitalize">{{ currentUser.role }}</span>
               </div>
             </div>
 
             <div class="border-t border-slate-100 pt-2">
               <button 
                 @click="handleLogout" 
-                class="w-full flex items-center gap-2 px-3 py-2 text-xs text-rose-600 hover:bg-rose-50 font-bold rounded-lg transition-colors cursor-pointer"
+                class="w-full flex items-center gap-2 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 font-bold rounded-lg transition-colors cursor-pointer"
               >
                 <LogOut :size="14" />
                 Log out
@@ -157,8 +165,8 @@ function handleLogout() {
               {{ currentUser.initials }}
             </div>
             <div class="text-left overflow-hidden">
-              <p class="text-xs font-bold text-slate-800 truncate">{{ currentUser.name }}</p>
-              <p class="text-[10px] text-slate-400 truncate">{{ currentUser.email }}</p>
+              <p class="text-sm font-bold text-slate-800 truncate">{{ currentUser.name }}</p>
+              <p class="text-[12px] text-slate-400 truncate">{{ currentUser.email }}</p>
             </div>
           </div>
           <MoreVertical :size="16" class="text-slate-400 group-hover:text-slate-700" />
@@ -168,7 +176,7 @@ function handleLogout() {
       </div>
     </aside>
 
-    <main :class="['flex-1 min-h-screen transition-all duration-300', isLoginPage ? 'pl-0' : (isSidebarOpen ? 'lg:pl-64 pl-0' : 'pl-0')]">
+    <main :class="['flex-1 min-h-screen transition-all duration-300', isStandalonePage ? 'pl-0' : (isSidebarOpen ? 'lg:pl-64 pl-0' : 'pl-0')]">
       <router-view />
     </main>
   </div>
