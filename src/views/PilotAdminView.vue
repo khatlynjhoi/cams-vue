@@ -1,45 +1,61 @@
 <template>
-  <div class="p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans text-slate-800 antialiased relative min-h-screen bg-slate-50">
+  <div class="p-4 md:p-6 max-w-8xl mx-auto space-y-6 font-sans text-slate-800 antialiased relative min-h-screen bg-slate-50">
     
-    <!-- BRANDED SYSTEM PRELOADER CARD -->
-    <transition
-      enter-active-class="transition ease-out duration-300"
-      enter-from-class="opacity-0 scale-95"
-      enter-to-class="opacity-100 scale-100"
-      leave-active-class="transition ease-in duration-200"
-      leave-from-class="opacity-100 scale-100"
-      leave-to-class="opacity-0 scale-95"
-    >
-      <div 
-        v-if="isLoading" 
-        class="min-h-125 w-full bg-white/90 backdrop-blur-xs border border-slate-100 rounded-3xl p-12 flex flex-col items-center justify-center text-center space-y-5 shadow-xs"
-      >
-        <!-- CAMS Emblem with Radar Pulse Effect -->
-        <div class="relative flex items-center justify-center">
-          <div class="absolute w-20 h-20 bg-emerald-500/10 rounded-full animate-ping"></div>
-          <div class="absolute w-16 h-16 bg-[#123524]/10 rounded-full animate-pulse"></div>
-          
-          <div class="w-14 h-14 bg-[#123524] rounded-2xl flex items-center justify-center font-black text-white text-2xl tracking-wider shadow-xl relative z-10">
-            C
+    <!-- BRANDED SKELETON LOADER -->
+    <div v-if="isLoading" class="space-y-6 animate-pulse">
+      
+      <!-- Top Banner Skeleton -->
+      <div class="bg-linear-to-r from-[#123524] to-[#1b4d35] p-6 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xs">
+        <div class="space-y-2">
+          <div class="flex items-center gap-2">
+            <div class="w-6 h-6 bg-emerald-500/30 rounded-md"></div>
+            <div class="h-6 w-72 max-w-full bg-white/20 rounded-md"></div>
+          </div>
+          <div class="h-3.5 w-96 max-w-full bg-white/10 rounded-md"></div>
+        </div>
+        <div class="h-10 w-44 bg-white/10 rounded-xl"></div>
+      </div>
+
+      <!-- Stat Metrics Grid Skeleton -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div v-for="i in 4" :key="i" class="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs flex justify-between items-start">
+          <div class="space-y-2 flex-1">
+            <div class="h-3 w-28 bg-slate-200 rounded"></div>
+            <div class="h-7 w-16 bg-slate-300 rounded"></div>
+            <div class="h-3.5 w-24 bg-emerald-100 rounded"></div>
+          </div>
+          <div class="w-10 h-10 bg-slate-100 rounded-xl"></div>
+        </div>
+      </div>
+
+      <!-- Filters & Data Table Skeleton -->
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
+          <div class="h-9 bg-slate-100 rounded-xl flex-1 w-full"></div>
+          <div class="h-9 w-36 bg-slate-100 rounded-xl"></div>
+        </div>
+
+        <div class="overflow-x-auto border border-slate-200/80 rounded-xl">
+          <div class="p-3.5 bg-slate-50 border-b border-slate-200/80 flex gap-4">
+            <div v-for="w in ['w-16', 'w-40', 'w-24', 'w-32', 'w-20', 'w-24']" :key="w" :class="[w, 'h-4 bg-slate-200 rounded']"></div>
+          </div>
+          <div class="divide-y divide-slate-100">
+            <div v-for="r in 4" :key="r" class="p-3.5 flex gap-4 items-center">
+              <div class="w-16 h-4 bg-slate-200 rounded"></div>
+              <div class="w-40 h-4 bg-slate-200 rounded"></div>
+              <div class="w-24 h-6 bg-slate-100 rounded-md"></div>
+              <div class="w-32 h-4 bg-slate-200 rounded"></div>
+              <div class="w-20 h-6 bg-emerald-50 rounded-full"></div>
+              <div class="w-24 h-7 bg-slate-100 rounded-xl ml-auto"></div>
+            </div>
           </div>
         </div>
-
-        <!-- Branding Text & Progress Bar -->
-        <div class="space-y-1.5 max-w-xs">
-          <h3 class="text-base font-bold text-slate-900 tracking-tight">CAMS STCW Portal</h3>
-          <p class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">Synchronizing Pilot Sessions...</p>
-        </div>
-
-        <div class="w-48 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-          <div class="bg-[#123524] h-full rounded-full animate-pulse w-3/4"></div>
-        </div>
-
-        <p class="text-[10px] text-slate-400 font-mono">Baliwag Maritime Academy System</p>
       </div>
-    </transition>
+
+    </div>
 
     <!-- MAIN VIEW CONTENT -->
-    <div v-show="!isLoading" class="space-y-6">
+    <div v-else class="space-y-6">
 
       <!-- Header Hero Banner -->
       <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xs">
@@ -48,7 +64,7 @@
             <SlidersHorizontal class="text-emerald-400" :size="22" />
             Pilot Administration Dashboard
           </h1>
-          <p class="text-xs text-slate-200 font-normal">
+          <p class="text-sm text-slate-200 font-normal">
             Monitor live proctored examination sessions, manage access codes, and stream real-time candidate security telemetry.
           </p>
         </div>
@@ -56,7 +72,7 @@
         <div class="flex items-center gap-2 shrink-0">
           <button 
             @click="openCreateModal"
-            class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
+            class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
           >
             <Plus :size="16" /> Schedule Pilot Session
           </button>
@@ -76,7 +92,6 @@
           </div>
         </div>
 
-        <!-- REPLACED ENROLLED CADETS CARD WITH RELEVANT EXAMINEE QUOTA DATA -->
         <div class="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-xs flex justify-between items-start">
           <div>
             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Target Examinee Quota</p>
@@ -120,13 +135,13 @@
               v-model="searchQuery"
               type="text"
               placeholder="Search by title, course, or access code..."
-              class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500 font-medium"
+              class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500 font-medium"
             />
           </div>
 
           <select 
             v-model="selectedStatusFilter" 
-            class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer focus:bg-white focus:ring-2 focus:ring-emerald-500"
+            class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none cursor-pointer focus:bg-white focus:ring-2 focus:ring-emerald-500"
           >
             <option value="All Statuses">All Statuses</option>
             <option value="Active">Active</option>
@@ -147,7 +162,7 @@
                 <th class="p-3.5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100 text-xs font-medium text-slate-700">
+            <tbody class="divide-y divide-slate-100 text-sm font-medium text-slate-700">
               <tr v-for="s in filteredSessions" :key="s.id" class="hover:bg-slate-50/80 transition-colors">
                 <td class="p-3.5 font-bold font-mono text-slate-900">{{ s.id }}</td>
                 <td class="p-3.5">
@@ -175,7 +190,7 @@
                 <td class="p-3.5 text-right">
                   <button 
                     @click="router.push('/reports?tab=post-pilot')"
-                    class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition inline-flex items-center gap-1 cursor-pointer shadow-xs"
+                    class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-sm font-bold transition inline-flex items-center gap-1 cursor-pointer shadow-xs"
                   >
                     <Eye :size="14" /> View Analysis
                   </button>
@@ -186,7 +201,7 @@
                 <td colspan="6" class="p-12 text-center text-slate-400">
                   <SlidersHorizontal class="w-8 h-8 mx-auto text-slate-300 mb-2" />
                   <p class="font-bold text-slate-700 text-sm">No Pilot Sessions Found</p>
-                  <p class="text-xs text-slate-400 mt-1">No active or scheduled sessions match your criteria. Create a course and test blueprint to begin scheduling.</p>
+                  <p class="text-sm text-slate-400 mt-1">No active or scheduled sessions match your criteria. Create a course and test blueprint to begin scheduling.</p>
                 </td>
               </tr>
             </tbody>
@@ -206,7 +221,7 @@
             </button>
           </div>
 
-          <div class="space-y-3.5 text-xs">
+          <div class="space-y-3.5 text-sm">
             <div>
               <label class="block font-bold text-slate-700 mb-1">Session Title</label>
               <input 
@@ -225,7 +240,6 @@
               />
             </div>
 
-            <!-- FIELD FOR SPECIFIC NO. OF EXAMINEES NEEDED TO COMPLETE PILOT TEST -->
             <div>
               <label class="block font-bold text-slate-700 mb-1">Target Examinees Needed</label>
               <input 
@@ -237,7 +251,6 @@
               />
             </div>
 
-            <!-- ACCESS PASSCODE WITH REGEN KEY BUTTON -->
             <div>
               <label class="block font-bold text-slate-700 mb-1">Access Passcode</label>
               <div class="flex gap-2">
@@ -261,13 +274,13 @@
           <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
             <button 
               @click="showCreateModal = false" 
-              class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer"
+              class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl cursor-pointer"
             >
               Cancel
             </button>
             <button 
               @click="handleCreateSession" 
-              class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer"
+              class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs cursor-pointer"
             >
               Schedule Session
             </button>

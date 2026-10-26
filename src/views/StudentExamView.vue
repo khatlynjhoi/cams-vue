@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { 
@@ -13,7 +13,9 @@ import {
   Key,
   User,
   ArrowLeft,
-  LogOut
+  LogOut,
+  GraduationCap,
+  Award
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -23,15 +25,16 @@ const authStore = useAuthStore()
 const baseUrl = import.meta.env.BASE_URL || '/'
 const logoUrl = `${baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'}cams-logo.png`
 
-// Determine if logged in as Admin/Faculty vs unauthenticated guest cadet
-const isLoggedIn = computed(() => {
-  return Boolean(
-    authStore.isAuthenticated || 
-    authStore.user || 
-    authStore.token || 
-    localStorage.getItem('cams_token') || 
-    localStorage.getItem('token')
-  )
+// Determine if logged in with an official Staff/Faculty Account (Admin, Officer, Instructor)
+const isStaffLoggedIn = computed(() => {
+  const token = authStore.token || localStorage.getItem('cams_token') || localStorage.getItem('token')
+  const user = authStore.user || JSON.parse(localStorage.getItem('cams_user') || 'null')
+  const role = user?.role || localStorage.getItem('cams_user_role')
+
+  if (!token || !user) return false
+  
+  // Return true only if user is an authenticated Staff/Faculty account
+  return role === 'Admin' || role === 'Assessment Officer' || role === 'Instructor'
 })
 
 const examActive = ref(false)
@@ -43,6 +46,9 @@ const showConfirmModal = ref(false)
 const courseCodeInput = ref('')
 const studentName = ref('')
 const cadetId = ref('')
+const selectedProgram = ref('')
+const selectedClassLevel = ref('')
+const coursesList = ref([])
 const totalItemsInput = ref(10)
 
 const examItems = ref([])
@@ -74,6 +80,29 @@ async function fetchFromEndpoints(path, options = {}) {
     // Silently fall through to local fallback
   }
   throw new Error('Backend endpoint unreachable')
+}
+
+onMounted(async () => {
+  try {
+    const data = await fetchFromEndpoints('/courses')
+    const list = Array.isArray(data) ? data : (data?.data || [])
+    if (list.length > 0) {
+      coursesList.value = list
+    } else {
+      loadFallbackCourses()
+    }
+  } catch (e) {
+    loadFallbackCourses()
+  }
+})
+
+function loadFallbackCourses() {
+  const local = JSON.parse(
+    localStorage.getItem('cams_courses_data') || 
+    localStorage.getItem('cams_courses') || 
+    '[]'
+  )
+  coursesList.value = local
 }
 
 function normalizeExamItem(q, idx, fallbackCode = '') {
@@ -130,8 +159,8 @@ function loadActiveScheduleQuestions(passcode) {
 }
 
 async function startExam() {
-  if (!cadetId.value.trim() || !studentName.value.trim() || !courseCodeInput.value.trim()) {
-    alert('Please complete your Cadet ID, Full Name, and Assessment Passcode.')
+  if (!cadetId.value.trim() || !studentName.value.trim() || !courseCodeInput.value.trim() || !selectedProgram.value || !selectedClassLevel.value) {
+    alert('Please complete all student details, including Course, Class Level, and Access Passcode.')
     return
   }
 
@@ -143,7 +172,9 @@ async function startExam() {
       body: JSON.stringify({ 
         courseId: passcode,
         passcode: passcode,
-        totalItems: totalItemsInput.value 
+        totalItems: totalItemsInput.value,
+        program: selectedProgram.value,
+        classLevel: selectedClassLevel.value
       })
     })
 
@@ -274,6 +305,9 @@ async function executeSubmission() {
     cadet_id: cadetId.value,
     cadet_name: studentName.value,
     course_code: courseCodeInput.value,
+    program: selectedProgram.value,
+    class_level: selectedClassLevel.value,
+    year_level: selectedClassLevel.value,
     score: totalScore,
     total_items: total,
     percentage,
@@ -303,7 +337,7 @@ async function executeSubmission() {
 }
 
 function handleExit() {
-  if (isLoggedIn.value) {
+  if (isStaffLoggedIn.value) {
     router.push('/dashboard')
   } else {
     if (authStore.logout) authStore.logout()
@@ -322,39 +356,39 @@ onUnmounted(() => {
     <!-- Top Bar Navigation Header -->
     <header class="bg-[#123524] border-b border-[#0e2a1d] px-6 py-3 flex justify-between items-center text-white shadow-xs">
       <div class="flex items-center gap-4">
-        <!-- Direct Exit Button to Admin Menu -->
+        <!-- Direct Exit Button -->
         <button 
           @click="handleExit" 
           class="px-4 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-sm font-bold transition flex items-center gap-2 cursor-pointer shadow-xs"
-          title="Return to Admin Menu / Dashboard"
+          :title="isStaffLoggedIn ? 'Return to Staff Dashboard' : 'Return to Login View'"
         >
           <ArrowLeft :size="16" />
-          <span>Exit to Admin Menu</span>
+          <span>{{ isStaffLoggedIn ? 'Exit to Admin Menu' : 'Exit to Login' }}</span>
         </button>
       </div>
     </header>
 
-<!-- ENTRANCE PORTAL CARD -->
-<main v-if="!examActive && !examSubmitted" class="flex-1 flex items-center justify-center px-4 pt-2 pb-3">
-  <div class="max-w-md w-full bg-white border border-slate-200 rounded-3xl px-6 pt-2 pb-4 shadow-xl space-y-5 text-center">
-    
-    <!-- Logo & Title Section (No inner logo box) -->
-    <div class="flex flex-col items-center justify-center space-y-3">
-      <div class="w-full flex items-center justify-center">
-        <img 
-          :src="logoUrl" 
-          alt="CAMS - Comprehensive Assessment Management System" 
-          class="max-w-full h-auto max-h-60 object-contain mx-auto" 
-        />
-      </div>
+    <!-- ENTRANCE PORTAL CARD -->
+    <main v-if="!examActive && !examSubmitted" class="flex-1 flex items-center justify-center px-4 pt-2 pb-3">
+      <div class="max-w-md w-full bg-white border border-slate-200 rounded-3xl px-6 pt-3 pb-5 shadow-xl space-y-4 text-center">
+        
+        <!-- Logo & Title Section -->
+        <div class="flex flex-col items-center justify-center space-y-2">
+          <div class="w-full flex items-center justify-center">
+            <img 
+              :src="logoUrl" 
+              alt="CAMS - Comprehensive Assessment Management System" 
+              class="max-w-full h-30 object-contain mx-auto" 
+            />
+          </div>
 
-      <div>
-        <h2 class="text-xl font-extrabold text-slate-900 tracking-tight">Cadet Examination Portal</h2>
-        <p class="text-xs text-slate-500 mt-0.5">Enter student details and pilot test passcode to start.</p>
-      </div>
-    </div>
+          <div>
+            <h2 class="text-xl font-extrabold text-slate-900 tracking-tight">Cadet Examination Portal</h2>
+            <p class="text-sm text-slate-500 mt-0.5">Enter student details and pilot test passcode to start.</p>
+          </div>
+        </div>
 
-        <div class="space-y-4 text-left">
+        <div class="space-y-3.5 text-left">
           <div>
             <label class="text-[12px] font-bold text-slate-700 block mb-1">Student Number</label>
             <div class="relative">
@@ -379,6 +413,41 @@ onUnmounted(() => {
             </div>
           </div>
 
+          <!-- PROGRAM & CLASS LEVEL SELECTION GRID -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="text-[12px] font-bold text-slate-700 block mb-1">Program</label>
+              <div class="relative">
+                <GraduationCap :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <select 
+                  v-model="selectedProgram"
+                  class="w-full text-sm pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 cursor-pointer"
+                >
+                  <option value="" disabled>Select Program</option>
+                  <option value="BSMT">BSMT</option>
+                  <option value="BSMarE">BSMarE</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="text-[12px] font-bold text-slate-700 block mb-1">Class Level</label>
+              <div class="relative">
+                <Award :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <select 
+                  v-model="selectedClassLevel"
+                  class="w-full text-sm pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 cursor-pointer"
+                >
+                  <option value="" disabled>Select Class</option>
+                  <option value="4th Class">4th Class</option>
+                  <option value="3rd Class">3rd Class</option>
+                  <option value="2nd Class">2nd Class</option>
+                  <option value="1st Class">1st Class</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           <div>
             <label class="text-[12px] font-bold text-slate-700 block mb-1">Access Passcode</label>
             <div class="relative">
@@ -393,7 +462,7 @@ onUnmounted(() => {
 
           <button 
             @click="startExam" 
-            class="w-full py-3 bg-[#123524] hover:bg-[#0e2a1d] text-white font-bold text-sm rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+            class="w-full py-3 bg-[#123524] hover:bg-[#0e2a1d] text-white font-bold text-sm rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 mt-1"
           >
             <span>Begin Examination</span> 
             <Send :size="16" />
@@ -406,8 +475,8 @@ onUnmounted(() => {
     <main v-if="examActive" class="flex-1 max-w-5xl w-full mx-auto p-6 space-y-6">
       <div class="bg-[#123524] text-white rounded-2xl p-4 shadow-md flex justify-between items-center sticky top-4 z-20 border border-emerald-800">
         <div>
-          <h2 class="text-sm font-bold text-white tracking-tight">{{ studentName }} <span class="text-xs font-normal text-slate-200">({{ cadetId }})</span></h2>
-          <span class="text-[11px] text-emerald-400 font-mono font-bold">{{ courseCodeInput }} Examination Paper</span>
+          <h2 class="text-sm font-bold text-white tracking-tight">{{ studentName }} <span class="text-sm font-normal text-slate-200">({{ cadetId }})</span></h2>
+          <span class="text-[11px] text-emerald-400 font-mono font-bold">{{ selectedProgram }} - {{ selectedClassLevel }} | {{ courseCodeInput }}</span>
         </div>
 
         <div class="flex items-center gap-2 bg-white/10 border border-white/20 px-4 py-2 rounded-xl text-emerald-400 font-mono text-sm font-bold">
@@ -420,14 +489,14 @@ onUnmounted(() => {
         <div class="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-col justify-between space-y-6 min-h-95">
           <div class="space-y-4">
             <div class="flex justify-between items-center pb-3 border-b border-slate-100">
-              <span class="text-xs font-mono font-bold bg-slate-100 text-slate-800 px-3 py-1 rounded-lg">
+              <span class="text-sm font-mono font-bold bg-slate-100 text-slate-800 px-3 py-1 rounded-lg">
                 Question {{ currentQuestionIndex + 1 }} of {{ examItems.length }}
               </span>
 
               <button 
                 @click="toggleFlag(currentQuestionIndex)"
                 :class="[
-                  'text-xs font-semibold px-3 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer',
+                  'text-sm font-semibold px-3 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer',
                   flaggedQuestions[currentQuestionIndex] 
                     ? 'bg-amber-100 text-amber-800 border border-amber-300 font-bold' 
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -452,14 +521,14 @@ onUnmounted(() => {
                 :key="optIdx"
                 @click="studentAnswers[currentQuestion.id] = optIdx"
                 :class="[
-                  'w-full text-left p-3.5 rounded-xl border text-xs sm:text-sm font-medium transition-all flex items-center justify-between cursor-pointer',
+                  'w-full text-left p-3.5 rounded-xl border text-sm sm:text-sm font-medium transition-all flex items-center justify-between cursor-pointer',
                   studentAnswers[currentQuestion.id] === optIdx
                     ? 'border-emerald-600 bg-emerald-50 text-emerald-950 font-bold shadow-xs'
                     : 'border-slate-200 hover:border-slate-300 text-slate-700 bg-white hover:bg-slate-50'
                 ]"
               >
                 <span>{{ String.fromCharCode(65 + optIdx) }}. {{ typeof opt === 'string' ? opt : opt.text }}</span>
-                <span v-if="studentAnswers[currentQuestion.id] === optIdx" class="w-5 h-5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xs shrink-0 ml-2">✓</span>
+                <span v-if="studentAnswers[currentQuestion.id] === optIdx" class="w-5 h-5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-sm shrink-0 ml-2">✓</span>
               </button>
             </div>
 
@@ -467,7 +536,7 @@ onUnmounted(() => {
               <button
                 @click="studentAnswers[currentQuestion.id] = 0"
                 :class="[
-                  'flex-1 p-4 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer',
+                  'flex-1 p-4 rounded-xl border text-sm font-bold transition-all text-center cursor-pointer',
                   studentAnswers[currentQuestion.id] === 0 ? 'border-emerald-600 bg-emerald-50 text-emerald-950 shadow-xs' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                 ]"
               >
@@ -476,7 +545,7 @@ onUnmounted(() => {
               <button
                 @click="studentAnswers[currentQuestion.id] = 1"
                 :class="[
-                  'flex-1 p-4 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer',
+                  'flex-1 p-4 rounded-xl border text-sm font-bold transition-all text-center cursor-pointer',
                   studentAnswers[currentQuestion.id] === 1 ? 'border-emerald-600 bg-emerald-50 text-emerald-950 shadow-xs' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                 ]"
               >
@@ -485,14 +554,14 @@ onUnmounted(() => {
             </div>
 
             <div v-else class="space-y-2 pt-2">
-              <div class="flex items-center gap-1.5 text-xs text-slate-500 font-medium mb-1">
+              <div class="flex items-center gap-1.5 text-sm text-slate-500 font-medium mb-1">
                 <Edit3 :size="14" /> Type your written answer below:
               </div>
               <textarea
                 v-model="studentAnswers[currentQuestion.id]"
                 rows="4"
                 placeholder="Provide a detailed explanation or answer..."
-                class="w-full p-3.5 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs sm:text-sm text-slate-800 outline-none transition-all bg-slate-50 focus:bg-white"
+                class="w-full p-3.5 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-sm sm:text-sm text-slate-800 outline-none transition-all bg-slate-50 focus:bg-white"
               ></textarea>
             </div>
           </div>
@@ -501,7 +570,7 @@ onUnmounted(() => {
             <button 
               @click="currentQuestionIndex--"
               :disabled="currentQuestionIndex === 0"
-              class="flex items-center gap-1 px-4 py-2 border border-slate-300 text-slate-700 text-xs font-semibold rounded-xl disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
+              class="flex items-center gap-1 px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-xl disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
             >
               <ChevronLeft :size="16" /> Previous
             </button>
@@ -509,7 +578,7 @@ onUnmounted(() => {
             <button 
               v-if="currentQuestionIndex < examItems.length - 1"
               @click="currentQuestionIndex++"
-              class="flex items-center gap-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl cursor-pointer shadow-xs"
+              class="flex items-center gap-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl cursor-pointer shadow-xs"
             >
               Next <ChevronRight :size="16" />
             </button>
@@ -517,7 +586,7 @@ onUnmounted(() => {
             <button 
               v-else
               @click="promptSubmission"
-              class="flex items-center gap-1 px-5 py-2 bg-[#123524] hover:bg-[#0e2a1d] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+              class="flex items-center gap-1 px-5 py-2 bg-[#123524] hover:bg-[#0e2a1d] text-white text-sm font-bold rounded-xl shadow-xs cursor-pointer"
             >
               Submit Exam
             </button>
@@ -527,7 +596,7 @@ onUnmounted(() => {
         <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-5">
           <div>
             <h3 class="text-sm font-bold text-slate-900">Question Palette</h3>
-            <p class="text-xs text-slate-500">Quickly jump to any question item.</p>
+            <p class="text-sm text-slate-500">Quickly jump to any question item.</p>
           </div>
 
           <div class="grid grid-cols-4 gap-2">
@@ -536,7 +605,7 @@ onUnmounted(() => {
               :key="q.id"
               @click="currentQuestionIndex = idx"
               :class="[
-                'h-10 rounded-xl text-xs font-bold border flex items-center justify-center relative transition-all cursor-pointer',
+                'h-10 rounded-xl text-sm font-bold border flex items-center justify-center relative transition-all cursor-pointer',
                 currentQuestionIndex === idx ? 'ring-2 ring-emerald-500 ring-offset-1' : '',
                 studentAnswers[q.id] !== undefined && studentAnswers[q.id] !== '' ? 'bg-emerald-100 border-emerald-300 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-600'
               ]"
@@ -546,7 +615,7 @@ onUnmounted(() => {
             </button>
           </div>
 
-          <div class="border-t border-slate-100 pt-4 space-y-2 text-xs text-slate-600">
+          <div class="border-t border-slate-100 pt-4 space-y-2 text-sm text-slate-600">
             <div class="flex justify-between">
               <span>Answered:</span>
               <span class="font-bold text-slate-900">{{ answeredCount }} / {{ examItems.length }}</span>
@@ -559,7 +628,7 @@ onUnmounted(() => {
 
           <button 
             @click="promptSubmission"
-            class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+            class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
           >
             Finalize & Submit
           </button>
@@ -576,19 +645,19 @@ onUnmounted(() => {
 
         <div>
           <h3 class="text-base font-bold text-slate-900">Confirm Exam Submission</h3>
-          <p class="text-xs text-slate-500 mt-1">Are you sure you want to submit your examination paper now?</p>
+          <p class="text-sm text-slate-500 mt-1">Are you sure you want to submit your examination paper now?</p>
         </div>
 
-        <div v-if="unansweredCount > 0 || flaggedCount > 0" class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-left text-xs text-amber-900 space-y-1">
+        <div v-if="unansweredCount > 0 || flaggedCount > 0" class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-left text-sm text-amber-900 space-y-1">
           <p v-if="unansweredCount > 0" class="font-semibold">• {{ unansweredCount }} question(s) left unanswered.</p>
           <p v-if="flaggedCount > 0" class="font-semibold">• {{ flaggedCount }} question(s) currently flagged.</p>
         </div>
 
         <div class="flex gap-2 pt-2">
-          <button @click="showConfirmModal = false" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer">
+          <button @click="showConfirmModal = false" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl cursor-pointer">
             Return to Exam
           </button>
-          <button @click="executeSubmission" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer">
+          <button @click="executeSubmission" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs cursor-pointer">
             Yes, Submit
           </button>
         </div>
@@ -606,15 +675,18 @@ onUnmounted(() => {
           <h2 class="text-xl font-bold text-slate-900">
             {{ scoreResults.percentage >= 75 ? 'Assessment Passed' : 'Assessment Completed' }}
           </h2>
-          <p class="text-xs text-slate-500 mt-1">
-            Candidate: <strong class="text-slate-800">{{ studentName }}</strong> | Score: <strong class="text-slate-800">{{ scoreResults.score }} / {{ scoreResults.total }}</strong>
+          <p class="text-sm text-slate-500 mt-1">
+            Candidate: <strong class="text-slate-800">{{ studentName }}</strong> ({{ selectedProgram }} - {{ selectedClassLevel }})
+          </p>
+          <p class="text-sm text-slate-500 mt-0.5">
+            Score: <strong class="text-slate-800">{{ scoreResults.score }} / {{ scoreResults.total }}</strong>
           </p>
         </div>
 
         <div class="border-t border-slate-100 pt-4 space-y-3 text-left">
-          <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">STCW Bloom's Cognitive Competency Breakdown</h3>
+          <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider">STCW Bloom's Cognitive Competency Breakdown</h3>
           <div v-for="(data, bloom) in scoreResults.breakdown" :key="bloom" class="space-y-1">
-            <div class="flex justify-between text-xs font-semibold text-slate-700">
+            <div class="flex justify-between text-sm font-semibold text-slate-700">
               <span>{{ bloom }}</span>
               <span>{{ data.correct }} / {{ data.total }} ({{ Math.round((data.correct / data.total) * 100) }}%)</span>
             </div>
@@ -624,14 +696,14 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <button @click="handleExit" class="w-full py-3 bg-[#123524] hover:bg-[#0e2a1d] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-xs">
-          <LogOut :size="16" /> Return to Login Screen
+        <button @click="handleExit" class="w-full py-3 bg-[#123524] hover:bg-[#0e2a1d] text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-xs">
+          <LogOut :size="16" /> {{ isStaffLoggedIn ? 'Return to Staff Dashboard' : 'Return to Login Screen' }}
         </button>
       </div>
     </main>
 
     <!-- Footer -->
-    <footer class="bg-white border-t border-slate-200 py-3.5 text-center text-[12px] text-slate-500 font-mono">
+    <footer class="bg-white border-t border-slate-200 py-3 text-center text-[12px] text-slate-500 font-mono">
       BALIWAG MARITIME ACADEMY, INC.
     </footer>
 

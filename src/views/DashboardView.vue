@@ -1,45 +1,78 @@
 <template>
-  <div class="p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans text-slate-800 antialiased relative min-h-screen bg-slate-50">
+  <div class="p-4 md:p-6 max-w-8xl mx-auto space-y-6 font-sans text-slate-800 antialiased min-h-screen bg-slate-50">
     
-    <!-- BRANDED SYSTEM LOADING OVERLAY -->
-    <transition
-      enter-active-class="transition ease-out duration-300"
-      enter-from-class="opacity-0 scale-95"
-      enter-to-class="opacity-100 scale-100"
-      leave-active-class="transition ease-in duration-200"
-      leave-from-class="opacity-100 scale-100"
-      leave-to-class="opacity-0 scale-95"
-    >
-      <div 
-        v-if="isLoading" 
-        class="min-h-125 w-full bg-white/90 backdrop-blur-xs border border-slate-100 rounded-3xl p-12 flex flex-col items-center justify-center text-center space-y-5 shadow-xs"
-      >
-        <!-- CAMS Emblem with Radar Pulse Effect -->
-        <div class="relative flex items-center justify-center">
-          <div class="absolute w-20 h-20 bg-emerald-500/10 rounded-full animate-ping"></div>
-          <div class="absolute w-16 h-16 bg-[#123524]/10 rounded-full animate-pulse"></div>
-          
-          <div class="w-14 h-14 bg-[#123524] rounded-2xl flex items-center justify-center font-black text-white text-2xl tracking-wider shadow-xl relative z-10">
-            C
+    <!-- BRANDED SKELETON LOADER -->
+    <div v-if="isLoading" class="space-y-6 animate-pulse">
+      
+      <!-- Top Banner Skeleton -->
+      <div class="bg-linear-to-r from-[#123524] to-[#1b4d35] p-6 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xs">
+        <div class="space-y-2">
+          <div class="flex items-center gap-2">
+            <div class="w-6 h-6 bg-emerald-500/30 rounded-md"></div>
+            <div class="h-6 w-48 bg-white/20 rounded-md"></div>
+          </div>
+          <div class="h-3.5 w-80 bg-white/10 rounded-md"></div>
+        </div>
+        <div class="h-6 w-24 bg-emerald-500/20 rounded-full"></div>
+      </div>
+
+      <!-- Metric Cards Grid Skeleton -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div 
+          v-for="i in 4" 
+          :key="i" 
+          class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex justify-between items-start"
+        >
+          <div class="space-y-2.5">
+            <div class="h-3 w-28 bg-slate-200 rounded-sm"></div>
+            <div class="h-7 w-16 bg-slate-300 rounded-md"></div>
+            <div class="h-3 w-24 bg-slate-200 rounded-sm"></div>
+          </div>
+          <div class="w-10 h-10 bg-emerald-50 border border-emerald-100 rounded-xl"></div>
+        </div>
+      </div>
+
+      <!-- Main Content Grid Skeleton -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Activity Stream Skeleton -->
+        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+          <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+            <div class="h-4 w-44 bg-slate-200 rounded-md"></div>
+            <div class="h-5 w-28 bg-slate-100 rounded-full"></div>
+          </div>
+          <div class="space-y-3.5 divide-y divide-slate-100">
+            <div v-for="i in 4" :key="i" class="pt-3 first:pt-0 flex justify-between items-center">
+              <div class="space-y-1.5">
+                <div class="h-3.5 w-48 bg-slate-200 rounded-md"></div>
+                <div class="h-2.5 w-32 bg-slate-100 rounded-md"></div>
+              </div>
+              <div class="h-6 w-20 bg-slate-200 rounded-lg"></div>
+            </div>
           </div>
         </div>
 
-        <!-- Branding Text & Progress Bar -->
-        <div class="space-y-1.5 max-w-xs">
-          <h3 class="text-base font-bold text-slate-900 tracking-tight">CAMS STCW Portal</h3>
-          <p class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">Synchronizing Operations & Telemetry...</p>
+        <!-- Quick Actions & Status Skeleton -->
+        <div class="space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+            <div class="h-3.5 w-28 bg-slate-200 rounded-md"></div>
+            <div class="grid grid-cols-2 gap-3">
+              <div v-for="i in 4" :key="i" class="h-20 bg-slate-100/80 rounded-2xl border border-slate-200/50"></div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-3">
+            <div class="h-3.5 w-36 bg-slate-200 rounded-md"></div>
+            <div class="h-16 bg-slate-50 border border-slate-200/60 rounded-2xl"></div>
+          </div>
         </div>
 
-        <div class="w-48 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-          <div class="bg-[#123524] h-full rounded-full animate-pulse w-3/4"></div>
-        </div>
-
-        <p class="text-[10px] text-slate-400 font-mono">Baliwag Maritime Academy System</p>
       </div>
-    </transition>
+
+    </div>
 
     <!-- DASHBOARD MAIN CONTENT VIEW -->
-    <div v-show="!isLoading" class="space-y-6">
+    <div v-else class="space-y-6">
       
       <!-- Top Header Hero Banner -->
       <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xs">
@@ -48,7 +81,7 @@
             <LayoutDashboard class="text-emerald-400" :size="22" />
             Welcome back, {{ currentUser.name }}
           </h1>
-          <p class="text-xs text-slate-200 font-normal flex items-center gap-2 flex-wrap">
+          <p class="text-sm text-slate-200 font-normal flex items-center gap-2 flex-wrap">
             <span class="px-2 py-0.5 text-[10px] font-bold bg-emerald-600 text-white rounded-md capitalize font-mono">
               {{ currentUser.role }}
             </span>
@@ -67,7 +100,7 @@
           <div>
             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{{ stat.title }}</p>
             <p class="text-2xl font-extrabold text-slate-900 mt-1">{{ stat.value }}</p>
-            <p class="text-xs font-semibold text-emerald-700 mt-1.5 flex items-center gap-1">
+            <p class="text-sm font-semibold text-emerald-700 mt-1.5 flex items-center gap-1">
               <ArrowUpRight :size="12" /> {{ stat.change }}
             </p>
           </div>
@@ -92,20 +125,20 @@
             </span>
           </div>
 
-          <div v-if="recentActivities.length === 0" class="p-12 text-center text-slate-400 text-xs font-medium space-y-1">
+          <div v-if="recentActivities.length === 0" class="p-12 text-center text-slate-400 text-sm font-medium space-y-1">
             <Clock class="w-8 h-8 mx-auto text-slate-300 mb-2" />
             <p class="font-bold text-slate-700 text-sm">No Recent Operational Activity</p>
-            <p class="text-xs text-slate-400 mt-0.5">Candidate examination submissions will stream here automatically in real time.</p>
+            <p class="text-sm text-slate-400 mt-0.5">Candidate examination submissions will stream here automatically in real time.</p>
           </div>
 
           <div v-else class="divide-y divide-slate-100">
-            <div v-for="act in recentActivities" :key="act.id" class="py-3 flex justify-between items-center text-xs">
+            <div v-for="act in recentActivities" :key="act.id" class="py-3 flex justify-between items-center text-sm">
               <div>
                 <p class="font-bold text-slate-900">{{ act.title }}</p>
                 <p class="text-[11px] text-slate-400">Candidate: <span class="text-slate-700 font-bold">{{ act.user }}</span></p>
               </div>
               <div class="text-right flex items-center gap-3">
-                <span class="font-mono text-xs font-bold text-slate-800">{{ act.score }}</span>
+                <span class="font-mono text-sm font-bold text-slate-800">{{ act.score }}</span>
                 <span :class="[
                   'px-2.5 py-1 rounded-lg font-bold text-[10px] uppercase tracking-wider border',
                   act.isPass ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200'
@@ -120,33 +153,33 @@
         <!-- Quick Actions & Status -->
         <div class="space-y-6">
           <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
-            <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Quick Actions</h3>
+            <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Quick Actions</h3>
             <div class="grid grid-cols-2 gap-3">
               <button @click="router.push('/questions')" class="p-3.5 border border-slate-200 rounded-2xl hover:bg-emerald-50/50 hover:border-emerald-300 transition text-left space-y-2 cursor-pointer group shadow-xs">
                 <HelpCircle class="text-slate-500 group-hover:text-emerald-700 transition" :size="18" />
-                <p class="text-xs font-bold text-slate-800">Question Bank</p>
+                <p class="text-sm font-bold text-slate-800">Question Bank</p>
               </button>
               <button @click="router.push('/test-builder')" class="p-3.5 border border-slate-200 rounded-2xl hover:bg-emerald-50/50 hover:border-emerald-300 transition text-left space-y-2 cursor-pointer group shadow-xs">
                 <FileText class="text-slate-500 group-hover:text-emerald-700 transition" :size="18" />
-                <p class="text-xs font-bold text-slate-800">Test Builder</p>
+                <p class="text-sm font-bold text-slate-800">Test Builder</p>
               </button>
               <button @click="router.push('/reports')" class="p-3.5 border border-slate-200 rounded-2xl hover:bg-emerald-50/50 hover:border-emerald-300 transition text-left space-y-2 cursor-pointer group shadow-xs">
                 <BarChart3 class="text-slate-500 group-hover:text-emerald-700 transition" :size="18" />
-                <p class="text-xs font-bold text-slate-800">Analytics</p>
+                <p class="text-sm font-bold text-slate-800">Analytics</p>
               </button>
               <button @click="router.push('/users')" class="p-3.5 border border-slate-200 rounded-2xl hover:bg-emerald-50/50 hover:border-emerald-300 transition text-left space-y-2 cursor-pointer group shadow-xs">
                 <Settings class="text-slate-500 group-hover:text-emerald-700 transition" :size="18" />
-                <p class="text-xs font-bold text-slate-800">Manage Users</p>
+                <p class="text-sm font-bold text-slate-800">Manage Users</p>
               </button>
             </div>
           </div>
 
           <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3">
-            <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">AI & Security Status</h3>
+            <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">AI & Security Status</h3>
             <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-start gap-2.5">
               <ShieldCheck class="text-emerald-700 shrink-0 mt-0.5" :size="16" />
               <div>
-                <p class="text-xs font-bold text-slate-800">Bloom's Taxonomy Balancer</p>
+                <p class="text-sm font-bold text-slate-800">Bloom's Taxonomy Balancer</p>
                 <p class="text-[10px] text-slate-500 mt-0.5">Active - Cognitive weights validated for all test blueprints.</p>
               </div>
             </div>
@@ -174,10 +207,10 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const isLoading = ref(true)
-const questionsCount = ref(0)
-const pilotSessionsCount = ref(0)
 const coursesCount = ref(0)
+const questionsCount = ref(0)
 const submissionsCount = ref(0)
+const pilotSessionsCount = ref(0)
 const recentActivities = ref([])
 
 // Purge legacy storage key to prevent stale mock course counts
@@ -206,22 +239,7 @@ async function fetchFromApi(endpoint) {
 async function fetchDashboardMetrics() {
   isLoading.value = true
 
-  // 1. Banked Questions Count
-  try {
-    const qData = await fetchFromApi('/questions')
-    let questionList = []
-    if (Array.isArray(qData)) {
-      questionList = qData
-    } else {
-      const local = localStorage.getItem('cams_questions_data')
-      questionList = local ? JSON.parse(local) : []
-    }
-    questionsCount.value = Array.isArray(questionList) ? questionList.length : 0
-  } catch (e) {
-    questionsCount.value = 0
-  }
-
-  // 2. STCW Courses Count (Reads strictly from cams_courses_data)
+  // 1. STCW Courses Count (Reads strictly from cams_courses_data)
   try {
     const cData = await fetchFromApi('/courses')
     let rawCourses = null
@@ -249,23 +267,22 @@ async function fetchDashboardMetrics() {
     coursesCount.value = 0
   }
 
-  // 3. Active Pilot Sessions Count
+  // 2. Banked Questions Count
   try {
-    const pData = await fetchFromApi('/pilot-sessions')
-    let sessionList = []
-    if (Array.isArray(pData)) {
-      sessionList = pData
+    const qData = await fetchFromApi('/questions')
+    let questionList = []
+    if (Array.isArray(qData)) {
+      questionList = qData
     } else {
-      const local = localStorage.getItem('cams_pilot_sessions')
-      sessionList = local ? JSON.parse(local) : []
+      const local = localStorage.getItem('cams_questions_data')
+      questionList = local ? JSON.parse(local) : []
     }
-    sessionList = Array.isArray(sessionList) ? sessionList.filter(s => s && (s.title || s.access_code || s.course_code)) : []
-    pilotSessionsCount.value = sessionList.length
+    questionsCount.value = Array.isArray(questionList) ? questionList.length : 0
   } catch (e) {
-    pilotSessionsCount.value = 0
+    questionsCount.value = 0
   }
 
-  // 4. Exam Submissions & Telemetry Logs
+  // 3. Exam Submissions & Telemetry Logs
   try {
     const sData = await fetchFromApi('/exam-submissions')
     let rawList = []
@@ -290,6 +307,22 @@ async function fetchDashboardMetrics() {
     }
 
     submissionsCount.value = validSubmissions.length
+
+  // 4. Active Pilot Sessions Count
+  try {
+    const pData = await fetchFromApi('/pilot-sessions')
+    let sessionList = []
+    if (Array.isArray(pData)) {
+      sessionList = pData
+    } else {
+      const local = localStorage.getItem('cams_pilot_sessions')
+      sessionList = local ? JSON.parse(local) : []
+    }
+    sessionList = Array.isArray(sessionList) ? sessionList.filter(s => s && (s.title || s.access_code || s.course_code)) : []
+    pilotSessionsCount.value = sessionList.length
+  } catch (e) {
+    pilotSessionsCount.value = 0
+  }
 
     recentActivities.value = validSubmissions.slice(0, 5).map(sub => {
       const formattedDate = sub.submitted_at 
@@ -329,15 +362,7 @@ const currentUser = computed(() => {
 })
 
 const stats = computed(() => [
-  { 
-    title: 'Total Banked Questions', 
-    value: questionsCount.value.toLocaleString(), 
-    change: questionsCount.value > 0 ? `${questionsCount.value} items active` : 'No items banked', 
-    icon: HelpCircle, 
-    color: 'text-emerald-800', 
-    bg: 'bg-emerald-50 border-emerald-200' 
-  },
-  { 
+    { 
     title: 'STCW Course Modules', 
     value: coursesCount.value.toString(), 
     change: coursesCount.value > 0 ? 'Active curriculum' : 'No courses configured', 
@@ -346,18 +371,26 @@ const stats = computed(() => [
     bg: 'bg-emerald-50 border-emerald-200' 
   },
   { 
-    title: 'Active Pilot Sessions', 
-    value: pilotSessionsCount.value.toString(), 
-    change: pilotSessionsCount.value > 0 ? 'Configured & active' : 'No active sessions', 
-    icon: SlidersHorizontal, 
+    title: 'Total Banked Questions', 
+    value: questionsCount.value.toLocaleString(), 
+    change: questionsCount.value > 0 ? `${questionsCount.value} items active` : 'No items banked', 
+    icon: HelpCircle, 
     color: 'text-emerald-800', 
     bg: 'bg-emerald-50 border-emerald-200' 
   },
-  { 
+    { 
     title: 'Total Exam Submissions', 
     value: submissionsCount.value.toString(), 
     change: submissionsCount.value > 0 ? 'Evaluated submissions' : 'No submissions yet', 
     icon: CheckCircle2, 
+    color: 'text-emerald-800', 
+    bg: 'bg-emerald-50 border-emerald-200' 
+  },
+  { 
+    title: 'Active Pilot Sessions', 
+    value: pilotSessionsCount.value.toString(), 
+    change: pilotSessionsCount.value > 0 ? 'Configured & active' : 'No active sessions', 
+    icon: SlidersHorizontal, 
     color: 'text-emerald-800', 
     bg: 'bg-emerald-50 border-emerald-200' 
   }

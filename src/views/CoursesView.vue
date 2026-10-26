@@ -1,45 +1,77 @@
 <template>
-  <div class="p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans text-slate-800 antialiased relative min-h-screen bg-slate-50">
+  <div class="p-4 md:p-6 max-w-8xl mx-auto space-y-6 font-sans text-slate-800 antialiased min-h-screen bg-slate-50">
     
-    <!-- CAMS SYSTEM PRELOADER CARD -->
-    <transition
-      enter-active-class="transition ease-out duration-300"
-      enter-from-class="opacity-0 scale-95"
-      enter-to-class="opacity-100 scale-100"
-      leave-active-class="transition ease-in duration-200"
-      leave-from-class="opacity-100 scale-100"
-      leave-to-class="opacity-0 scale-95"
-    >
-      <div 
-        v-if="isLoading" 
-        class="min-h-125 w-full bg-white/90 backdrop-blur-xs border border-slate-100 rounded-3xl p-12 flex flex-col items-center justify-center text-center space-y-5 shadow-xs"
-      >
-        <!-- CAMS Emblem with Radar Pulse Effect -->
-        <div class="relative flex items-center justify-center">
-          <div class="absolute w-20 h-20 bg-emerald-500/10 rounded-full animate-ping"></div>
-          <div class="absolute w-16 h-16 bg-[#123524]/10 rounded-full animate-pulse"></div>
-          
-          <div class="w-14 h-14 bg-[#123524] rounded-2xl flex items-center justify-center font-black text-white text-2xl tracking-wider shadow-xl relative z-10">
-            C
+    <!-- BRANDED SKELETON LOADER -->
+    <div v-if="isLoading" class="space-y-6 animate-pulse">
+      
+      <!-- Top Banner Skeleton -->
+      <div class="bg-linear-to-r from-[#123524] to-[#1b4d35] p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-xs">
+        <div class="space-y-2">
+          <div class="flex items-center gap-2">
+            <div class="w-6 h-6 bg-emerald-500/30 rounded-md"></div>
+            <div class="h-6 w-64 bg-white/20 rounded-md"></div>
+          </div>
+          <div class="h-3.5 w-96 max-w-full bg-white/10 rounded-md"></div>
+        </div>
+      </div>
+
+      <!-- Course Builder Form Card Skeleton -->
+      <div class="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-6">
+        <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-3 border-b border-slate-100 pb-4">
+          <div class="h-4 w-48 bg-slate-200 rounded-md"></div>
+          <div class="flex items-center gap-2">
+            <div class="h-9 w-36 bg-slate-100 border border-slate-200/60 rounded-xl"></div>
+            <div class="h-9 w-36 bg-slate-200 rounded-xl"></div>
           </div>
         </div>
 
-        <!-- Branding Text & Progress Bar -->
-        <div class="space-y-1.5 max-w-xs">
-          <h3 class="text-base font-bold text-slate-900 tracking-tight">CAMS STCW Portal</h3>
-          <p class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">Synchronizing Course Syllabus Data...</p>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="h-10 bg-slate-100/80 rounded-xl border border-slate-200/50"></div>
+          <div class="h-10 bg-slate-100/80 rounded-xl border border-slate-200/50"></div>
+          <div class="md:col-span-2 h-10 bg-slate-100/80 rounded-xl border border-slate-200/50"></div>
         </div>
 
-        <div class="w-48 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-          <div class="bg-[#123524] h-full rounded-full animate-pulse w-3/4"></div>
+        <div class="space-y-4">
+          <div class="h-10 bg-slate-100/60 rounded-xl"></div>
+          <div class="h-28 bg-slate-50 border border-slate-200/60 rounded-2xl"></div>
         </div>
-
-        <p class="text-[10px] text-slate-400 font-mono">Baliwag Maritime Academy System</p>
       </div>
-    </transition>
+
+      <!-- Toolbar Skeleton -->
+      <div class="bg-white p-4 rounded-2xl flex flex-wrap gap-4 items-center justify-between border border-slate-200/80 shadow-xs">
+        <div class="flex items-center gap-3 flex-1 min-w-72">
+          <div class="h-9 w-64 bg-slate-100 rounded-xl"></div>
+          <div class="h-9 w-32 bg-slate-100 rounded-xl"></div>
+        </div>
+        <div class="h-9 w-40 bg-slate-100 rounded-xl"></div>
+      </div>
+
+      <!-- Collapsible Registry Skeleton -->
+      <div class="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+        <div class="p-4 bg-slate-50 border-b border-slate-200/80">
+          <div class="h-3.5 w-40 bg-slate-200 rounded-md"></div>
+        </div>
+        <div class="divide-y divide-slate-100">
+          <div v-for="i in 3" :key="i" class="p-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-4 h-4 bg-slate-200 rounded"></div>
+              <div class="h-5 w-12 bg-slate-200 rounded"></div>
+              <div class="h-5 w-16 bg-slate-300 rounded"></div>
+              <div class="h-4 w-48 bg-slate-200 rounded"></div>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="h-3 w-16 bg-slate-200 rounded"></div>
+              <div class="w-6 h-6 bg-slate-100 rounded-lg"></div>
+              <div class="w-6 h-6 bg-slate-100 rounded-lg"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
 
     <!-- MAIN COURSES VIEW CONTENT -->
-    <div v-show="!isLoading" class="space-y-6">
+    <div v-else class="space-y-6">
 
       <!-- Module Header Hero Banner -->
       <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-xs">
@@ -48,7 +80,7 @@
             <BookOpen :size="22" class="text-emerald-400" />
             Course Builder & Syllabus Manager
           </h1>
-          <p class="text-xs text-slate-200 font-normal">
+          <p class="text-sm text-slate-200 font-normal">
             Define Programs, Course Codes, Titles, Course Outcomes (COs), and Learning Objectives (LOs) with hours allocation.
           </p>
         </div>
@@ -80,14 +112,14 @@
             <button 
               @click="downloadCSVTemplate" 
               type="button"
-              class="px-3.5 py-2 bg-white hover:bg-emerald-50 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-300 flex items-center gap-2 transition shadow-xs cursor-pointer"
+              class="px-3.5 py-2 bg-white hover:bg-emerald-50 text-emerald-800 text-sm font-bold rounded-xl border border-emerald-300 flex items-center gap-2 transition shadow-xs cursor-pointer"
             >
               <Download :size="14" class="text-emerald-700" />
               Download .CSV Template
             </button>
 
             <label 
-              class="px-3.5 py-2 bg-[#123524] hover:bg-[#0e2a1d] text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-xs"
+              class="px-3.5 py-2 bg-[#123524] hover:bg-[#0e2a1d] text-white text-sm font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-xs"
             >
               <Upload :size="14" /> 
               <span>{{ isUploadingBulk ? 'Uploading...' : 'Bulk Upload CSV' }}</span>
@@ -105,7 +137,7 @@
             <button 
               v-if="editingCourseId" 
               @click="cancelEdit" 
-              class="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1 font-bold bg-slate-100 px-3 py-2 rounded-xl border border-slate-200 cursor-pointer"
+              class="text-sm text-slate-600 hover:text-slate-900 flex items-center gap-1 font-bold bg-slate-100 px-3 py-2 rounded-xl border border-slate-200 cursor-pointer"
             >
               <RotateCcw :size="14" /> Cancel Edit
             </button>
@@ -114,38 +146,38 @@
 
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Target Program</label>
-            <select v-model="courseProgram" class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer text-slate-900">
+            <label class="block text-sm font-bold text-slate-700 mb-1">Target Program</label>
+            <select v-model="courseProgram" class="w-full text-sm p-2.5 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer text-slate-900">
               <option value="BSMT">BSMT</option>
               <option value="BSMarE">BSMarE</option>
               <option value="Both">Both (BSMT & BSMarE)</option>
             </select>
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Course Code</label>
-            <input v-model="courseCode" placeholder="e.g. NAV1" class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-mono font-bold focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900" />
+            <label class="block text-sm font-bold text-slate-700 mb-1">Course Code</label>
+            <input v-model="courseCode" placeholder="e.g. NAV1" class="w-full text-sm p-2.5 border border-slate-200 rounded-xl font-mono font-bold focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900" />
           </div>
           <div class="md:col-span-2">
-            <label class="block text-xs font-bold text-slate-700 mb-1">Course Descriptive Title</label>
-            <input v-model="courseTitle" placeholder="e.g. Navigational Instruments with Compasses" class="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 font-medium" />
+            <label class="block text-sm font-bold text-slate-700 mb-1">Course Descriptive Title</label>
+            <input v-model="courseTitle" placeholder="e.g. Navigational Instruments with Compasses" class="w-full text-sm p-2.5 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 font-medium" />
           </div>
         </div>
 
         <div class="space-y-6">
           <div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
-            <span class="text-xs font-bold text-slate-800">Course Outcomes (CO) & Objectives (LO) Breakdown</span>
-            <span class="text-xs font-bold text-emerald-800 flex items-center gap-1 font-mono">
+            <span class="text-sm font-bold text-slate-800">Course Outcomes (CO) & Objectives (LO) Breakdown</span>
+            <span class="text-sm font-bold text-emerald-800 flex items-center gap-1 font-mono">
               <Clock :size="14" /> Total Hours: {{ totalCourseHours }} hrs
             </span>
           </div>
 
           <div v-for="(co, coIndex) in courseOutcomes" :key="coIndex" class="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 space-y-4">
             <div class="flex items-center gap-3">
-              <span class="px-2.5 py-1 bg-[#123524] text-white font-mono text-xs font-bold rounded-lg">{{ co.id }}</span>
+              <span class="px-2.5 py-1 bg-[#123524] text-white font-mono text-sm font-bold rounded-lg">{{ co.id }}</span>
               <input 
                 v-model="co.title" 
                 :placeholder="`Course Outcome ${coIndex + 1} Description`" 
-                class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-semibold bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900"
+                class="w-full text-sm p-2.5 border border-slate-200 rounded-xl font-semibold bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900"
               />
               <button @click="removeCourseOutcome(coIndex)" class="text-rose-500 hover:text-rose-700 p-1 cursor-pointer">
                 <Trash2 :size="16" />
@@ -155,24 +187,24 @@
             <div class="pl-6 border-l-2 border-emerald-600 space-y-3">
               <div class="flex justify-between items-center">
                 <label class="text-[11px] font-bold text-slate-600 uppercase">Learning Objectives (LO) & Hours</label>
-                <button @click="addLearningOutcome(coIndex)" class="text-xs text-emerald-800 font-bold hover:underline cursor-pointer">+ Add LO</button>
+                <button @click="addLearningOutcome(coIndex)" class="text-sm text-emerald-800 font-bold hover:underline cursor-pointer">+ Add LO</button>
               </div>
 
               <div v-for="(lo, loIndex) in co.learningOutcomes" :key="loIndex" class="flex items-center gap-3">
-                <span class="text-xs font-mono font-bold text-slate-500 w-12">{{ lo.id }}</span>
+                <span class="text-sm font-mono font-bold text-slate-500 w-12">{{ lo.id }}</span>
                 <input 
                   v-model="lo.description" 
-                  placeholder="Learning Objective Description" 
-                  class="w-full text-xs p-2 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 font-medium"
+                  placeholder="Learning Objective 1 Description" 
+                  class="w-full text-sm p-2 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 font-medium"
                 />
                 <div class="flex items-center gap-1 min-w-28">
                   <input 
                     type="number" 
                     v-model="lo.hours" 
                     min="0"
-                    class="w-16 text-xs p-2 border border-slate-200 rounded-xl text-center font-bold bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900" 
+                    class="w-16 text-sm p-2 border border-slate-200 rounded-xl text-center font-bold bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900" 
                   />
-                  <span class="text-xs text-slate-500 font-medium">hrs</span>
+                  <span class="text-sm text-slate-500 font-medium">hrs</span>
                 </div>
                 <button @click="removeLearningOutcome(coIndex, loIndex)" class="text-slate-400 hover:text-rose-600 p-1 cursor-pointer">
                   <Trash2 :size="14" />
@@ -181,7 +213,7 @@
             </div>
           </div>
 
-          <button @click="addCourseOutcome" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer">
+          <button @click="addCourseOutcome" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-sm font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer">
             <Plus :size="14" /> Add Another Course Outcome (CO)
           </button>
         </div>
@@ -192,7 +224,7 @@
           class="border-t border-slate-200 pt-5 space-y-4"
         >
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <h3 class="text-xs font-bold text-slate-800">
+            <h3 class="text-sm font-bold text-slate-800">
               CSV Course Import
             </h3>
 
@@ -206,13 +238,13 @@
 
           <p 
             v-if="csvParseError" 
-            class="text-xs text-rose-600 font-semibold"
+            class="text-sm text-rose-600 font-semibold"
           >
             {{ csvParseError }}
           </p>
 
           <div v-if="bulkPreview.length > 0" class="space-y-4">
-            <h3 class="text-xs font-bold text-slate-800">
+            <h3 class="text-sm font-bold text-slate-800">
               Parsed Course Preview ({{ bulkPreview.length }} Courses)
             </h3>
 
@@ -223,13 +255,13 @@
                 class="border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-2"
               >
                 <div class="flex items-center gap-2">
-                  <span class="px-2 py-0.5 bg-[#123524] text-white font-mono text-xs font-bold rounded">
+                  <span class="px-2 py-0.5 bg-[#123524] text-white font-mono text-sm font-bold rounded">
                     {{ c.program || 'BSMT' }}
                   </span>
-                  <span class="px-2 py-0.5 bg-slate-200 text-slate-800 font-mono text-xs font-bold rounded">
+                  <span class="px-2 py-0.5 bg-slate-200 text-slate-800 font-mono text-sm font-bold rounded">
                     {{ c.code }}
                   </span>
-                  <span class="text-xs font-bold text-slate-900">
+                  <span class="text-sm font-bold text-slate-900">
                     {{ c.title }}
                   </span>
                 </div>
@@ -238,7 +270,7 @@
                   <div 
                     v-for="co in c.courseOutcomes" 
                     :key="co.id" 
-                    class="text-xs"
+                    class="text-sm"
                   >
                     <span class="font-bold text-slate-700">
                       {{ co.id }}: {{ co.title }}
@@ -263,7 +295,7 @@
 
             <button 
               @click="submitBulkCourses" 
-              class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+              class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl shadow-xs cursor-pointer"
             >
               Import All {{ bulkPreview.length }} Courses
             </button>
@@ -273,7 +305,7 @@
         <div class="flex items-center gap-3 pt-2">
           <button 
             @click="handleSaveCourse" 
-            class="px-6 py-2.5 text-xs font-bold text-white rounded-xl shadow-xs transition-colors cursor-pointer"
+            class="px-6 py-2.5 text-sm font-bold text-white rounded-xl shadow-xs transition-colors cursor-pointer"
             :class="editingCourseId ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
           >
             {{ editingCourseId ? 'Update Syllabus & Structure' : 'Save Syllabus & Structure' }}
@@ -281,7 +313,7 @@
           <button 
             v-if="editingCourseId" 
             @click="cancelEdit" 
-            class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-300 cursor-pointer"
+            class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-xl border border-slate-300 cursor-pointer"
           >
             Cancel
           </button>
@@ -293,12 +325,12 @@
         <div class="flex items-center gap-3 flex-1 min-w-72">
           <div class="relative w-full max-w-xs">
             <Search class="absolute left-3 top-2.5 text-slate-400" :size="14" />
-            <input v-model="searchQuery" placeholder="Search course code or title..." class="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs bg-slate-50 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800" />
+            <input v-model="searchQuery" placeholder="Search course code or title..." class="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800" />
           </div>
 
-          <div class="flex items-center gap-1.5 text-slate-700 font-bold text-xs">
+          <div class="flex items-center gap-1.5 text-slate-700 font-bold text-sm">
             <Filter :size="14" />
-            <select v-model="filterProgram" class="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 outline-none cursor-pointer font-bold text-slate-800">
+            <select v-model="filterProgram" class="p-2 border border-slate-200 rounded-xl text-sm bg-slate-50 outline-none cursor-pointer font-bold text-slate-800">
               <option value="All">All Programs</option>
               <option value="BSMT">BSMT Only</option>
               <option value="BSMarE">BSMarE Only</option>
@@ -307,10 +339,10 @@
           </div>
         </div>
 
-        <div class="flex items-center gap-2 font-bold text-slate-700 text-xs">
+        <div class="flex items-center gap-2 font-bold text-slate-700 text-sm">
           <ArrowUpDown :size="14" />
           <span>Sort By:</span>
-          <select v-model="sortBy" class="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 outline-none cursor-pointer font-bold text-slate-800">
+          <select v-model="sortBy" class="p-2 border border-slate-200 rounded-xl text-sm bg-slate-50 outline-none cursor-pointer font-bold text-slate-800">
             <option value="code">Course Code</option>
             <option value="title">Course Title</option>
           </select>
@@ -320,10 +352,10 @@
       <!-- Collapsible Course Registry -->
       <div class="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
         <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-          <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Registered Courses ({{ filteredAndSortedCourses.length }})</h3>
+          <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Registered Courses ({{ filteredAndSortedCourses.length }})</h3>
         </div>
 
-        <div v-if="filteredAndSortedCourses.length === 0" class="p-8 text-center text-slate-500 text-xs">
+        <div v-if="filteredAndSortedCourses.length === 0" class="p-8 text-center text-slate-500 text-sm">
           No courses found matching your filter criteria.
         </div>
 
@@ -346,8 +378,8 @@
                       }">
                   {{ c.program || 'BSMT' }}
                 </span>
-                <span class="px-2 py-0.5 bg-[#123524] text-white font-mono text-xs font-bold rounded-md">{{ c.code }}</span>
-                <span class="text-xs font-bold text-slate-900">{{ c.title }}</span>
+                <span class="px-2 py-0.5 bg-[#123524] text-white font-mono text-sm font-bold rounded-md">{{ c.code }}</span>
+                <span class="text-sm font-bold text-slate-900">{{ c.title }}</span>
               </button>
 
               <div class="flex items-center gap-3">
@@ -373,14 +405,14 @@
 
             <!-- Course Level Collapsible Content -->
             <div v-if="expandedCourses.has(c.id)" class="px-6 pb-4 pt-1 bg-slate-50/50 space-y-3 border-t border-slate-100">
-              <div v-if="!c.courseOutcomes || c.courseOutcomes.length === 0" class="text-xs text-slate-400 italic py-2">
+              <div v-if="!c.courseOutcomes || c.courseOutcomes.length === 0" class="text-sm text-slate-400 italic py-2">
                 No course outcomes defined.
               </div>
 
               <!-- Course Outcome Level Accordion -->
               <div v-for="co in c.courseOutcomes" :key="co.id" class="border border-slate-200 rounded-xl bg-white overflow-hidden shadow-xs">
-                <button @click="toggleOutcome(`${c.id}-${co.id}`)" class="w-full p-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer">
-                  <div class="flex items-center gap-2 text-xs">
+                <button @click="toggleOutcome(`${c.id}-${co.id}`)" class="w-full p-2.5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer">
+                  <div class="flex items-center gap-2 text-sm">
                     <component :is="expandedOutcomes.has(`${c.id}-${co.id}`) ? ChevronDown : ChevronRight" :size="16" class="text-slate-400" />
                     <span class="font-bold text-slate-800">{{ co.id }}:</span>
                     <span class="text-slate-700 font-medium">{{ co.title }}</span>
@@ -390,7 +422,7 @@
 
                 <!-- Learning Outcomes Collapsible Content -->
                 <div v-if="expandedOutcomes.has(`${c.id}-${co.id}`)" class="p-3 bg-slate-50/60 border-t border-slate-100 space-y-2 pl-8">
-                  <div v-for="lo in co.learningOutcomes" :key="lo.id" class="flex justify-between items-center text-xs">
+                  <div v-for="lo in co.learningOutcomes" :key="lo.id" class="flex justify-between items-center text-sm">
                     <div class="flex items-start gap-2 text-slate-700">
                       <span class="font-mono font-bold text-emerald-700 min-w-12">{{ lo.id }}:</span>
                       <span>{{ lo.description }}</span>
@@ -399,7 +431,7 @@
                       {{ lo.hours }} hrs
                     </span>
                   </div>
-                  <div v-if="!co.learningOutcomes || co.learningOutcomes.length === 0" class="text-xs text-slate-400 italic">
+                  <div v-if="!co.learningOutcomes || co.learningOutcomes.length === 0" class="text-sm text-slate-400 italic">
                     No learning outcomes attached.
                   </div>
                 </div>

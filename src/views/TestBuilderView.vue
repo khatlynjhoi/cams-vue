@@ -1,45 +1,71 @@
 <template>
-  <div class="p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans text-slate-800 antialiased relative min-h-screen bg-slate-50">
+  <div class="p-4 md:p-6 max-w-8xl mx-auto space-y-6 font-sans text-slate-800 antialiased relative min-h-screen bg-slate-50">
     
-    <!-- BRANDED SYSTEM PRELOADER CARD -->
-    <transition
-      enter-active-class="transition ease-out duration-300"
-      enter-from-class="opacity-0 scale-95"
-      enter-to-class="opacity-100 scale-100"
-      leave-active-class="transition ease-in duration-200"
-      leave-from-class="opacity-100 scale-100"
-      leave-to-class="opacity-0 scale-95"
-    >
-      <div 
-        v-if="isLoading" 
-        class="min-h-125 w-full bg-white/90 backdrop-blur-xs border border-slate-100 rounded-3xl p-12 flex flex-col items-center justify-center text-center space-y-5 shadow-xs"
-      >
-        <!-- CAMS Emblem with Radar Pulse Effect -->
-        <div class="relative flex items-center justify-center">
-          <div class="absolute w-20 h-20 bg-emerald-500/10 rounded-full animate-ping"></div>
-          <div class="absolute w-16 h-16 bg-[#123524]/10 rounded-full animate-pulse"></div>
-          
-          <div class="w-14 h-14 bg-[#123524] rounded-2xl flex items-center justify-center font-black text-white text-2xl tracking-wider shadow-xl relative z-10">
-            C
+    <!-- BRANDED SKELETON LOADER -->
+    <div v-if="isLoading" class="space-y-6 animate-pulse">
+      
+      <!-- Top Banner Skeleton -->
+      <div class="bg-linear-to-r from-[#123524] to-[#1b4d35] p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-xs">
+        <div class="space-y-2">
+          <div class="flex items-center gap-2">
+            <div class="w-6 h-6 bg-emerald-500/30 rounded-md"></div>
+            <div class="h-6 w-80 max-w-full bg-white/20 rounded-md"></div>
+          </div>
+          <div class="h-3.5 w-96 max-w-full bg-white/10 rounded-md"></div>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="h-10 w-36 bg-white/10 rounded-xl"></div>
+          <div class="h-10 w-36 bg-white/10 rounded-xl"></div>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs Skeleton -->
+      <div class="flex items-center gap-3 border-b border-slate-200 pb-3">
+        <div class="h-10 w-36 bg-slate-200 rounded-full"></div>
+        <div class="h-10 w-44 bg-slate-100 rounded-full"></div>
+      </div>
+
+      <!-- Grid Layout Skeleton -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left Column Skeleton -->
+        <div class="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-5">
+          <div class="h-5 w-40 bg-slate-200 rounded-md"></div>
+          <div class="space-y-4">
+            <div v-for="i in 5" :key="i" class="space-y-2">
+              <div class="h-3.5 w-24 bg-slate-200 rounded-md"></div>
+              <div class="h-10 bg-slate-100 rounded-xl"></div>
+            </div>
           </div>
         </div>
 
-        <!-- Branding Text & Progress Bar -->
-        <div class="space-y-1.5 max-w-xs">
-          <h3 class="text-base font-bold text-slate-900 tracking-tight">CAMS STCW Portal</h3>
-          <p class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">Synchronizing Exam Builder...</p>
-        </div>
+        <!-- Right Column Skeleton -->
+        <div class="lg:col-span-2 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-6">
+          <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+            <div class="space-y-2">
+              <div class="h-5 w-48 bg-slate-200 rounded-md"></div>
+              <div class="h-3.5 w-64 bg-slate-100 rounded-md"></div>
+            </div>
+            <div class="h-9 w-44 bg-slate-200 rounded-xl"></div>
+          </div>
 
-        <div class="w-48 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-          <div class="bg-[#123524] h-full rounded-full animate-pulse w-3/4"></div>
+          <div class="space-y-3">
+            <div v-for="i in 3" :key="i" class="p-4 border border-slate-200/80 rounded-2xl bg-slate-50/50 space-y-3">
+              <div class="flex items-center gap-2">
+                <div class="h-5 w-8 bg-slate-200 rounded"></div>
+                <div class="h-5 w-16 bg-slate-300 rounded"></div>
+                <div class="h-5 w-16 bg-slate-200 rounded"></div>
+                <div class="h-5 w-20 bg-emerald-100 rounded"></div>
+              </div>
+              <div class="h-4 w-5/6 bg-slate-200 rounded"></div>
+            </div>
+          </div>
         </div>
-
-        <p class="text-[10px] text-slate-400 font-mono">Baliwag Maritime Academy System</p>
       </div>
-    </transition>
+
+    </div>
 
     <!-- MAIN VIEW CONTENT -->
-    <div v-show="!isLoading" class="space-y-6">
+    <div v-else class="space-y-6">
 
       <!-- Header Hero Banner -->
       <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-xs">
@@ -48,7 +74,7 @@
             <FileText class="text-emerald-400" :size="22" />
             Assessment Examination Builder
           </h1>
-          <p class="text-xs text-slate-200 font-normal">
+          <p class="text-sm text-slate-200 font-normal">
             Assemble examinations and auto-populate blueprints directly from accurate Question Bank data.
           </p>
         </div>
@@ -57,7 +83,7 @@
           <button 
             v-if="activeTab === 'builder'"
             @click="isAiModalOpen = true"
-            class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-2 transition shadow-xs cursor-pointer"
+            class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl flex items-center gap-2 transition shadow-xs cursor-pointer"
           >
             <Sparkles :size="14" />
             <span>AI Auto-Assemble</span>
@@ -66,7 +92,7 @@
           <button 
             v-if="activeTab === 'builder'"
             @click="saveTest"
-            class="px-4 py-2.5 bg-[#123524] hover:bg-[#0e2a1d] text-white text-xs font-bold rounded-xl flex items-center gap-2 transition shadow-xs border border-emerald-500/30 cursor-pointer"
+            class="px-4 py-2.5 bg-[#123524] hover:bg-[#0e2a1d] text-white text-sm font-bold rounded-xl flex items-center gap-2 transition shadow-xs border border-emerald-500/30 cursor-pointer"
           >
             <Save :size="14" />
             <span>Save Test Blueprint</span>
@@ -79,7 +105,7 @@
         <button 
           @click="activeTab = 'builder'"
           :class="[
-            'px-5 py-2.5 rounded-full font-bold text-xs flex items-center gap-2 transition-all cursor-pointer',
+            'px-5 py-2.5 rounded-full font-bold text-sm flex items-center gap-2 transition-all cursor-pointer',
             activeTab === 'builder' 
               ? 'bg-[#123524] text-white shadow-xs' 
               : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-xs'
@@ -92,7 +118,7 @@
         <button 
           @click="activeTab = 'saved'"
           :class="[
-            'px-5 py-2.5 rounded-full font-bold text-xs flex items-center gap-2 transition-all cursor-pointer',
+            'px-5 py-2.5 rounded-full font-bold text-sm flex items-center gap-2 transition-all cursor-pointer',
             activeTab === 'saved' 
               ? 'bg-[#123524] text-white shadow-xs' 
               : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-xs'
@@ -123,11 +149,11 @@
 
           <div class="space-y-4">
             <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Target Program</label>
+              <label class="block text-sm font-bold text-slate-700 mb-1">Target Program</label>
               <select 
                 v-model="examConfig.program" 
                 @change="onProgramChange"
-                class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer text-slate-900"
+                class="w-full text-sm p-2 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer text-slate-900"
               >
                 <option value="" disabled selected>Select Program</option>
                 <option value="BSMT">BSMT (Bachelor of Science in Marine Transportation)</option>
@@ -137,11 +163,11 @@
 
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Academic Year</label>
+                <label class="block text-sm font-bold text-slate-700 mb-1">Academic Year</label>
                 <select 
                   v-model="examConfig.academicYear" 
                   @change="updateExamTitle"
-                  class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer text-slate-900"
+                  class="w-full text-sm p-2 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer text-slate-900"
                 >
                   <option value="" disabled selected>Select Academic Year</option>
                   <option v-for="ay in academicYears" :key="ay" :value="ay">AY {{ ay }}</option>
@@ -149,11 +175,11 @@
               </div>
 
               <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Semester</label>
+                <label class="block text-sm font-bold text-slate-700 mb-1">Semester</label>
                 <select 
                   v-model="examConfig.semester" 
                   @change="updateExamTitle"
-                  class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer text-slate-900"
+                  class="w-full text-sm p-2 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer text-slate-900"
                 >
                   <option value="" disabled selected>Select Semester</option>
                   <option value="First Semester">First Semester</option>
@@ -164,12 +190,12 @@
             </div>
 
             <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Course / Subject</label>
+              <label class="block text-sm font-bold text-slate-700 mb-1">Course / Subject</label>
               <select 
                 v-model="examConfig.course" 
                 @change="onCourseChange"
                 :disabled="isLoadingCourses"
-                class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer disabled:opacity-50 text-slate-900"
+                class="w-full text-sm p-2 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer disabled:opacity-50 text-slate-900"
               >
                 <option value="" disabled selected>Select Course</option>
                 <option v-if="isLoadingCourses" value="" disabled>Loading registered courses...</option>
@@ -181,11 +207,11 @@
             </div>
 
             <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Assessment Term</label>
+              <label class="block text-sm font-bold text-slate-700 mb-1">Assessment Term</label>
               <select 
                 v-model="examConfig.term" 
                 @change="updateExamTitle"
-                class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer text-slate-900"
+                class="w-full text-sm p-2 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer text-slate-900"
               >
                 <option value="" disabled selected>Select Term</option>
                 <option value="Midterm Exam">Midterm Exam</option>
@@ -194,37 +220,37 @@
             </div>
 
             <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Assessment Title</label>
+              <label class="block text-sm font-bold text-slate-700 mb-1">Assessment Title</label>
               <input 
                 v-model="examConfig.title" 
                 type="text" 
                 placeholder="Select Course and Term to auto-generate title"
-                class="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-slate-900 bg-slate-50 focus:bg-white"
+                class="w-full text-sm p-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-slate-900 bg-slate-50 focus:bg-white"
               />
             </div>
 
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Time Limit (Mins)</label>
+                <label class="block text-sm font-bold text-slate-700 mb-1">Time Limit (Mins)</label>
                 <input 
                   v-model.number="examConfig.durationMinutes" 
                   type="number" 
-                  class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold text-center focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white text-slate-900"
+                  class="w-full text-sm p-2 border border-slate-200 rounded-xl font-bold text-center focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white text-slate-900"
                 />
               </div>
 
               <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Passing Mark (%)</label>
+                <label class="block text-sm font-bold text-slate-700 mb-1">Passing Mark (%)</label>
                 <input 
                   v-model.number="examConfig.passingScorePercent" 
                   type="number" 
-                  class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold text-center focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white text-slate-900"
+                  class="w-full text-sm p-2 border border-slate-200 rounded-xl font-bold text-center focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white text-slate-900"
                 />
               </div>
             </div>
           </div>
 
-          <div class="border-t border-slate-100 pt-4 space-y-2.5 text-xs text-slate-600">
+          <div class="border-t border-slate-100 pt-4 space-y-2.5 text-sm text-slate-600">
             <div class="flex justify-between items-center">
               <span class="font-semibold">Total Exam Items:</span>
               <span class="font-bold text-slate-900 bg-slate-100 px-2.5 py-0.5 rounded-full font-mono text-[11px]">{{ totalItemsCount }} Questions</span>
@@ -242,7 +268,7 @@
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
               <div>
                 <h2 class="text-sm font-bold text-slate-900 tracking-tight">Assembled Test Blueprint</h2>
-                <p class="text-xs text-slate-500">
+                <p class="text-sm text-slate-500">
                   Course: <span class="font-bold text-emerald-800">{{ examConfig.course || 'None Selected' }}</span> | 
                   Term: <span class="font-bold text-slate-700">{{ examConfig.term || 'None Selected' }}</span>
                 </p>
@@ -252,23 +278,23 @@
                 <button 
                   @click="isQuestionModalOpen = true"
                   :disabled="!examConfig.course"
-                  class="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed text-emerald-800 border border-emerald-300 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  class="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed text-emerald-800 border border-emerald-300 font-bold text-sm rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   <Plus :size="14" />
                   <span>Add from Question Bank</span>
                 </button>
 
-                <span class="text-xs font-bold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl border border-slate-200">
+                <span class="text-sm font-bold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl border border-slate-200">
                   {{ totalItemsCount }} Selected
                 </span>
               </div>
             </div>
 
-            <div v-if="isLoadingQuestions" class="p-8 text-center text-slate-500 text-xs font-semibold animate-pulse">
+            <div v-if="isLoadingQuestions" class="p-8 text-center text-slate-500 text-sm font-semibold animate-pulse">
               Loading question bank items for {{ examConfig.course }}...
             </div>
 
-            <div v-else-if="selectedItems.length === 0" class="p-8 text-center text-slate-400 text-xs italic bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            <div v-else-if="selectedItems.length === 0" class="p-8 text-center text-slate-400 text-sm italic bg-slate-50 rounded-2xl border border-dashed border-slate-200">
               No questions selected for this exam. Click "Add from Question Bank" or use AI Auto-Assemble.
             </div>
 
@@ -280,7 +306,7 @@
               >
                 <div class="space-y-2 flex-1">
                   <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-xs font-mono font-bold text-slate-400">#{{ idx + 1 }}</span>
+                    <span class="text-sm font-mono font-bold text-slate-400">#{{ idx + 1 }}</span>
                     <span class="px-2 py-0.5 bg-[#123524] text-white font-mono text-[11px] font-bold rounded-md">
                       {{ item.code }}
                     </span>
@@ -317,7 +343,7 @@
                       {{ item.type }}
                     </span>
                   </div>
-                  <p class="text-xs font-semibold text-slate-800 pt-0.5 leading-relaxed">{{ item.text }}</p>
+                  <p class="text-sm font-semibold text-slate-800 pt-0.5 leading-relaxed">{{ item.text }}</p>
                   
                   <!-- Attachment Image Preview in Builder List -->
                   <div v-if="getQuestionImage(item)" class="pt-1">
@@ -336,7 +362,7 @@
                       v-model.number="item.points" 
                       type="number" 
                       min="1" 
-                      class="w-14 border border-slate-200 rounded-xl text-center text-xs font-bold py-1 outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                      class="w-14 border border-slate-200 rounded-xl text-center text-sm font-bold py-1 outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
                     />
                   </div>
 
@@ -355,7 +381,7 @@
           <div class="pt-4 border-t border-slate-100 flex justify-end">
             <button 
               @click="saveTest" 
-              class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+              class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
             >
               <Save :size="14" />
               <span>Save Test Blueprint</span>
@@ -377,14 +403,14 @@
                 v-model="savedSearchQuery"
                 type="text"
                 placeholder="Search by title, course, or program..."
-                class="w-full text-xs pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800"
+                class="w-full text-sm pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800"
               />
             </div>
 
             <div>
               <select 
                 v-model="savedFilterProgram"
-                class="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                class="w-full text-sm p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-emerald-500 cursor-pointer"
               >
                 <option value="">All Programs</option>
                 <option v-for="p in uniqueSavedPrograms" :key="p" :value="p">{{ p }}</option>
@@ -394,7 +420,7 @@
             <div>
               <select 
                 v-model="savedFilterCourse"
-                class="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                class="w-full text-sm p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-emerald-500 cursor-pointer"
               >
                 <option value="">All Courses</option>
                 <option v-for="c in uniqueSavedCourses" :key="c" :value="c">{{ c }}</option>
@@ -404,7 +430,7 @@
             <div>
               <select 
                 v-model="savedSortBy"
-                class="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                class="w-full text-sm p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-emerald-500 cursor-pointer"
               >
                 <option value="newest">Sort: Newest First</option>
                 <option value="oldest">Sort: Oldest First</option>
@@ -414,7 +440,7 @@
             </div>
           </div>
 
-          <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+          <div class="flex items-center justify-between text-sm pt-1 border-t border-slate-100">
             <span class="text-slate-500 font-medium">
               Showing <strong class="text-slate-800 font-bold">{{ filteredSavedTests.length }}</strong> of {{ savedTests.length }} saved test(s)
             </span>
@@ -436,12 +462,12 @@
             <List :size="24" />
           </div>
           <h3 class="text-sm font-bold text-slate-800">No Saved Tests Match Criteria</h3>
-          <p class="text-xs text-slate-500 max-w-sm mx-auto">
+          <p class="text-sm text-slate-500 max-w-sm mx-auto">
             Try adjusting or clearing your search filters, or construct a new examination blueprint in the Test Builder.
           </p>
           <button 
             @click="resetSavedFilters"
-            class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+            class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-xl transition cursor-pointer"
           >
             Reset Filters
           </button>
@@ -470,7 +496,7 @@
 
               <h3 class="text-base font-bold text-slate-900 leading-snug">{{ test.title }}</h3>
 
-              <p class="text-xs text-slate-500 font-medium">
+              <p class="text-sm text-slate-500 font-medium">
                 Course: <strong class="text-emerald-800 font-bold">{{ test.course }}</strong>
                 <span v-if="test.academicYear"> | AY: {{ test.academicYear }}</span>
                 <span v-if="test.semester"> ({{ test.semester }})</span>
@@ -478,20 +504,20 @@
             </div>
 
             <!-- Stats Metadata Pills -->
-            <div class="flex items-center gap-3 shrink-0 text-xs">
+            <div class="flex items-center gap-3 shrink-0 text-sm">
               <div class="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-center">
                 <span class="block text-[10px] text-slate-400 font-bold uppercase">Items</span>
-                <span class="font-bold text-slate-800 font-mono text-xs">{{ test.totalItems }} Questions</span>
+                <span class="font-bold text-slate-800 font-mono text-sm">{{ test.totalItems }} Questions</span>
               </div>
 
               <div class="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-center">
                 <span class="block text-[10px] text-slate-400 font-bold uppercase">Marks</span>
-                <span class="font-bold text-emerald-800 font-mono text-xs">{{ test.totalPoints }} Points</span>
+                <span class="font-bold text-emerald-800 font-mono text-sm">{{ test.totalPoints }} Points</span>
               </div>
 
               <div class="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-center">
                 <span class="block text-[10px] text-slate-400 font-bold uppercase">Time</span>
-                <span class="font-bold text-slate-800 text-xs">{{ test.durationMinutes }} Mins</span>
+                <span class="font-bold text-slate-800 text-sm">{{ test.durationMinutes }} Mins</span>
               </div>
             </div>
 
@@ -499,7 +525,7 @@
             <div class="flex items-center gap-2 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-4 shrink-0">
               <button 
                 @click="viewSavedTestDetails(test)"
-                class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
                 title="Open Exam Preview Modal"
               >
                 <Eye :size="14" />
@@ -508,7 +534,7 @@
 
               <button 
                 @click="loadTestToBuilder(test)"
-                class="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                class="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-sm font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer"
                 title="Edit in Test Builder"
               >
                 <FileText :size="14" />
@@ -538,7 +564,7 @@
             <BookOpen :size="20" class="text-emerald-400" />
             <div>
               <h3 class="text-base font-bold text-white">Select Questions from Question Bank</h3>
-              <p class="text-xs text-slate-200">
+              <p class="text-sm text-slate-200">
                 Course: <span class="font-bold text-emerald-300">{{ examConfig.course }}</span> (Approved Only)
               </p>
             </div>
@@ -555,7 +581,7 @@
               v-model="searchQuery"
               type="text"
               placeholder="Search code, text, CO, or LO..."
-              class="w-full text-xs pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+              class="w-full text-sm pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
             />
           </div>
 
@@ -563,7 +589,7 @@
             <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Course Outcome</label>
             <select 
               v-model="filterCO"
-              class="w-full text-xs py-1.5 px-2 bg-white border border-slate-200 rounded-xl outline-none font-bold focus:ring-2 focus:ring-emerald-500 cursor-pointer text-slate-800"
+              class="w-full text-sm py-1.5 px-2 bg-white border border-slate-200 rounded-xl outline-none font-bold focus:ring-2 focus:ring-emerald-500 cursor-pointer text-slate-800"
             >
               <option value="">All Course Outcomes</option>
               <option v-for="co in availableCOs" :key="co" :value="co">{{ co }}</option>
@@ -574,7 +600,7 @@
             <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Learning Outcome</label>
             <select 
               v-model="filterLO"
-              class="w-full text-xs py-1.5 px-2 bg-white border border-slate-200 rounded-xl outline-none font-bold focus:ring-2 focus:ring-emerald-500 cursor-pointer text-slate-800"
+              class="w-full text-sm py-1.5 px-2 bg-white border border-slate-200 rounded-xl outline-none font-bold focus:ring-2 focus:ring-emerald-500 cursor-pointer text-slate-800"
             >
               <option value="">All Learning Outcomes</option>
               <option v-for="lo in availableLOs" :key="lo" :value="lo">{{ lo }}</option>
@@ -585,7 +611,7 @@
             <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Question Type</label>
             <select 
               v-model="filterType"
-              class="w-full text-xs py-1.5 px-2 bg-white border border-slate-200 rounded-xl outline-none font-bold focus:ring-2 focus:ring-emerald-500 cursor-pointer text-slate-800"
+              class="w-full text-sm py-1.5 px-2 bg-white border border-slate-200 rounded-xl outline-none font-bold focus:ring-2 focus:ring-emerald-500 cursor-pointer text-slate-800"
             >
               <option value="">All Question Types</option>
               <option v-for="t in availableTypes" :key="t" :value="t">{{ t }}</option>
@@ -593,7 +619,7 @@
           </div>
         </div>
 
-        <div class="px-5 py-2.5 bg-white border-b border-slate-100 flex items-center justify-between text-xs">
+        <div class="px-5 py-2.5 bg-white border-b border-slate-100 flex items-center justify-between text-sm">
           <button 
             @click="toggleSelectAllFiltered"
             class="flex items-center gap-2 font-bold text-slate-700 hover:text-emerald-800 cursor-pointer"
@@ -605,7 +631,7 @@
 
           <div class="flex items-center gap-2">
             <span class="text-slate-400 font-medium">Sort by:</span>
-            <select v-model="sortBy" class="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer text-slate-800">
+            <select v-model="sortBy" class="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-sm font-bold outline-none cursor-pointer text-slate-800">
               <option value="code_asc">Code (Ascending)</option>
               <option value="code_desc">Code (Descending)</option>
               <option value="co">Course Outcome (CO)</option>
@@ -616,7 +642,7 @@
         </div>
 
         <div class="p-5 overflow-y-auto flex-1 space-y-3 bg-slate-50/50">
-          <div v-if="filteredQuestionBank.length === 0" class="p-10 text-center text-slate-400 text-xs italic">
+          <div v-if="filteredQuestionBank.length === 0" class="p-10 text-center text-slate-400 text-sm italic">
             No approved questions found in the Question Bank matching your criteria.
           </div>
 
@@ -638,7 +664,7 @@
 
             <div class="space-y-2 flex-1">
               <div class="flex items-center gap-2 flex-wrap">
-                <span class="px-2 py-0.5 bg-[#123524] text-white font-mono text-xs font-bold rounded-md">
+                <span class="px-2 py-0.5 bg-[#123524] text-white font-mono text-sm font-bold rounded-md">
                   {{ q.code }}
                 </span>
 
@@ -675,7 +701,7 @@
                 </span>
               </div>
 
-              <p class="text-xs font-semibold text-slate-800 leading-relaxed">
+              <p class="text-sm font-semibold text-slate-800 leading-relaxed">
                 {{ q.text }}
               </p>
 
@@ -691,21 +717,21 @@
         </div>
 
         <div class="p-4 bg-white border-t border-slate-200 flex justify-between items-center">
-          <span class="text-xs font-bold text-slate-700">
+          <span class="text-sm font-bold text-slate-700">
             {{ pickerSelectedIds.length }} question(s) checked
           </span>
 
           <div class="flex gap-2">
             <button 
               @click="isQuestionModalOpen = false"
-              class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+              class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-xl transition cursor-pointer"
             >
               Cancel
             </button>
             <button 
               @click="importSelectedQuestions"
               :disabled="pickerSelectedIds.length === 0"
-              class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
+              class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
             >
               <Plus :size="14" />
               <span>Add Selected to Blueprint</span>
@@ -724,7 +750,7 @@
         <div class="p-5 bg-[#123524] text-white flex justify-between items-center">
           <div>
             <h3 class="text-base font-bold text-white">{{ selectedTestPreview.title }}</h3>
-            <p class="text-xs text-slate-200">
+            <p class="text-sm text-slate-200">
               Course: <span class="font-bold text-emerald-300">{{ selectedTestPreview.course }}</span> | 
               Total Items: <span class="font-bold text-emerald-300">{{ selectedTestPreview.totalItems }} Questions</span> ({{ selectedTestPreview.totalPoints }} Points)
             </p>
@@ -743,8 +769,8 @@
           >
             <!-- Item Meta Header -->
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-xs font-mono font-bold text-slate-400">#{{ idx + 1 }}</span>
-              <span class="px-2 py-0.5 bg-[#123524] text-white font-mono text-xs font-bold rounded-md">
+              <span class="text-sm font-mono font-bold text-slate-400">#{{ idx + 1 }}</span>
+              <span class="px-2 py-0.5 bg-[#123524] text-white font-mono text-sm font-bold rounded-md">
                 {{ item.code }}
               </span>
               <span class="text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200 px-2 py-0.5 rounded-md font-mono">
@@ -765,7 +791,7 @@
             </div>
 
             <!-- Question Prompt Text -->
-            <p class="text-xs font-bold text-slate-900 leading-relaxed">{{ item.text }}</p>
+            <p class="text-sm font-bold text-slate-900 leading-relaxed">{{ item.text }}</p>
 
             <!-- Question Attachment Image -->
             <div v-if="getQuestionImage(item)" class="my-2">
@@ -789,7 +815,7 @@
                 <div 
                   v-for="(pair, pIdx) in getMatchingPairs(item)" 
                   :key="pair.id || pIdx"
-                  class="p-2.5 bg-slate-50/80 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs"
+                  class="p-2.5 bg-slate-50/80 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-sm"
                 >
                   <!-- Prompt / Left Item -->
                   <div class="flex items-center gap-2 flex-1 min-w-0">
@@ -827,7 +853,7 @@
                 v-for="(opt, optIdx) in getQuestionOptions(item)" 
                 :key="optIdx"
                 :class="[
-                  'text-xs p-2.5 rounded-xl flex items-start gap-2 font-medium transition-colors border',
+                  'text-sm p-2.5 rounded-xl flex items-start gap-2 font-medium transition-colors border',
                   isOptionCorrect(item, optIdx) 
                     ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold' 
                     : 'bg-slate-50 border-slate-200 text-slate-700'
@@ -842,7 +868,7 @@
             </div>
 
             <!-- EXPLICIT CORRECT ANSWER KEY BANNER -->
-            <div class="p-2.5 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-900">
+            <div class="p-2.5 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-center justify-between text-sm text-emerald-900">
               <div class="flex items-center gap-1.5 font-bold">
                 <CheckCircle2 :size="15" class="text-emerald-700" />
                 <span>Correct Answer Key:</span>
@@ -858,7 +884,7 @@
         <div class="p-4 bg-white border-t border-slate-200 flex justify-end">
           <button 
             @click="isPreviewModalOpen = false"
-            class="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+            class="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-xl transition cursor-pointer"
           >
             Close Preview
           </button>
@@ -875,34 +901,34 @@
           </div>
           <div>
             <h3 class="text-base font-bold text-slate-900">AI Blueprint Builder</h3>
-            <p class="text-xs text-slate-500">Automatically select balanced items from approved questions.</p>
+            <p class="text-sm text-slate-500">Automatically select balanced items from approved questions.</p>
           </div>
         </div>
 
         <div class="space-y-4">
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Target Item Count</label>
+            <label class="block text-sm font-bold text-slate-700 mb-1">Target Item Count</label>
             <input 
               v-model.number="aiBlueprint.targetTotalItems" 
               type="number" 
-              class="w-full text-xs p-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white text-slate-900"
+              class="w-full text-sm p-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white text-slate-900"
             />
           </div>
 
           <div class="space-y-1.5">
-            <span class="block text-xs font-bold text-slate-700">Cognitive Balance (Bloom's Taxonomy)</span>
-            <div class="grid grid-cols-3 gap-2 text-center text-xs">
+            <span class="block text-sm font-bold text-slate-700">Cognitive Balance (Bloom's Taxonomy)</span>
+            <div class="grid grid-cols-3 gap-2 text-center text-sm">
               <div class="bg-slate-50 border border-slate-200 p-2.5 rounded-2xl">
                 <span class="block text-slate-500 text-[11px] font-medium">Easy</span>
-                <span class="font-bold text-emerald-900 text-xs">{{ aiBlueprint.easyPercent }}%</span>
+                <span class="font-bold text-emerald-900 text-sm">{{ aiBlueprint.easyPercent }}%</span>
               </div>
               <div class="bg-slate-50 border border-slate-200 p-2.5 rounded-2xl">
                 <span class="block text-slate-500 text-[11px] font-medium">Medium</span>
-                <span class="font-bold text-emerald-900 text-xs">{{ aiBlueprint.mediumPercent }}%</span>
+                <span class="font-bold text-emerald-900 text-sm">{{ aiBlueprint.mediumPercent }}%</span>
               </div>
               <div class="bg-slate-50 border border-slate-200 p-2.5 rounded-2xl">
                 <span class="block text-slate-500 text-[11px] font-medium">Hard</span>
-                <span class="font-bold text-emerald-900 text-xs">{{ aiBlueprint.hardPercent }}%</span>
+                <span class="font-bold text-emerald-900 text-sm">{{ aiBlueprint.hardPercent }}%</span>
               </div>
             </div>
           </div>
@@ -911,14 +937,14 @@
         <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
           <button 
             @click="isAiModalOpen = false" 
-            class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+            class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-xl transition cursor-pointer"
           >
             Cancel
           </button>
           <button 
             @click="autoAssembleTest" 
             :disabled="isAutoBuilding"
-            class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl shadow-xs transition flex items-center gap-2 disabled:opacity-50 cursor-pointer"
           >
             <Sparkles :size="14" :class="{ 'animate-spin': isAutoBuilding }" />
             <span>{{ isAutoBuilding ? 'Assembling...' : 'Assemble Items' }}</span>

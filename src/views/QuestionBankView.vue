@@ -1,45 +1,67 @@
 <template>
-  <div class="p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans text-slate-800 antialiased relative min-h-screen bg-slate-50">
+  <div class="p-4 md:p-6 max-w-8xl mx-auto space-y-6 font-sans text-slate-800 antialiased min-h-screen bg-slate-50">
     
-    <!-- BRANDED SYSTEM PRELOADER CARD -->
-    <transition
-      enter-active-class="transition ease-out duration-300"
-      enter-from-class="opacity-0 scale-95"
-      enter-to-class="opacity-100 scale-100"
-      leave-active-class="transition ease-in duration-200"
-      leave-from-class="opacity-100 scale-100"
-      leave-to-class="opacity-0 scale-95"
-    >
-      <div 
-        v-if="isLoading" 
-        class="min-h-125 w-full bg-white/90 backdrop-blur-xs border border-slate-100 rounded-3xl p-12 flex flex-col items-center justify-center text-center space-y-5 shadow-xs"
-      >
-        <!-- CAMS Emblem with Radar Pulse Effect -->
-        <div class="relative flex items-center justify-center">
-          <div class="absolute w-20 h-20 bg-emerald-500/10 rounded-full animate-ping"></div>
-          <div class="absolute w-16 h-16 bg-[#123524]/10 rounded-full animate-pulse"></div>
-          
-          <div class="w-14 h-14 bg-[#123524] rounded-2xl flex items-center justify-center font-black text-white text-2xl tracking-wider shadow-xl relative z-10">
-            C
+    <!-- BRANDED SKELETON LOADER -->
+    <div v-if="isLoading" class="space-y-6 animate-pulse">
+      
+      <!-- Top Banner Skeleton -->
+      <div class="bg-linear-to-r from-[#123524] to-[#1b4d35] p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-xs">
+        <div class="space-y-2">
+          <div class="flex items-center gap-2">
+            <div class="w-6 h-6 bg-emerald-500/30 rounded-md"></div>
+            <div class="h-6 w-80 max-w-full bg-white/20 rounded-md"></div>
+          </div>
+          <div class="h-3.5 w-96 max-w-full bg-white/10 rounded-md"></div>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs Skeleton -->
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-52 bg-slate-200 rounded-full"></div>
+        <div class="h-10 w-44 bg-slate-100 rounded-full"></div>
+        <div class="h-10 w-48 bg-slate-100 rounded-full"></div>
+      </div>
+
+      <!-- Repository / Content Container Skeleton -->
+      <div class="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-5">
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div class="space-y-2">
+            <div class="h-5 w-56 bg-slate-200 rounded-md"></div>
+            <div class="h-3.5 w-96 max-w-full bg-slate-100 rounded-md"></div>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="h-9 w-28 bg-slate-100 rounded-xl"></div>
+            <div class="h-9 w-28 bg-slate-100 rounded-xl"></div>
+            <div class="h-9 w-32 bg-slate-200 rounded-xl"></div>
           </div>
         </div>
 
-        <!-- Branding Text & Progress Bar -->
-        <div class="space-y-1.5 max-w-xs">
-          <h3 class="text-base font-bold text-slate-900 tracking-tight">CAMS STCW Portal</h3>
-          <p class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">Synchronizing Question Bank Items...</p>
-        </div>
+        <div class="h-10 bg-slate-50 border border-slate-200/60 rounded-xl"></div>
 
-        <div class="w-48 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-          <div class="bg-[#123524] h-full rounded-full animate-pulse w-3/4"></div>
+        <!-- Question Cards Loop Skeleton -->
+        <div class="space-y-4">
+          <div v-for="i in 3" :key="i" class="border border-slate-200/80 rounded-2xl p-4 bg-slate-50/50 space-y-3">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-200/60">
+              <div class="flex items-center gap-2">
+                <div class="h-5 w-12 bg-slate-200 rounded"></div>
+                <div class="h-5 w-16 bg-slate-200 rounded"></div>
+                <div class="h-5 w-24 bg-slate-300 rounded"></div>
+              </div>
+              <div class="h-6 w-20 bg-emerald-100 rounded-full"></div>
+            </div>
+            <div class="h-4 w-3/4 bg-slate-200 rounded"></div>
+            <div class="grid grid-cols-2 gap-2">
+              <div class="h-9 bg-white border border-slate-200/60 rounded-xl"></div>
+              <div class="h-9 bg-white border border-slate-200/60 rounded-xl"></div>
+            </div>
+          </div>
         </div>
-
-        <p class="text-[10px] text-slate-400 font-mono">Baliwag Maritime Academy System</p>
       </div>
-    </transition>
+
+    </div>
 
     <!-- MAIN VIEW CONTENT -->
-    <div v-show="!isLoading" class="space-y-6">
+    <div v-else class="space-y-6">
 
       <!-- Hero Banner Header with Branding Icon -->
       <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-xs">
@@ -48,7 +70,7 @@
             <HelpCircle :size="22" class="text-emerald-400" />
             Assessment Question Authoring & Item Bank
           </h1>
-          <p class="text-xs text-slate-200 font-normal">
+          <p class="text-sm text-slate-200 font-normal">
             Map items by Program, Term, Course Code, Outcomes, and Bloom's Taxonomy.
           </p>
         </div>
@@ -59,7 +81,7 @@
         <button 
           @click="activeTab = 'repository'"
           :class="[
-            'px-5 py-2.5 rounded-full font-bold text-xs flex items-center gap-2 transition-all cursor-pointer',
+            'px-5 py-2.5 rounded-full font-bold text-sm flex items-center gap-2 transition-all cursor-pointer',
             activeTab === 'repository' 
               ? 'bg-[#123524] text-white shadow-xs' 
               : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-xs'
@@ -78,7 +100,7 @@
         <button 
           @click="activeTab = 'create'"
           :class="[
-            'px-5 py-2.5 rounded-full font-bold text-xs flex items-center gap-2 transition-all cursor-pointer',
+            'px-5 py-2.5 rounded-full font-bold text-sm flex items-center gap-2 transition-all cursor-pointer',
             activeTab === 'create' 
               ? 'bg-[#123524] text-white shadow-xs' 
               : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-xs'
@@ -91,7 +113,7 @@
         <button 
           @click="activeTab = 'report'"
           :class="[
-            'px-5 py-2.5 rounded-full font-bold text-xs flex items-center gap-2 transition-all cursor-pointer',
+            'px-5 py-2.5 rounded-full font-bold text-sm flex items-center gap-2 transition-all cursor-pointer',
             activeTab === 'report' 
               ? 'bg-[#123524] text-white shadow-xs' 
               : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-xs'
@@ -112,7 +134,7 @@
                 {{ filteredQuestions.length }} items
               </span>
             </div>
-            <p class="text-xs text-slate-500 mt-0.5">
+            <p class="text-sm text-slate-500 mt-0.5">
               Review, approve/disapprove, or apply AI cognitive suggestions organized by Course Code and Title.
             </p>
           </div>
@@ -123,26 +145,26 @@
               <input 
                 v-model="searchQuery" 
                 placeholder="Search questions..." 
-                class="w-full px-3 py-1.5 border border-slate-200 rounded-xl bg-slate-50 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-400 shadow-xs"
+                class="w-full px-3 py-1.5 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-400 shadow-xs"
               />
             </div>
             
             <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-              <select v-model="filterStatus" class="px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-50 text-xs text-slate-700 font-bold outline-none cursor-pointer shadow-xs">
+              <select v-model="filterStatus" class="px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-700 font-bold outline-none cursor-pointer shadow-xs">
                 <option value="All">All Statuses</option>
                 <option value="Pending">Pending</option>
                 <option value="Approved">Approved</option>
                 <option value="Disapproved">Disapproved</option>
               </select>
 
-              <select v-model="filterProgram" class="px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-50 text-xs text-slate-700 font-bold outline-none cursor-pointer shadow-xs">
+              <select v-model="filterProgram" class="px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-700 font-bold outline-none cursor-pointer shadow-xs">
                 <option value="All">All Programs</option>
                 <option value="BSMT">BSMT</option>
                 <option value="BSMarE">BSMarE</option>
                 <option value="Both">Both</option>
               </select>
 
-              <select v-model="filterType" class="px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-50 text-xs text-slate-700 font-bold outline-none cursor-pointer shadow-xs">
+              <select v-model="filterType" class="px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-700 font-bold outline-none cursor-pointer shadow-xs">
                 <option value="All">All Types</option>
                 <option value="multiple_choice">Multiple Choice</option>
                 <option value="matching">Matching Type</option>
@@ -150,7 +172,7 @@
                 <option value="short_answer">Short Answer</option>
               </select>
 
-              <select v-model="sortBy" class="px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-100 text-xs text-slate-800 font-bold outline-none cursor-pointer shadow-xs">
+              <select v-model="sortBy" class="px-2.5 py-1.5 border border-slate-200 rounded-xl bg-slate-100 text-sm text-slate-800 font-bold outline-none cursor-pointer shadow-xs">
                 <option value="default">Sort: Default</option>
                 <option value="code">Sort by Course Code</option>
                 <option value="newest">Sort by Newest</option>
@@ -161,7 +183,7 @@
         </div>
 
         <!-- Bulk Actions Bar -->
-        <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-sm">
           <div class="flex items-center gap-3">
             <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-700 select-none">
               <input 
@@ -193,7 +215,7 @@
         <hr class="border-slate-100" />
 
         <!-- Questions Empty State -->
-        <div v-if="groupedQuestions.length === 0" class="text-center py-20 text-slate-400 text-xs font-normal">
+        <div v-if="groupedQuestions.length === 0" class="text-center py-20 text-slate-400 text-sm font-normal">
           No questions found in the Question Bank matching selected criteria.
         </div>
 
@@ -212,7 +234,7 @@
               <div class="flex items-center gap-3">
                 <component :is="collapsedCourses[group.courseKey] ? ChevronRight : ChevronDown" :size="16" class="text-slate-600"></component>
                 <div>
-                  <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2">
+                  <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                     <span class="bg-[#123524] text-white px-2.5 py-0.5 rounded-md text-[11px] font-mono tracking-wide">{{ group.code }}</span>
                     <span>{{ group.title }}</span>
                   </h3>
@@ -280,7 +302,7 @@
 
                 <!-- Stem -->
                 <div>
-                  <p class="text-xs font-semibold text-slate-800">{{ q.text }}</p>
+                  <p class="text-sm font-semibold text-slate-800">{{ q.text }}</p>
                   <img 
                     v-if="q.imageUrl" 
                     :src="q.imageUrl" 
@@ -291,7 +313,7 @@
                 </div>
 
                 <!-- Multiple Choice Options -->
-                <div v-if="q.options && q.options.length > 0 && q.type === 'multiple_choice'" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div v-if="q.options && q.options.length > 0 && q.type === 'multiple_choice'" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                   <div v-for="(opt, oIdx) in q.options" :key="oIdx" class="p-2.5 rounded-xl border border-slate-200 text-[11px] flex flex-col gap-1" :class="(Array.isArray(q.correctAnswer) && q.correctAnswer.includes(oIdx)) || q.correctAnswer === oIdx ? 'bg-emerald-50 border-emerald-300 font-bold text-emerald-900' : 'bg-white text-slate-700'">
                     <div>
                       <span class="font-bold mr-1">{{ String.fromCharCode(65 + oIdx) }}.</span> {{ typeof opt === 'string' ? opt : opt.text }}
@@ -307,7 +329,7 @@
                 </div>
 
                 <!-- Matching Type Pairs -->
-                <div v-if="q.type === 'matching' && q.matchingPairs" class="space-y-2 text-xs">
+                <div v-if="q.type === 'matching' && q.matchingPairs" class="space-y-2 text-sm">
                   <div v-for="(pair, pIdx) in q.matchingPairs" :key="pIdx" class="p-2.5 rounded-xl border border-slate-200 bg-white flex items-center justify-between text-[11px]">
                     <div class="flex items-center gap-2">
                       <span class="font-bold text-slate-500">{{ pIdx + 1 }}.</span>
@@ -338,7 +360,7 @@
                 <div
                   v-for="ai in [generateAiSuggestion(q)]"
                   :key="'ai-' + q.id"
-                  class="p-3 rounded-xl text-xs border"
+                  class="p-3 rounded-xl text-sm border"
                   :class="{
                     'bg-amber-50/80 border-amber-200 text-amber-900': ai.type === 'warning',
                     'bg-slate-50 border-slate-200 text-slate-900': ai.type === 'info',
@@ -415,14 +437,14 @@
               <button 
                 @click="downloadCSVTemplate" 
                 type="button" 
-                class="px-3.5 py-2 bg-white hover:bg-emerald-50 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-300 flex items-center gap-2 transition shadow-xs cursor-pointer"
+                class="px-3.5 py-2 bg-white hover:bg-emerald-50 text-emerald-800 text-sm font-bold rounded-xl border border-emerald-300 flex items-center gap-2 transition shadow-xs cursor-pointer"
               >
                 <Download :size="14" class="text-emerald-700"></Download> 
                 Download CSV Template
               </button>
 
               <label 
-                class="px-3.5 py-2 bg-[#123524] hover:bg-[#0e2a1d] text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-xs"
+                class="px-3.5 py-2 bg-[#123524] hover:bg-[#0e2a1d] text-white text-sm font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-xs"
               >
                 <Upload :size="14"></Upload> 
                 <span>{{ isUploadingBulk ? 'Uploading...' : 'Bulk Upload CSV' }}</span>
@@ -440,7 +462,7 @@
           </div>
 
           <!-- Curriculum Mapping Fields -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs">
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-sm">
             <div>
               <label class="font-bold text-slate-700 block mb-1">Program</label>
               <select 
@@ -523,12 +545,12 @@
 
         <!-- 2. ITEM CLASSIFICATION -->
         <div>
-          <h2 class="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2 mb-4">
+          <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2 mb-4">
             2. ITEM CLASSIFICATION
           </h2>
 
           <div class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
                 <label class="font-bold text-slate-700 block mb-1">Bloom's Taxonomy</label>
                 <select v-model="form.bloomLevel" class="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none">
@@ -552,19 +574,19 @@
             </div>
 
             <div>
-              <label class="font-bold text-xs text-slate-700 block mb-1">Question Stem</label>
+              <label class="font-bold text-sm text-slate-700 block mb-1">Question Stem</label>
               <textarea 
                 v-model="form.text" 
                 rows="3" 
                 placeholder="Enter question statement..." 
-                class="w-full p-3 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
               ></textarea>
             </div>
 
-            <div class="border border-dashed border-slate-200 rounded-2xl p-3 text-xs bg-slate-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div class="border border-dashed border-slate-200 rounded-2xl p-3 text-sm bg-slate-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <span class="font-bold text-slate-700 block">Question Image (Optional)</span>
-                <input type="file" accept="image/*" @change="e => handleImageUpload(e, form, 'imageUrl')" class="text-xs mt-1 file:mr-3 file:py-1 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer" />
+                <input type="file" accept="image/*" @change="e => handleImageUpload(e, form, 'imageUrl')" class="text-sm mt-1 file:mr-3 file:py-1 file:px-3 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer" />
               </div>
               <div v-if="form.imageUrl" class="relative shrink-0">
                 <img 
@@ -583,15 +605,15 @@
 
         <!-- 3. OPTIONS & CORRECT ANSWERS -->
         <div>
-          <h2 class="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2 mb-4">
+          <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2 mb-4">
             3. OPTIONS & CORRECT ANSWERS
           </h2>
 
           <!-- MULTIPLE CHOICE OPTIONS -->
           <div v-if="form.type === 'multiple_choice'" class="space-y-3 border border-slate-200 p-4 rounded-2xl bg-slate-50/30">
             <div class="flex justify-between items-center mb-1">
-              <span class="text-xs font-bold text-slate-800">Options & Correct Answer(s) (Check all that apply)</span>
-              <button @click="addOption" type="button" class="text-xs text-emerald-800 font-bold hover:underline flex items-center gap-1 cursor-pointer">
+              <span class="text-sm font-bold text-slate-800">Options & Correct Answer(s) (Check all that apply)</span>
+              <button @click="addOption" type="button" class="text-sm text-emerald-800 font-bold hover:underline flex items-center gap-1 cursor-pointer">
                 <Plus :size="14"></Plus> Add Option
               </button>
             </div>
@@ -599,11 +621,11 @@
             <div v-for="(opt, idx) in form.options" :key="idx" class="flex flex-col sm:flex-row sm:items-center gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
               <div class="flex items-center gap-3 flex-1">
                 <input type="checkbox" v-model="opt.isCorrect" title="Mark as correct answer" class="h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 shrink-0 cursor-pointer" />
-                <input v-model="opt.text" :placeholder="`Option ${idx + 1} text...`" class="flex-1 p-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500" />
+                <input v-model="opt.text" :placeholder="`Option ${idx + 1} text...`" class="flex-1 p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
               </div>
 
               <div class="flex items-center gap-2 self-end sm:self-auto">
-                <label class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 cursor-pointer flex items-center gap-1.5 transition">
+                <label class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl border border-slate-200 cursor-pointer flex items-center gap-1.5 transition">
                   <ImageIcon :size="14" class="text-slate-500"></ImageIcon>
                   <span>Image</span>
                   <input type="file" accept="image/*" @change="e => handleImageUpload(e, opt, 'imageUrl')" class="hidden" />
@@ -631,24 +653,24 @@
           <!-- MATCHING TYPE PAIRS -->
           <div v-if="form.type === 'matching'" class="space-y-3 border border-slate-200 p-4 rounded-2xl bg-slate-50/30">
             <div class="flex justify-between items-center mb-1">
-              <span class="text-xs font-bold text-slate-800">Matching Pairs (Item ⟶ Correct Match)</span>
-              <button @click="addMatchingPair" type="button" class="text-xs text-emerald-800 font-bold hover:underline flex items-center gap-1 cursor-pointer">
+              <span class="text-sm font-bold text-slate-800">Matching Pairs (Item ⟶ Correct Match)</span>
+              <button @click="addMatchingPair" type="button" class="text-sm text-emerald-800 font-bold hover:underline flex items-center gap-1 cursor-pointer">
                 <Plus :size="14"></Plus> Add Matching Pair
               </button>
             </div>
 
             <div v-for="(pair, idx) in form.matchingPairs" :key="idx" class="p-3 bg-white rounded-xl border border-slate-200 shadow-xs space-y-2">
               <div class="flex items-center justify-between">
-                <span class="font-bold text-xs text-slate-600">Pair #{{ idx + 1 }}</span>
+                <span class="font-bold text-sm text-slate-600">Pair #{{ idx + 1 }}</span>
                 <button v-if="form.matchingPairs.length > 2" @click="removeMatchingPair(idx)" title="Remove Pair" class="text-rose-500 hover:bg-rose-50 p-1 rounded cursor-pointer">
                   <Trash2 :size="14"></Trash2>
                 </button>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                 <div class="space-y-2 border border-slate-200 p-2.5 rounded-xl bg-slate-50/50">
                   <span class="font-bold text-[11px] text-slate-500">Premise Item / Question</span>
-                  <input v-model="pair.leftText" placeholder="Left item text..." class="w-full p-2 border border-slate-200 rounded-lg text-xs outline-none bg-white" />
+                  <input v-model="pair.leftText" placeholder="Left item text..." class="w-full p-2 border border-slate-200 rounded-lg text-sm outline-none bg-white" />
                   
                   <div class="flex items-center justify-between">
                     <label class="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-semibold rounded-lg border border-slate-200 cursor-pointer flex items-center gap-1">
@@ -671,7 +693,7 @@
 
                 <div class="space-y-2 border border-slate-200 p-2.5 rounded-xl bg-slate-50/50">
                   <span class="font-bold text-[11px] text-slate-500">Matching Target / Answer</span>
-                  <input v-model="pair.rightText" placeholder="Right matching text..." class="w-full p-2 border border-slate-200 rounded-lg text-xs outline-none bg-white" />
+                  <input v-model="pair.rightText" placeholder="Right matching text..." class="w-full p-2 border border-slate-200 rounded-lg text-sm outline-none bg-white" />
                   
                   <div class="flex items-center justify-between">
                     <label class="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-semibold rounded-lg border border-slate-200 cursor-pointer flex items-center gap-1">
@@ -697,8 +719,8 @@
 
           <!-- TRUE / FALSE -->
           <div v-if="form.type === 'true_false'" class="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-            <label class="font-bold text-xs text-slate-700 block">Select Correct Answer</label>
-            <div class="flex gap-6 text-xs font-bold text-slate-800">
+            <label class="font-bold text-sm text-slate-700 block">Select Correct Answer</label>
+            <div class="flex gap-6 text-sm font-bold text-slate-800">
               <label class="flex items-center gap-2 cursor-pointer bg-white px-4 py-2.5 rounded-xl border border-slate-200 hover:border-emerald-500">
                 <input type="radio" value="true" v-model="form.tfCorrect" name="tf_answer" class="text-emerald-600" /> True
               </label>
@@ -710,8 +732,8 @@
 
           <!-- SHORT ANSWER -->
           <div v-if="form.type === 'short_answer'" class="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-            <label class="font-bold text-xs text-slate-700 block">Expected Answer Keywords (Comma Separated)</label>
-            <input v-model="form.shortAnswerKeywords" placeholder="e.g. ECDIS, navigation, chart" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500" />
+            <label class="font-bold text-sm text-slate-700 block">Expected Answer Keywords (Comma Separated)</label>
+            <input v-model="form.shortAnswerKeywords" placeholder="e.g. ECDIS, navigation, chart" class="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
         </div>
 
@@ -720,7 +742,7 @@
           <button 
             @click="saveQuestion" 
             :disabled="isSubmitting" 
-            class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
+            class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
           >
             <Save :size="16"></Save> 
             <span>{{ isSubmitting ? 'Saving...' : 'Save Question Item' }}</span>
@@ -735,10 +757,10 @@
             <h2 class="text-base font-bold text-slate-900 flex items-center gap-2 tracking-tight">
               <BarChart2 class="text-emerald-700" :size="20"></BarChart2> Course Question Changes & Audit Report
             </h2>
-            <p class="text-xs text-slate-500">View question counts, approval status, accepted AI suggestions, and AI overrides grouped per course.</p>
+            <p class="text-sm text-slate-500">View question counts, approval status, accepted AI suggestions, and AI overrides grouped per course.</p>
           </div>
 
-          <button @click="exportCourseReportCSV" type="button" class="px-3.5 py-2 bg-[#123524] hover:bg-[#0e2a1d] text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-xs">
+          <button @click="exportCourseReportCSV" type="button" class="px-3.5 py-2 bg-[#123524] hover:bg-[#0e2a1d] text-white text-sm font-bold rounded-xl cursor-pointer flex items-center gap-2 transition shadow-xs">
             <Download :size="14"></Download> Export Report CSV
           </button>
         </div>
@@ -771,7 +793,7 @@
         </div>
 
         <div class="overflow-x-auto border border-slate-200 rounded-2xl">
-          <table class="w-full text-left text-xs">
+          <table class="w-full text-left text-sm">
             <thead class="bg-slate-50 text-slate-700 uppercase font-bold border-b border-slate-200">
               <tr>
                 <th class="p-3">Course Code</th>
@@ -824,7 +846,7 @@
             </button>
           </div>
 
-          <div class="space-y-4 text-xs">
+          <div class="space-y-4 text-sm">
             <!-- Mapping Metadata -->
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
@@ -884,14 +906,14 @@
             <!-- Stem Text -->
             <div>
               <label class="font-bold text-slate-700 block mb-1">Question Stem</label>
-              <textarea v-model="editingQuestion.text" rows="3" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white"></textarea>
+              <textarea v-model="editingQuestion.text" rows="3" class="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white"></textarea>
             </div>
 
             <!-- Image Upload -->
             <div class="border border-dashed border-slate-200 p-3 rounded-2xl bg-slate-50 flex items-center justify-between">
               <div>
                 <span class="font-bold text-slate-700 block">Stem Image</span>
-                <input type="file" accept="image/*" @change="e => handleImageUpload(e, editingQuestion, 'imageUrl')" class="text-xs mt-1 cursor-pointer" />
+                <input type="file" accept="image/*" @change="e => handleImageUpload(e, editingQuestion, 'imageUrl')" class="text-sm mt-1 cursor-pointer" />
               </div>
               <div v-if="editingQuestion.imageUrl" class="relative">
                 <img 
@@ -910,7 +932,7 @@
             <div v-if="editingQuestion.type === 'multiple_choice'" class="space-y-3 border border-slate-200 p-3 rounded-2xl bg-slate-50/50">
               <div class="flex justify-between items-center">
                 <span class="font-bold text-slate-700">Multiple Choice Options</span>
-                <button @click="editingQuestion.options.push({ text: '', imageUrl: '' })" type="button" class="text-emerald-800 font-bold text-xs flex items-center gap-1 cursor-pointer">
+                <button @click="editingQuestion.options.push({ text: '', imageUrl: '' })" type="button" class="text-emerald-800 font-bold text-sm flex items-center gap-1 cursor-pointer">
                   <Plus :size="12"></Plus> Add Option
                 </button>
               </div>
@@ -918,7 +940,7 @@
               <div v-for="(opt, oIdx) in editingQuestion.options" :key="oIdx" class="p-2.5 bg-white border border-slate-200 rounded-xl space-y-2 shadow-xs">
                 <div class="flex items-center gap-2">
                   <input type="checkbox" :checked="Array.isArray(editingQuestion.correctAnswer) ? editingQuestion.correctAnswer.includes(oIdx) : editingQuestion.correctAnswer === oIdx" @change="toggleEditCorrectOption(oIdx)" class="h-4 w-4 text-emerald-600 rounded cursor-pointer" />
-                  <input v-model="opt.text" class="flex-1 p-1.5 border border-slate-200 rounded-lg text-xs outline-none" :placeholder="`Option ${oIdx + 1} text...`" />
+                  <input v-model="opt.text" class="flex-1 p-1.5 border border-slate-200 rounded-lg text-sm outline-none" :placeholder="`Option ${oIdx + 1} text...`" />
                   <button v-if="editingQuestion.options.length > 2" @click="editingQuestion.options.splice(oIdx, 1)" class="text-rose-500 p-1 cursor-pointer">
                     <Trash2 :size="14"></Trash2>
                   </button>
@@ -948,7 +970,7 @@
             <div v-if="editingQuestion.type === 'matching'" class="space-y-3 border border-slate-200 p-3 rounded-2xl bg-slate-50/50">
               <div class="flex justify-between items-center">
                 <span class="font-bold text-slate-700">Matching Type Pairs</span>
-                <button @click="editingQuestion.matchingPairs.push({ leftText: '', leftImageUrl: '', rightText: '', rightImageUrl: '' })" type="button" class="text-emerald-800 font-bold text-xs flex items-center gap-1 cursor-pointer">
+                <button @click="editingQuestion.matchingPairs.push({ leftText: '', leftImageUrl: '', rightText: '', rightImageUrl: '' })" type="button" class="text-emerald-800 font-bold text-sm flex items-center gap-1 cursor-pointer">
                   <Plus :size="12"></Plus> Add Pair
                 </button>
               </div>
@@ -964,7 +986,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div class="space-y-1 border border-slate-200 p-2 rounded-lg bg-slate-50/50">
                     <span class="font-semibold text-[10px] text-slate-500">Left Item</span>
-                    <input v-model="pair.leftText" class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white outline-none" />
+                    <input v-model="pair.leftText" class="w-full p-1.5 border border-slate-200 rounded-lg text-sm bg-white outline-none" />
                     <div class="flex items-center justify-between pt-1">
                       <label class="px-2 py-0.5 bg-white border text-[10px] font-semibold rounded-lg cursor-pointer flex items-center gap-1">
                         <ImageIcon :size="10"></ImageIcon> Image
@@ -986,7 +1008,7 @@
 
                   <div class="space-y-1 border border-slate-200 p-2 rounded-lg bg-slate-50/50">
                     <span class="font-semibold text-[10px] text-slate-500">Right Target</span>
-                    <input v-model="pair.rightText" class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white outline-none" />
+                    <input v-model="pair.rightText" class="w-full p-1.5 border border-slate-200 rounded-lg text-sm bg-white outline-none" />
                     <div class="flex items-center justify-between pt-1">
                       <label class="px-2 py-0.5 bg-white border text-[10px] font-semibold rounded-lg cursor-pointer flex items-center gap-1">
                         <ImageIcon :size="10"></ImageIcon> Image
@@ -1030,10 +1052,10 @@
           </div>
 
           <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
-            <button @click="closeEditModal" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl cursor-pointer">
+            <button @click="closeEditModal" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-xl cursor-pointer">
               Cancel
             </button>
-            <button @click="saveEditedQuestion" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs">
+            <button @click="saveEditedQuestion" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs">
               <Save :size="14"></Save> Save Changes
             </button>
           </div>
@@ -1062,7 +1084,7 @@
                 :alt="lightboxImage.caption || 'Enlarged Image'" 
                 class="max-h-[75vh] max-w-full object-contain rounded-xl select-none" 
               />
-              <p v-if="lightboxImage.caption" class="text-xs font-semibold text-slate-100 mt-2 px-3 py-1 bg-slate-900/80 rounded-full border border-slate-700/50">
+              <p v-if="lightboxImage.caption" class="text-sm font-semibold text-slate-100 mt-2 px-3 py-1 bg-slate-900/80 rounded-full border border-slate-700/50">
                 {{ lightboxImage.caption }}
               </p>
             </div>

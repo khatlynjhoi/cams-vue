@@ -1,45 +1,50 @@
 <template>
-  <div class="p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans text-slate-800 antialiased relative min-h-screen bg-slate-50">
+  <div class="p-4 md:p-6 max-w-8xl mx-auto space-y-6 font-sans text-slate-800 antialiased relative min-h-screen bg-slate-50">
     
-    <!-- BRANDED SYSTEM PRELOADER CARD -->
-    <transition
-      enter-active-class="transition ease-out duration-300"
-      enter-from-class="opacity-0 scale-95"
-      enter-to-class="opacity-100 scale-100"
-      leave-active-class="transition ease-in duration-200"
-      leave-from-class="opacity-100 scale-100"
-      leave-to-class="opacity-0 scale-95"
-    >
-      <div 
-        v-if="isLoading" 
-        class="min-h-125 w-full bg-white/90 backdrop-blur-xs border border-slate-100 rounded-3xl p-12 flex flex-col items-center justify-center text-center space-y-5 shadow-xs"
-      >
-        <!-- CAMS Emblem with Radar Pulse Effect -->
-        <div class="relative flex items-center justify-center">
-          <div class="absolute w-20 h-20 bg-emerald-500/10 rounded-full animate-ping"></div>
-          <div class="absolute w-16 h-16 bg-[#123524]/10 rounded-full animate-pulse"></div>
-          
-          <div class="w-14 h-14 bg-[#123524] rounded-2xl flex items-center justify-center font-black text-white text-2xl tracking-wider shadow-xl relative z-10">
-            C
+    <!-- BRANDED SKELETON LOADER -->
+    <div v-if="isLoading" class="space-y-6 animate-pulse">
+      
+      <!-- Top Banner Skeleton -->
+      <div class="bg-linear-to-r from-[#123524] to-[#1b4d35] p-6 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xs">
+        <div class="space-y-2">
+          <div class="flex items-center gap-2">
+            <div class="w-6 h-6 bg-emerald-500/30 rounded-md"></div>
+            <div class="h-6 w-72 max-w-full bg-white/20 rounded-md"></div>
+          </div>
+          <div class="h-3.5 w-96 max-w-full bg-white/10 rounded-md"></div>
+        </div>
+        <div class="h-10 w-40 bg-white/10 rounded-xl"></div>
+      </div>
+
+      <!-- Filter Toolbar Skeleton -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center gap-3">
+        <div class="h-9 bg-slate-100 rounded-xl flex-1 w-full"></div>
+        <div class="h-9 w-36 bg-slate-100 rounded-xl"></div>
+      </div>
+
+      <!-- Data Table Skeleton -->
+      <div class="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs">
+        <div class="p-3.5 bg-slate-50 border-b border-slate-200/80 flex gap-4">
+          <div v-for="w in ['w-48', 'w-28', 'w-24', 'w-32', 'w-28']" :key="w" :class="[w, 'h-4 bg-slate-200 rounded']"></div>
+        </div>
+        <div class="divide-y divide-slate-100">
+          <div v-for="r in 5" :key="r" class="p-3.5 flex gap-4 items-center">
+            <div class="w-48 space-y-1.5">
+              <div class="h-4 w-32 bg-slate-200 rounded"></div>
+              <div class="h-3 w-40 bg-slate-100 rounded"></div>
+            </div>
+            <div class="w-28 h-6 bg-purple-100/60 rounded-full"></div>
+            <div class="w-24 h-4 bg-slate-200 rounded"></div>
+            <div class="w-32 h-6 bg-emerald-100/60 rounded-full"></div>
+            <div class="w-28 h-7 bg-slate-100 rounded-xl ml-auto"></div>
           </div>
         </div>
-
-        <!-- Branding Text & Progress Bar -->
-        <div class="space-y-1.5 max-w-xs">
-          <h3 class="text-base font-bold text-slate-900 tracking-tight">CAMS STCW Portal</h3>
-          <p class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">Synchronizing User Accounts...</p>
-        </div>
-
-        <div class="w-48 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-          <div class="bg-[#123524] h-full rounded-full animate-pulse w-3/4"></div>
-        </div>
-
-        <p class="text-[10px] text-slate-400 font-mono">Baliwag Maritime Academy System</p>
       </div>
-    </transition>
+
+    </div>
 
     <!-- MAIN VIEW CONTENT -->
-    <div v-show="!isLoading" class="space-y-6">
+    <div v-else class="space-y-6">
 
       <!-- Header Hero Banner -->
       <div class="bg-[#123524] text-white p-6 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xs">
@@ -48,7 +53,7 @@
             <Users class="text-emerald-400" :size="22" />
             User Access & Authorization
           </h1>
-          <p class="text-xs text-slate-200 font-normal">
+          <p class="text-sm text-slate-200 font-normal">
             Manage system privileges, edit accounts, and grant or revoke access rights across BMA departments.
           </p>
         </div>
@@ -56,7 +61,7 @@
         <div class="flex items-center gap-2 shrink-0">
           <button 
             @click="openAddModal"
-            class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
+            class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
           >
             <UserPlus :size="16" /> Add New Account
           </button>
@@ -71,13 +76,13 @@
             v-model="searchQuery"
             type="text"
             placeholder="Search by name, email, or department..."
-            class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none font-medium"
+            class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none font-medium"
           />
         </div>
 
         <select 
           v-model="selectedRoleFilter" 
-          class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer focus:bg-white focus:ring-2 focus:ring-emerald-500"
+          class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none cursor-pointer focus:bg-white focus:ring-2 focus:ring-emerald-500"
         >
           <option value="All">All Roles</option>
           <option v-for="r in rolesList" :key="r" :value="r">{{ r }}</option>
@@ -96,7 +101,7 @@
               <th class="p-3.5 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100 text-xs text-slate-700">
+          <tbody class="divide-y divide-slate-100 text-sm text-slate-700">
             <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-slate-50/80 transition-colors">
               
               <td class="p-3.5">
@@ -138,14 +143,14 @@
               <td class="p-3.5 text-right space-x-2">
                 <button 
                   @click="openEditModal(user)"
-                  class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition cursor-pointer"
+                  class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-sm font-bold transition cursor-pointer"
                 >
                   <Edit3 :size="14" class="inline mr-1" /> Edit
                 </button>
 
                 <button 
                   @click="openDeleteModal(user)"
-                  class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition cursor-pointer"
+                  class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-sm font-bold transition cursor-pointer"
                 >
                   <Trash2 :size="14" class="inline mr-1" /> Remove
                 </button>
@@ -153,10 +158,10 @@
             </tr>
 
             <tr v-if="filteredUsers.length === 0">
-              <td colspan="5" class="p-12 text-center text-slate-400 font-medium text-xs">
+              <td colspan="5" class="p-12 text-center text-slate-400 font-medium text-sm">
                 <Users class="w-8 h-8 mx-auto text-slate-300 mb-2" />
                 <p class="font-bold text-slate-700 text-sm">No User Accounts Found</p>
-                <p class="text-xs text-slate-400 mt-1">No registered users match your search query or role filter.</p>
+                <p class="text-sm text-slate-400 mt-1">No registered users match your search query or role filter.</p>
               </td>
             </tr>
           </tbody>
@@ -175,7 +180,7 @@
             </button>
           </div>
 
-          <div class="space-y-3.5 text-xs">
+          <div class="space-y-3.5 text-sm">
             <div>
               <label class="block font-bold text-slate-700 mb-1">Full Name</label>
               <input 
@@ -234,10 +239,10 @@
           </div>
 
           <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
-            <button @click="showAddModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer">
+            <button @click="showAddModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl cursor-pointer">
               Cancel
             </button>
-            <button @click="handleCreateUser" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer">
+            <button @click="handleCreateUser" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs cursor-pointer">
               Create & Grant Access
             </button>
           </div>
@@ -256,7 +261,7 @@
             </button>
           </div>
 
-          <div class="space-y-3.5 text-xs">
+          <div class="space-y-3.5 text-sm">
             <div>
               <label class="block font-bold text-slate-700 mb-1">Full Name</label>
               <input v-model="form.name" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold" />
@@ -300,10 +305,10 @@
           </div>
 
           <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
-            <button @click="showEditModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer">
+            <button @click="showEditModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl cursor-pointer">
               Cancel
             </button>
-            <button @click="handleUpdateUser" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer">
+            <button @click="handleUpdateUser" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs cursor-pointer">
               Save Changes
             </button>
           </div>
@@ -318,16 +323,16 @@
           </div>
           <div>
             <h3 class="text-base font-bold text-slate-900">Remove User Account</h3>
-            <p class="text-xs text-slate-500 mt-1">
+            <p class="text-sm text-slate-500 mt-1">
               Are you sure you want to delete <strong class="text-slate-800">{{ selectedUser?.name }}</strong>?
             </p>
           </div>
 
           <div class="flex gap-2 pt-2">
-            <button @click="showDeleteModal = false" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer">
+            <button @click="showDeleteModal = false" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl cursor-pointer">
               Cancel
             </button>
-            <button @click="handleDeleteUser" class="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer">
+            <button @click="handleDeleteUser" class="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm rounded-xl shadow-xs cursor-pointer">
               Confirm Removal
             </button>
           </div>
@@ -350,10 +355,7 @@ import {
   CheckCircle2, 
   XCircle, 
   X,
-  AlertTriangle,
-  Mail,
-  User,
-  Shield
+  AlertTriangle
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 
@@ -433,9 +435,14 @@ async function loadUsers() {
         status: u.status || 'Active'
       }))
 
-      // Merge local created items not present in remote backend
+      // Merge local created items not present in remote backend, preserving custom passwords
       localSaved.forEach(localItem => {
-        if (!apiUsers.some(a => String(a.id) === String(localItem.id) || a.email === localItem.email)) {
+        const apiIdx = apiUsers.findIndex(a => String(a.id) === String(localItem.id) || a.email.toLowerCase() === localItem.email.toLowerCase())
+        if (apiIdx !== -1) {
+          if (localItem.password && !apiUsers[apiIdx].password) {
+            apiUsers[apiIdx].password = localItem.password
+          }
+        } else {
           apiUsers.push(localItem)
         }
       })
@@ -457,8 +464,8 @@ function loadFallbackUsers(localSaved = []) {
     users.value = localSaved
   } else {
     const defaults = [
-      { id: 1, name: 'IT Administrator', email: 'it@bma.edu.ph', role: 'Admin', department: 'ICT', status: 'Active' },
-      { id: 2, name: 'Percival Banting', email: 'p.banting@bma.edu.ph', role: 'Admin', department: 'ICT', status: 'Active' }
+      { id: 1, name: 'IT Administrator', email: 'it@bma.edu.ph', password: 'password', role: 'Admin', department: 'ICT', status: 'Active' },
+      { id: 2, name: 'Percival Banting', email: 'p.banting@bma.edu.ph', password: 'password', role: 'Admin', department: 'ICT', status: 'Active' }
     ]
     users.value = defaults
     saveLocalUsers()
@@ -530,7 +537,7 @@ async function handleCreateUser() {
     role: form.value.role,
     department: form.value.department,
     status: form.value.status,
-    password: form.value.password
+    password: form.value.password ? form.value.password.trim() : 'password'
   }
 
   try {
@@ -545,7 +552,8 @@ async function handleCreateUser() {
         name: resData.name || payload.name,
         email: resData.email || payload.email,
         department: resData.department || payload.department,
-        status: resData.status || payload.status
+        status: resData.status || payload.status,
+        password: payload.password
       }
       users.value.unshift(created)
     } else {
@@ -564,10 +572,10 @@ function addLocalUser(payload) {
   const newUser = { 
     ...payload, 
     id: Date.now(),
+    password: payload.password ? payload.password.trim() : 'password',
     department: payload.department || 'ICT',
     status: payload.status || 'Active'
   }
-  delete newUser.password
   users.value.unshift(newUser)
 }
 
@@ -592,6 +600,9 @@ async function handleUpdateUser() {
           department: form.value.department,
           status: form.value.status
         }
+        if (form.value.password && form.value.password.trim()) {
+          users.value[idx].password = form.value.password.trim()
+        }
       }
     } else {
       updateLocalUser()
@@ -608,7 +619,7 @@ async function handleUpdateUser() {
 function updateLocalUser() {
   const idx = users.value.findIndex(u => u.id === form.value.id)
   if (idx !== -1) {
-    users.value[idx] = { 
+    const updated = { 
       ...users.value[idx], 
       name: form.value.name,
       email: form.value.email,
@@ -616,6 +627,11 @@ function updateLocalUser() {
       department: form.value.department,
       status: form.value.status
     }
+    // Update password if a new one was entered in edit modal
+    if (form.value.password && form.value.password.trim()) {
+      updated.password = form.value.password.trim()
+    }
+    users.value[idx] = updated
   }
 }
 
