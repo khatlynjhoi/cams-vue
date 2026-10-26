@@ -81,7 +81,7 @@
             Course Builder & Syllabus Manager
           </h1>
           <p class="text-sm text-slate-200 font-normal">
-            Define Programs, Course Codes, Titles, Course Outcomes (COs), and Learning Objectives (LOs) with hours allocation.
+            Define Programs, Course Codes, Titles, Course Outcomes (COs), and Learning Objectives (LOs) mapped directly to MySQL.
           </p>
         </div>
       </div>
@@ -356,7 +356,7 @@
         </div>
 
         <div v-if="filteredAndSortedCourses.length === 0" class="p-8 text-center text-slate-500 text-sm">
-          No courses found matching your filter criteria.
+          No registered courses found in database. Create a new course above or upload a CSV file.
         </div>
 
         <div class="divide-y divide-slate-100">
@@ -456,42 +456,6 @@ import {
 
 const STORAGE_KEY = 'cams_courses_data'
 
-// DEFAULT STCW CURRICULUM COURSES
-const DEFAULT_COURSES = [
-  {
-    id: 'course-nav-101',
-    program: 'BSMT',
-    code: 'NAV-101',
-    title: 'Terrestrial and Coastal Navigation',
-    courseOutcomes: [
-      {
-        id: 'CO1',
-        title: 'Demonstrate competence in maintaining a safe navigational watch and coastal navigation.',
-        learningOutcomes: [
-          { id: 'LO1.1', description: 'Apply COLREG Rules of the Road in navigational watch scenario', hours: 12 },
-          { id: 'LO1.2', description: 'Plot positions using compass bearings and nautical charts', hours: 15 }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'course-eng-201',
-    program: 'BSMarE',
-    code: 'ENG-201',
-    title: 'Marine Engineering Systems & Watchkeeping',
-    courseOutcomes: [
-      {
-        id: 'CO1',
-        title: 'Operate main propulsion machinery and auxiliary control systems safely.',
-        learningOutcomes: [
-          { id: 'LO1.1', description: 'Perform pre-start checks on diesel main engines', hours: 15 },
-          { id: 'LO1.2', description: 'Monitor temperature and pressure gauges during engine operation', hours: 10 }
-        ]
-      }
-    ]
-  }
-]
-
 const courses = ref([])
 const isLoading = ref(true)
 
@@ -527,7 +491,7 @@ const bulkPreview = ref([])
 const isUploadingBulk = ref(false)
 const bulkFileInput = ref(null)
 
-// Proxy-aware API fetcher with local storage fallback
+// Proxy-aware API fetcher querying available backend endpoints
 async function fetchFromEndpoints(path, options = {}) {
   const token = localStorage.getItem('cams_token') || localStorage.getItem('token') || ''
   
@@ -538,50 +502,49 @@ async function fetchFromEndpoints(path, options = {}) {
     ...(options.headers || {})
   }
 
-  try {
-    const res = await fetch(`/api${path}`, { ...options, headers })
-    if (res.ok) {
-      return await res.json()
+  const endpoints = ['/api', 'http://127.0.0.1:8000/api', 'http://localhost:8000/api']
+
+  for (const baseUrl of endpoints) {
+    try {
+      const res = await fetch(`${baseUrl}${path}`, { ...options, headers })
+      const contentType = res.headers.get('content-type') || ''
+      if (contentType.includes('application/json')) {
+        const json = await res.json()
+        return { ok: res.ok, status: res.status, data: json }
+      }
+    } catch (e) {
+      // try next endpoint
     }
-  } catch (e) {
-    // Fall through to local storage
   }
   throw new Error('Backend API unreachable')
 }
 
-// Load Courses Data
+// Load Courses strictly from MySQL
 async function loadCoursesFromStorage() {
   isLoading.value = true
 
   try {
-    const data = await fetchFromEndpoints('/courses')
-    const rawList = Array.isArray(data) ? data : (data?.data || [])
+    const res = await fetchFromEndpoints('/courses?all=1')
+    if (res && res.ok) {
+      const json = res.data
+      const rawList = Array.isArray(json) ? json : (json?.data || [])
 
-    if (rawList.length > 0) {
       courses.value = rawList.map(course => ({
         ...course,
         courseOutcomes: course.course_outcomes || course.courseOutcomes || []
       }))
-    } else {
-      const savedData = localStorage.getItem(STORAGE_KEY)
-      const parsed = savedData ? JSON.parse(savedData) : []
-      courses.value = parsed.length > 0 ? parsed : DEFAULT_COURSES
+      saveCoursesToStorage()
+      return
     }
-
-    saveCoursesToStorage()
   } catch (err) {
     try {
       const savedData = localStorage.getItem(STORAGE_KEY)
-      const parsed = savedData ? JSON.parse(savedData) : []
-      courses.value = parsed.length > 0 ? parsed : DEFAULT_COURSES
+      courses.value = savedData ? JSON.parse(savedData) : []
     } catch (storageError) {
-      courses.value = DEFAULT_COURSES
+      courses.value = []
     }
-    saveCoursesToStorage()
   } finally {
-    setTimeout(() => {
-      isLoading.value = false
-    }, 400)
+    isLoading.value = false
   }
 }
 
@@ -687,9 +650,11 @@ function removeLearningOutcome(coIndex, loIndex) {
 const totalCourseHours = computed(() => {
   let total = 0
   courseOutcomes.value.forEach(co => {
-    co.learningOutcomes.forEach(lo => {
-      total += Number(lo.hours) || 0
-    })
+    if (Array.isArray(co.learningOutcomes)) {
+      co.learningOutcomes.forEach(lo => {
+        total += Number(lo.hours) || 0
+      })
+    }
   })
   return total
 })
@@ -727,7 +692,7 @@ function cancelEdit() {
   ]
 }
 
-// Save Course Data
+// Save Course Data directly to MySQL
 async function handleSaveCourse() {
   if (!courseCode.value.trim() || !courseTitle.value.trim()) {
     alert('Please enter both Course Code and Course Title.')
@@ -748,43 +713,20 @@ async function handleSaveCourse() {
     const path = isEdit ? `/courses/${editingCourseId.value}` : '/courses'
     const method = isEdit ? 'PUT' : 'POST'
 
-    const data = await fetchFromEndpoints(path, {
+    const res = await fetchFromEndpoints(path, {
       method,
       body: JSON.stringify(payload)
     })
 
-    const savedCourse = {
-      ...data,
-      courseOutcomes: data.course_outcomes || data.courseOutcomes || payload.course_outcomes
-    }
-
-    if (isEdit) {
-      const index = courses.value.findIndex(c => c.id === editingCourseId.value)
-      if (index !== -1) courses.value[index] = savedCourse
+    if (res && res.ok) {
+      alert('Course syllabus successfully saved to MySQL database!')
+      cancelEdit()
+      await loadCoursesFromStorage()
     } else {
-      courses.value.unshift(savedCourse)
+      alert(res?.data?.message || 'Failed to save course in database.')
     }
-
-    saveCoursesToStorage()
-    cancelEdit()
   } catch (err) {
-    const fallbackCourse = {
-      id: editingCourseId.value || Date.now(),
-      code: payload.code,
-      title: payload.title,
-      program: payload.program,
-      courseOutcomes: payload.course_outcomes
-    }
-
-    if (editingCourseId.value) {
-      const index = courses.value.findIndex(c => c.id === editingCourseId.value)
-      if (index !== -1) courses.value[index] = fallbackCourse
-    } else {
-      courses.value.unshift(fallbackCourse)
-    }
-
-    saveCoursesToStorage()
-    cancelEdit()
+    alert('Server unreachable. Could not save course to MySQL.')
   } finally {
     isLoading.value = false
   }
@@ -883,7 +825,6 @@ function parseCourseCSVText(csvText) {
 
     if (!courseMap.has(code)) {
       courseMap.set(code, {
-        id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
         program,
         code,
         title,
@@ -924,9 +865,8 @@ function handleBulkCSVUpload(event) {
     } catch (err) {
       csvParseError.value = err.message
       bulkPreview.value = []
-    } finally {
+    } font
       event.target.value = ''
-    }
   }
 
   reader.readAsText(file)
@@ -934,12 +874,10 @@ function handleBulkCSVUpload(event) {
 
 async function submitBulkCourses() {
   if (bulkPreview.value.length === 0) return
-  if (!confirm(`Are you sure you want to import ${bulkPreview.value.length} course(s) into CAMS?`)) return
+  if (!confirm(`Are you sure you want to import ${bulkPreview.value.length} course(s) into MySQL?`)) return
 
   isUploadingBulk.value = true
   isLoading.value = true
-
-  const importedCourses = []
 
   for (const course of bulkPreview.value) {
     const payload = {
@@ -950,47 +888,39 @@ async function submitBulkCourses() {
     }
 
     try {
-      const data = await fetchFromEndpoints('/courses', {
+      await fetchFromEndpoints('/courses', {
         method: 'POST',
         body: JSON.stringify(payload)
       })
-
-      importedCourses.push({
-        ...data,
-        courseOutcomes: data.course_outcomes || course.courseOutcomes || []
-      })
     } catch (e) {
-      importedCourses.push({
-        id: Date.now() + Math.random().toString(36).substring(2, 7),
-        ...payload,
-        courseOutcomes: course.courseOutcomes || []
-      })
+      console.error('Failed to import course:', course.code)
     }
   }
 
-  courses.value = [...importedCourses, ...courses.value]
-  saveCoursesToStorage()
-
+  await loadCoursesFromStorage()
   bulkPreview.value = []
   csvFileName.value = ''
   isUploadingBulk.value = false
   isLoading.value = false
 }
 
-// Delete Course
+// Delete Course from MySQL
 async function deleteCourse(id) {
   if (!confirm('Are you sure you want to delete this course structure?')) return
 
   isLoading.value = true
 
   try {
-    await fetchFromEndpoints(`/courses/${id}`, { method: 'DELETE' })
+    const res = await fetchFromEndpoints(`/courses/${id}`, { method: 'DELETE' })
+    if (res && res.ok) {
+      if (editingCourseId.value === id) cancelEdit()
+      await loadCoursesFromStorage()
+    } else {
+      alert(res?.data?.message || 'Failed to delete course.')
+    }
   } catch (err) {
-    // Delete local fallback
+    alert('Failed to delete course from MySQL server.')
   } finally {
-    courses.value = courses.value.filter(c => c.id !== id)
-    if (editingCourseId.value === id) cancelEdit()
-    saveCoursesToStorage()
     isLoading.value = false
   }
 }
