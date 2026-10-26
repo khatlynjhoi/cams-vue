@@ -463,11 +463,15 @@ async function sendApiRequest(path, options = {}) {
       if (contentType.includes('application/json')) {
         const data = await res.json()
 
-        // Handle expired or wiped Sanctum tokens automatically
+        // Handle expired or wiped Sanctum tokens automatically with dynamic base URL
         if (res.status === 401) {
           localStorage.removeItem('cams_token')
           localStorage.removeItem('cams_user')
-          window.location.href = '/login?expired=true'
+
+          const viteBase = import.meta.env.BASE_URL || '/'
+          const target = `${viteBase.endsWith('/') ? viteBase : viteBase + '/'}login?expired=true`
+
+          window.location.href = target
           return { ok: false, status: 401, data: { message: 'Session expired. Please log in again.' } }
         }
 
