@@ -3,8 +3,6 @@
     
     <!-- BRANDED SKELETON LOADER -->
     <div v-if="isLoading" class="space-y-6 animate-pulse">
-      
-      <!-- Top Banner Skeleton -->
       <div class="bg-linear-to-r from-[#123524] to-[#1b4d35] p-6 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xs">
         <div class="space-y-2">
           <div class="flex items-center gap-2">
@@ -16,13 +14,11 @@
         <div class="h-10 w-40 bg-white/10 rounded-xl"></div>
       </div>
 
-      <!-- Filter Toolbar Skeleton -->
       <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center gap-3">
         <div class="h-9 bg-slate-100 rounded-xl flex-1 w-full"></div>
         <div class="h-9 w-36 bg-slate-100 rounded-xl"></div>
       </div>
 
-      <!-- Data Table Skeleton -->
       <div class="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs">
         <div class="p-3.5 bg-slate-50 border-b border-slate-200/80 flex gap-4">
           <div v-for="w in ['w-48', 'w-28', 'w-24', 'w-32', 'w-28']" :key="w" :class="[w, 'h-4 bg-slate-200 rounded']"></div>
@@ -40,7 +36,6 @@
           </div>
         </div>
       </div>
-
     </div>
 
     <!-- MAIN VIEW CONTENT -->
@@ -211,7 +206,6 @@
                 class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold" 
               />
 
-              <!-- Password Strength Indicator -->
               <div v-if="form.password" class="mt-2 space-y-1">
                 <div class="flex justify-between items-center text-xs font-bold">
                   <span class="text-slate-500">Strength:</span>
@@ -258,8 +252,8 @@
             <button @click="showAddModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl cursor-pointer">
               Cancel
             </button>
-            <button @click="handleCreateUser" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs cursor-pointer">
-              Create & Grant Access
+            <button @click="handleCreateUser" :disabled="isSubmitting" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs cursor-pointer disabled:opacity-50">
+              {{ isSubmitting ? 'Saving...' : 'Create & Grant Access' }}
             </button>
           </div>
         </div>
@@ -294,7 +288,6 @@
               <label class="block font-bold text-slate-700 mb-1">Reset Password (Optional)</label>
               <input v-model="form.password" type="password" placeholder="Leave blank to keep current password" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold" />
 
-              <!-- Password Strength Indicator for Reset Password -->
               <div v-if="form.password" class="mt-2 space-y-1">
                 <div class="flex justify-between items-center text-xs font-bold">
                   <span class="text-slate-500">Strength:</span>
@@ -341,8 +334,8 @@
             <button @click="showEditModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl cursor-pointer">
               Cancel
             </button>
-            <button @click="handleUpdateUser" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs cursor-pointer">
-              Save Changes
+            <button @click="handleUpdateUser" :disabled="isSubmitting" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs cursor-pointer disabled:opacity-50">
+              {{ isSubmitting ? 'Updating...' : 'Save Changes' }}
             </button>
           </div>
         </div>
@@ -397,6 +390,7 @@ const auth = useAuthStore()
 // State
 const users = ref([])
 const isLoading = ref(true)
+const isSubmitting = ref(false)
 const searchQuery = ref('')
 const selectedRoleFilter = ref('All')
 
@@ -447,10 +441,10 @@ const passwordStrength = computed(() => {
 })
 
 /**
- * Standard API Fetch helper supporting token authorization & role headers
+ * Standard API Fetch helper supporting token authorization & error handling
  */
-async function fetchFromEndpoints(path, options = {}) {
-  const ports = ['/api', 'http://127.0.0.1:8000/api', 'http://localhost:8000/api']
+async function sendApiRequest(path, options = {}) {
+  const endpoints = ['/api', 'http://127.0.0.1:8000/api', 'http://localhost:8000/api']
   const token = auth.token || localStorage.getItem('cams_token') || localStorage.getItem('token') || ''
 
   const headers = {
@@ -461,83 +455,60 @@ async function fetchFromEndpoints(path, options = {}) {
     ...(options.headers || {})
   }
 
-  for (const baseUrl of ports) {
+  for (const baseUrl of endpoints) {
     try {
       const res = await fetch(`${baseUrl}${path}`, { ...options, headers })
-      if (res.ok) {
-        return await res.json()
+      const contentType = res.headers.get('content-type') || ''
+      
+      if (contentType.includes('application/json')) {
+        const data = await res.json()
+
+        // Handle expired or wiped Sanctum tokens automatically
+        if (res.status === 401) {
+          localStorage.removeItem('cams_token')
+          localStorage.removeItem('cams_user')
+          window.location.href = '/login?expired=true'
+          return { ok: false, status: 401, data: { message: 'Session expired. Please log in again.' } }
+        }
+
+        return { ok: res.ok, status: res.status, data }
       }
     } catch (e) {
       // Try next available endpoint
     }
   }
-  throw new Error(`Endpoint ${path} unreachable`)
+  throw new Error(`API Endpoint ${path} unreachable`)
 }
 
 onMounted(() => {
-  isLoading.value = true
   loadUsers()
 })
 
 async function loadUsers() {
-  const localSaved = JSON.parse(localStorage.getItem('cams_users_list') || '[]')
-
+  isLoading.value = true
   try {
-    const data = await fetchFromEndpoints('/users')
-    const rawList = Array.isArray(data) ? data : (data.data || data.users || [])
-
-    if (Array.isArray(rawList) && rawList.length > 0) {
-      const apiUsers = rawList.map(u => ({
+    const res = await sendApiRequest('/users')
+    if (res && res.ok) {
+      const rawList = Array.isArray(res.data) ? res.data : (res.data.data || res.data.users || [])
+      users.value = rawList.map(u => ({
         ...u,
         department: u.department || 'ICT',
         status: u.status || 'Active'
       }))
-
-      // Merge local created items, preserving local custom set passwords
-      localSaved.forEach(localItem => {
-        const apiIdx = apiUsers.findIndex(a => 
-          String(a.id) === String(localItem.id) || 
-          (a.email && localItem.email && a.email.toLowerCase() === localItem.email.toLowerCase())
-        )
-
-        if (apiIdx !== -1) {
-          apiUsers[apiIdx] = {
-            ...apiUsers[apiIdx],
-            ...localItem,
-            password: localItem.password || apiUsers[apiIdx].password || 'password'
-          }
-        } else {
-          apiUsers.push(localItem)
-        }
-      })
-
-      users.value = apiUsers
-      saveLocalUsers()
-    } else {
-      loadFallbackUsers(localSaved)
+      return
     }
   } catch (e) {
-    loadFallbackUsers(localSaved)
+    console.warn('API unavailable, loading local cached user list.')
   } finally {
     isLoading.value = false
   }
-}
 
-function loadFallbackUsers(localSaved = []) {
-  if (localSaved.length > 0) {
-    users.value = localSaved
-  } else {
-    const defaults = [
-      { id: 1, name: 'IT Administrator', email: 'it@bma.edu.ph', password: 'password', role: 'Admin', department: 'ICT', status: 'Active' },
-      { id: 2, name: 'Percival Banting', email: 'p.banting@bma.edu.ph', password: 'password', role: 'Admin', department: 'ICT', status: 'Active' }
-    ]
-    users.value = defaults
-    saveLocalUsers()
-  }
-}
-
-function saveLocalUsers() {
-  localStorage.setItem('cams_users_list', JSON.stringify(users.value))
+  // Local fallback if backend server is unreachable
+  const localSaved = JSON.parse(localStorage.getItem('cams_users_list') || '[]')
+  users.value = localSaved.length ? localSaved : [
+    { id: 1, name: 'IT Administrator', email: 'it@bma.edu.ph', role: 'Admin', department: 'ICT', status: 'Active' },
+    { id: 2, name: 'Percival Banting', email: 'p.banting@bma.edu.ph', role: 'Admin', department: 'ICT', status: 'Active' }
+  ]
 }
 
 const filteredUsers = computed(() => {
@@ -589,7 +560,7 @@ function validateForm(isEdit = false) {
   } else if (form.value.password && form.value.password.length < 8) {
     errors.password = 'Password must be at least 8 characters long.'
   } else if (form.value.password && passwordStrength.value.score < 50) {
-    errors.password = 'Password is too weak. Combine letters, numbers, or symbols.'
+    errors.password = 'Password is too weak. Combine letters, numbers, and symbols.'
   }
 
   formErrors.value = errors
@@ -598,6 +569,7 @@ function validateForm(isEdit = false) {
 
 async function handleCreateUser() {
   if (!validateForm(false)) return
+  isSubmitting.value = true
 
   const payload = { 
     name: form.value.name.trim(),
@@ -605,131 +577,99 @@ async function handleCreateUser() {
     role: form.value.role,
     department: form.value.department,
     status: form.value.status,
-    password: form.value.password ? form.value.password.trim() : 'password'
+    password: form.value.password.trim()
   }
 
   try {
-    const data = await fetchFromEndpoints('/users', {
+    const res = await sendApiRequest('/users', {
       method: 'POST',
       body: JSON.stringify(payload)
     })
-    const resData = data.data || data
-    if (data.success || resData.id) {
-      const created = {
-        ...resData,
-        name: payload.name,
-        email: payload.email,
-        department: payload.department,
-        status: payload.status,
-        password: payload.password
-      }
-      users.value.unshift(created)
+
+    if (res && res.ok) {
+      await loadUsers()
+      showAddModal.value = false
+      resetForm()
     } else {
-      addLocalUser(payload)
+      const msg = res?.data?.message || 'Failed to create user in database.'
+      formErrors.value = { password: msg }
     }
   } catch (e) {
-    addLocalUser(payload)
+    alert('Server unreachable. Could not save user to MySQL.')
   } finally {
-    saveLocalUsers()
-    showAddModal.value = false
-    resetForm()
+    isSubmitting.value = false
   }
-}
-
-function addLocalUser(payload) {
-  const newUser = { 
-    id: Date.now(),
-    name: payload.name,
-    email: payload.email.toLowerCase().trim(),
-    password: payload.password ? payload.password.trim() : 'password',
-    role: payload.role,
-    department: payload.department || 'ICT',
-    status: payload.status || 'Active'
-  }
-  users.value.unshift(newUser)
 }
 
 async function handleUpdateUser() {
   if (!validateForm(true)) return
+  isSubmitting.value = true
 
-  const newPassword = form.value.password && form.value.password.trim() ? form.value.password.trim() : null
+  const payload = {
+    name: form.value.name.trim(),
+    email: form.value.email.trim().toLowerCase(),
+    role: form.value.role,
+    department: form.value.department,
+    status: form.value.status
+  }
+
+  // Only include password if explicitly modified
+  if (form.value.password && form.value.password.trim()) {
+    payload.password = form.value.password.trim()
+  }
 
   try {
-    const data = await fetchFromEndpoints(`/users/${form.value.id}`, {
+    const res = await sendApiRequest(`/users/${form.value.id}`, {
       method: 'PUT',
-      body: JSON.stringify(form.value)
+      body: JSON.stringify(payload)
     })
-    const resData = data.data || data
-    if (data.success || resData.id) {
-      const idx = users.value.findIndex(u => u.id === form.value.id)
-      if (idx !== -1) {
-        users.value[idx] = {
-          ...users.value[idx],
-          ...resData,
-          name: form.value.name,
-          email: form.value.email,
-          role: form.value.role,
-          department: form.value.department,
-          status: form.value.status,
-          password: newPassword || users.value[idx].password
-        }
-      }
+
+    if (res && res.ok) {
+      await loadUsers()
+      showEditModal.value = false
+      resetForm()
+      alert('User account updated successfully in MySQL!')
     } else {
-      updateLocalUser()
+      const msg = res?.data?.message || 'Failed to update user in MySQL.'
+      formErrors.value = { password: msg }
     }
   } catch (e) {
-    updateLocalUser()
+    alert('Server unreachable. Could not update user in MySQL.')
   } finally {
-    saveLocalUsers()
-    showEditModal.value = false
-    resetForm()
-  }
-}
-
-function updateLocalUser() {
-  const idx = users.value.findIndex(u => u.id === form.value.id)
-  if (idx !== -1) {
-    const updated = { 
-      ...users.value[idx], 
-      name: form.value.name,
-      email: form.value.email,
-      role: form.value.role,
-      department: form.value.department,
-      status: form.value.status
-    }
-    if (form.value.password && form.value.password.trim()) {
-      updated.password = form.value.password.trim()
-    }
-    users.value[idx] = updated
+    isSubmitting.value = false
   }
 }
 
 async function toggleUserAccess(user) {
   const newStatus = user.status === 'Active' ? 'Inactive' : 'Active'
-  user.status = newStatus
-
   try {
-    await fetchFromEndpoints(`/users/${user.id}`, {
+    const res = await sendApiRequest(`/users/${user.id}`, {
       method: 'PUT',
       body: JSON.stringify({ status: newStatus })
     })
-  } catch (e) {}
-
-  saveLocalUsers()
+    if (res && res.ok) {
+      user.status = newStatus
+    }
+  } catch (e) {
+    alert('Could not update status on MySQL server.')
+  }
 }
 
 async function handleDeleteUser() {
   if (!selectedUser.value) return
 
   try {
-    await fetchFromEndpoints(`/users/${selectedUser.value.id}`, {
+    const res = await sendApiRequest(`/users/${selectedUser.value.id}`, {
       method: 'DELETE'
     })
-  } catch (e) {}
-
-  users.value = users.value.filter(u => u.id !== selectedUser.value.id)
-  saveLocalUsers()
-  showDeleteModal.value = false
-  selectedUser.value = null
+    if (res && res.ok) {
+      await loadUsers()
+    }
+  } catch (e) {
+    alert('Failed to remove user from MySQL server.')
+  } finally {
+    showDeleteModal.value = false
+    selectedUser.value = null
+  }
 }
 </script>
