@@ -570,13 +570,17 @@ async function handleCreateUser() {
 
 function addLocalUser(payload) {
   const newUser = { 
-    ...payload, 
     id: Date.now(),
-    password: payload.password ? payload.password.trim() : 'password',
+    name: payload.name,
+    email: payload.email.toLowerCase().trim(),
+    password: payload.password ? payload.password.trim() : 'password', // Ensure password is saved!
+    role: payload.role,
     department: payload.department || 'ICT',
     status: payload.status || 'Active'
   }
+  
   users.value.unshift(newUser)
+  saveUsersToLocalStorage()
 }
 
 async function handleUpdateUser() {
@@ -616,22 +620,22 @@ async function handleUpdateUser() {
   }
 }
 
-function updateLocalUser() {
-  const idx = users.value.findIndex(u => u.id === form.value.id)
+function updateLocalUser(payload) {
+  const idx = users.value.findIndex(u => u.id === payload.id)
   if (idx !== -1) {
-    const updated = { 
+    users.value[idx] = { 
       ...users.value[idx], 
-      name: form.value.name,
-      email: form.value.email,
-      role: form.value.role,
-      department: form.value.department,
-      status: form.value.status
+      name: payload.name,
+      email: payload.email.toLowerCase().trim(),
+      role: payload.role,
+      department: payload.department,
+      status: payload.status,
+      // Update password only if a new non-empty password was provided
+      password: (payload.password && payload.password.trim()) 
+        ? payload.password.trim() 
+        : users.value[idx].password
     }
-    // Update password if a new one was entered in edit modal
-    if (form.value.password && form.value.password.trim()) {
-      updated.password = form.value.password.trim()
-    }
-    users.value[idx] = updated
+    saveUsersToLocalStorage()
   }
 }
 
@@ -663,4 +667,9 @@ async function handleDeleteUser() {
   showDeleteModal.value = false
   selectedUser.value = null
 }
+
+function saveUsersToLocalStorage() {
+  localStorage.setItem('cams_users_list', JSON.stringify(users.value))
+}
+
 </script>

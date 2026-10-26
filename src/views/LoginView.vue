@@ -86,7 +86,7 @@ async function handleLogin() {
   try {
     const registeredUsers = await fetchUsersList()
     
-    // 1. Check account existence in User Management
+    // 1. Match email in User Management
     const matchedUser = registeredUsers.find(
       u => u && u.email && u.email.trim().toLowerCase() === inputEmail
     )
@@ -97,27 +97,33 @@ async function handleLogin() {
       return
     }
 
-    // 2. Access Authorization Status Check
+    // 2. Check if account status is active
     if ((matchedUser.status || 'Active').toLowerCase() !== 'active') {
       errorMessage.value = 'Access Revoked: Your account is marked as Inactive in User Management.'
       isLoading.value = false
       return
     }
 
-    // 3. STRICT Password Match against stored account record
-    const storedPassword = matchedUser.password || 'password'
+    // 3. Strict Password Verification (No fallback string!)
+    const storedPassword = matchedUser.password
+
+    if (!storedPassword) {
+      errorMessage.value = 'Account setup incomplete. Please re-create this user in User Management.'
+      isLoading.value = false
+      return
+    }
+
     if (inputPassword !== storedPassword) {
       errorMessage.value = 'Incorrect password. Please verify your credentials.'
       isLoading.value = false
       return
     }
 
-    // 4. Complete session login in Auth Store
+    // 4. Successful Authentication
     if (authStore.login) {
       await authStore.login(inputEmail, inputPassword, matchedUser)
     }
 
-    // Save authorized user session
     localStorage.setItem('cams_user', JSON.stringify(matchedUser))
     localStorage.setItem('cams_user_role', matchedUser.role || 'Admin')
     if (!localStorage.getItem('cams_token')) {
