@@ -372,6 +372,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { 
   Users, 
   UserPlus, 
@@ -385,6 +386,7 @@ import {
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 
+const router = useRouter()
 const auth = useAuthStore()
 
 // State
@@ -441,16 +443,17 @@ const passwordStrength = computed(() => {
 })
 
 /**
- * Standard API Fetch helper supporting token authorization & error handling
+ * Standard API Fetch helper prioritizing fresh localStorage token and Vue Router navigation
  */
 async function sendApiRequest(path, options = {}) {
   const endpoints = ['/api', 'http://127.0.0.1:8000/api', 'http://localhost:8000/api']
-  const token = auth.token || localStorage.getItem('cams_token') || localStorage.getItem('token') || ''
+  // Prioritize fresh cams_token from localStorage over stale Pinia state
+  const token = localStorage.getItem('cams_token') || auth.token || localStorage.getItem('token') || ''
 
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'X-User-Role': auth.user?.role || 'Admin',
+    'X-User-Role': auth.user?.role || localStorage.getItem('cams_user_role') || 'Admin',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...(options.headers || {})
   }
@@ -463,15 +466,18 @@ async function sendApiRequest(path, options = {}) {
       if (contentType.includes('application/json')) {
         const data = await res.json()
 
-        // Handle expired or wiped Sanctum tokens automatically with dynamic base URL
+        // Handle expired Sanctum token using Vue Router to preserve base URL /cams-vue/
         if (res.status === 401) {
           localStorage.removeItem('cams_token')
           localStorage.removeItem('cams_user')
 
-          const viteBase = import.meta.env.BASE_URL || '/'
-          const target = `${viteBase.endsWith('/') ? viteBase : viteBase + '/'}login?expired=true`
-
-          window.location.href = target
+          if (router) {
+            router.push({ path: '/login', query: { expired: 'true' } })
+          } else {
+            const viteBase = import.meta.env.BASE_URL || '/'
+            const cleanBase = viteBase.endsWith('/') ? viteBase.slice(0, -1) : viteBase
+            window.location.href = `${cleanBase}/login?expired=true`
+          }
           return { ok: false, status: 401, data: { message: 'Session expired. Please log in again.' } }
         }
 
