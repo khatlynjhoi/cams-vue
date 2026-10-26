@@ -210,6 +210,22 @@
                 placeholder="••••••••" 
                 class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold" 
               />
+
+              <!-- Password Strength Indicator -->
+              <div v-if="form.password" class="mt-2 space-y-1">
+                <div class="flex justify-between items-center text-xs font-bold">
+                  <span class="text-slate-500">Strength:</span>
+                  <span :class="passwordStrength.color">{{ passwordStrength.label }}</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div 
+                    class="h-full transition-all duration-300" 
+                    :class="passwordStrength.barColor" 
+                    :style="{ width: `${passwordStrength.score}%` }"
+                  ></div>
+                </div>
+              </div>
+
               <p v-if="formErrors.password" class="text-[11px] text-rose-600 mt-1 font-semibold">{{ formErrors.password }}</p>
             </div>
 
@@ -277,6 +293,23 @@
             <div>
               <label class="block font-bold text-slate-700 mb-1">Reset Password (Optional)</label>
               <input v-model="form.password" type="password" placeholder="Leave blank to keep current password" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold" />
+
+              <!-- Password Strength Indicator for Reset Password -->
+              <div v-if="form.password" class="mt-2 space-y-1">
+                <div class="flex justify-between items-center text-xs font-bold">
+                  <span class="text-slate-500">Strength:</span>
+                  <span :class="passwordStrength.color">{{ passwordStrength.label }}</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div 
+                    class="h-full transition-all duration-300" 
+                    :class="passwordStrength.barColor" 
+                    :style="{ width: `${passwordStrength.score}%` }"
+                  ></div>
+                </div>
+              </div>
+
+              <p v-if="formErrors.password" class="text-[11px] text-rose-600 mt-1 font-semibold">{{ formErrors.password }}</p>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -388,6 +421,31 @@ const formErrors = ref({})
 const rolesList = ['Admin', 'Assessment Officer', 'Instructor', 'Cadet']
 const departmentList = ['BSMT', 'BSMARE', 'General Education', 'Assessment & Quality', 'ICT']
 
+// Password Strength Evaluator
+const passwordStrength = computed(() => {
+  const pwd = form.value.password || ''
+  if (!pwd) return { score: 0, label: '', color: '', barColor: 'bg-slate-200' }
+
+  let score = 0
+  if (pwd.length >= 8) score++
+  if (/[A-Z]/.test(pwd)) score++
+  if (/[0-9]/.test(pwd)) score++
+  if (/[^A-Za-z0-9]/.test(pwd)) score++
+
+  switch (score) {
+    case 1:
+      return { score: 25, label: 'Weak', color: 'text-rose-600', barColor: 'bg-rose-500' }
+    case 2:
+      return { score: 50, label: 'Fair', color: 'text-amber-600', barColor: 'bg-amber-500' }
+    case 3:
+      return { score: 75, label: 'Good', color: 'text-blue-600', barColor: 'bg-blue-500' }
+    case 4:
+      return { score: 100, label: 'Strong', color: 'text-emerald-600', barColor: 'bg-emerald-500' }
+    default:
+      return { score: 0, label: '', color: '', barColor: 'bg-slate-200' }
+  }
+})
+
 /**
  * Standard API Fetch helper supporting token authorization & role headers
  */
@@ -435,12 +493,18 @@ async function loadUsers() {
         status: u.status || 'Active'
       }))
 
-      // Merge local created items not present in remote backend, preserving custom passwords
+      // Merge local created items, preserving local custom set passwords
       localSaved.forEach(localItem => {
-        const apiIdx = apiUsers.findIndex(a => String(a.id) === String(localItem.id) || a.email.toLowerCase() === localItem.email.toLowerCase())
+        const apiIdx = apiUsers.findIndex(a => 
+          String(a.id) === String(localItem.id) || 
+          (a.email && localItem.email && a.email.toLowerCase() === localItem.email.toLowerCase())
+        )
+
         if (apiIdx !== -1) {
-          if (localItem.password && !apiUsers[apiIdx].password) {
-            apiUsers[apiIdx].password = localItem.password
+          apiUsers[apiIdx] = {
+            ...apiUsers[apiIdx],
+            ...localItem,
+            password: localItem.password || apiUsers[apiIdx].password || 'password'
           }
         } else {
           apiUsers.push(localItem)
@@ -522,6 +586,10 @@ function validateForm(isEdit = false) {
 
   if (!isEdit && !form.value.password) {
     errors.password = 'Initial password is required.'
+  } else if (form.value.password && form.value.password.length < 8) {
+    errors.password = 'Password must be at least 8 characters long.'
+  } else if (form.value.password && passwordStrength.value.score < 50) {
+    errors.password = 'Password is too weak. Combine letters, numbers, or symbols.'
   }
 
   formErrors.value = errors
@@ -549,10 +617,10 @@ async function handleCreateUser() {
     if (data.success || resData.id) {
       const created = {
         ...resData,
-        name: resData.name || payload.name,
-        email: resData.email || payload.email,
-        department: resData.department || payload.department,
-        status: resData.status || payload.status,
+        name: payload.name,
+        email: payload.email,
+        department: payload.department,
+        status: payload.status,
         password: payload.password
       }
       users.value.unshift(created)
@@ -573,18 +641,18 @@ function addLocalUser(payload) {
     id: Date.now(),
     name: payload.name,
     email: payload.email.toLowerCase().trim(),
-    password: payload.password ? payload.password.trim() : 'password', // Ensure password is saved!
+    password: payload.password ? payload.password.trim() : 'password',
     role: payload.role,
     department: payload.department || 'ICT',
     status: payload.status || 'Active'
   }
-  
   users.value.unshift(newUser)
-  saveUsersToLocalStorage()
 }
 
 async function handleUpdateUser() {
   if (!validateForm(true)) return
+
+  const newPassword = form.value.password && form.value.password.trim() ? form.value.password.trim() : null
 
   try {
     const data = await fetchFromEndpoints(`/users/${form.value.id}`, {
@@ -602,10 +670,8 @@ async function handleUpdateUser() {
           email: form.value.email,
           role: form.value.role,
           department: form.value.department,
-          status: form.value.status
-        }
-        if (form.value.password && form.value.password.trim()) {
-          users.value[idx].password = form.value.password.trim()
+          status: form.value.status,
+          password: newPassword || users.value[idx].password
         }
       }
     } else {
@@ -620,22 +686,21 @@ async function handleUpdateUser() {
   }
 }
 
-function updateLocalUser(payload) {
-  const idx = users.value.findIndex(u => u.id === payload.id)
+function updateLocalUser() {
+  const idx = users.value.findIndex(u => u.id === form.value.id)
   if (idx !== -1) {
-    users.value[idx] = { 
+    const updated = { 
       ...users.value[idx], 
-      name: payload.name,
-      email: payload.email.toLowerCase().trim(),
-      role: payload.role,
-      department: payload.department,
-      status: payload.status,
-      // Update password only if a new non-empty password was provided
-      password: (payload.password && payload.password.trim()) 
-        ? payload.password.trim() 
-        : users.value[idx].password
+      name: form.value.name,
+      email: form.value.email,
+      role: form.value.role,
+      department: form.value.department,
+      status: form.value.status
     }
-    saveUsersToLocalStorage()
+    if (form.value.password && form.value.password.trim()) {
+      updated.password = form.value.password.trim()
+    }
+    users.value[idx] = updated
   }
 }
 
@@ -667,9 +732,4 @@ async function handleDeleteUser() {
   showDeleteModal.value = false
   selectedUser.value = null
 }
-
-function saveUsersToLocalStorage() {
-  localStorage.setItem('cams_users_list', JSON.stringify(users.value))
-}
-
 </script>

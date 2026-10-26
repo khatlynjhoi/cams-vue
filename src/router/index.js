@@ -67,16 +67,46 @@ const router = createRouter({
   scrollBehavior: () => ({ top: 0 })
 })
 
+// Session Token Max Age: 8 Hours (8 * 60 * 60 * 1000 ms)
+const SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000
+
 function getValidToken() {
   const token = localStorage.getItem('cams_token') || localStorage.getItem('token')
   if (!token || token === 'null' || token === 'undefined') return null
   return token
 }
 
+function isSessionExpired() {
+  const tokenTime = localStorage.getItem('cams_token_time')
+  if (!tokenTime) return false
+
+  const elapsed = Date.now() - parseInt(tokenTime, 10)
+  return elapsed > SESSION_MAX_AGE_MS
+}
+
+function purgeSession() {
+  localStorage.removeItem('cams_token')
+  localStorage.removeItem('token')
+  localStorage.removeItem('cams_token_time')
+  localStorage.removeItem('cams_user')
+  localStorage.removeItem('cams_user_role')
+  localStorage.removeItem('user')
+}
+
 router.beforeEach((to, from, next) => {
   const token = getValidToken()
-  let user = null
 
+  if (to.meta.title) {
+    document.title = to.meta.title
+  }
+
+  // 1. Session Expiration Verification Guard
+  if (token && isSessionExpired()) {
+    purgeSession()
+    return next({ path: '/login', query: { expired: 'true' } })
+  }
+
+  let user = null
   try {
     const raw = localStorage.getItem('cams_user') || localStorage.getItem('user')
     if (raw && raw !== 'null' && raw !== 'undefined') {
@@ -86,16 +116,12 @@ router.beforeEach((to, from, next) => {
     user = null
   }
 
-  if (to.meta.title) {
-    document.title = to.meta.title
-  }
-
-  // 1. Force strict redirect to /login if unauthenticated
+  // 2. Force strict redirect to /login if unauthenticated
   if (to.meta.requiresAuth && !token) {
     return next('/login')
   }
 
-  // 2. Prevent authenticated users from opening guest-only routes (/login)
+  // 3. Prevent authenticated users from opening guest-only routes (/login)
   if (to.meta.guestOnly && token) {
     const userRole = (user?.role || '').toLowerCase()
     if (userRole === 'cadet') {
@@ -104,7 +130,7 @@ router.beforeEach((to, from, next) => {
     return next('/')
   }
 
-  // 3. Cadet Protection: Redirect Cadets attempting to navigate to staff routes back to Student Exam
+  // 4. Cadet Protection: Redirect Cadets attempting to navigate to staff routes back to Student Exam
   if (user) {
     const userRole = (user.role || '').toLowerCase()
     if (userRole === 'cadet' && to.path !== '/student-exam') {

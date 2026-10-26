@@ -1,10 +1,11 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { LogIn, Mail, Lock, AlertCircle, RefreshCw, GraduationCap } from 'lucide-vue-next'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 // Dynamically resolve logo URL
@@ -17,58 +18,36 @@ const isLoading = ref(false)
 const isStudentLoading = ref(false)
 const errorMessage = ref('')
 
+onMounted(() => {
+  if (route.query.expired === 'true') {
+    errorMessage.value = 'Your session has expired due to 8 hours of inactivity. Please sign in again.'
+  }
+})
+
 /**
- * Fetch registered accounts from User Management (localStorage & API)
+ * Standard API Fetch helper for authenticating credentials
  */
-async function fetchUsersList() {
-  let localUsers = []
-  try {
-    const raw = localStorage.getItem('cams_users_list')
-    if (raw) localUsers = JSON.parse(raw)
-  } catch (e) {
-    localUsers = []
-  }
+async function postLogin(payload) {
+  const baseUrls = ['/api', 'http://127.0.0.1:8000/api', 'http://localhost:8000/api']
+  
+  for (const url of baseUrls) {
+    try {
+      const res = await fetch(`${url}/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
 
-  // Fallback defaults if list is completely empty
-  if (!Array.isArray(localUsers) || localUsers.length === 0) {
-    localUsers = [
-      { id: 1, name: 'IT Administrator', email: 'it@bma.edu.ph', password: 'password', role: 'Admin', department: 'ICT', status: 'Active' },
-      { id: 2, name: 'Percival Banting', email: 'p.banting@bma.edu.ph', password: 'password', role: 'Admin', department: 'ICT', status: 'Active' }
-    ]
-    localStorage.setItem('cams_users_list', JSON.stringify(localUsers))
-  }
-
-  try {
-    const token = authStore.token || localStorage.getItem('cams_token') || ''
-    const res = await fetch('/api/users', {
-      headers: {
-        'Accept': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      }
-    })
-    if (res.ok) {
       const data = await res.json()
-      const apiUsers = Array.isArray(data) ? data : (data.data || data.users || [])
-      if (apiUsers.length > 0) {
-        apiUsers.forEach(u => {
-          const existingLocal = localUsers.find(l => l.email && l.email.toLowerCase() === u.email.toLowerCase())
-          if (!existingLocal) {
-            localUsers.push({
-              ...u,
-              status: u.status || 'Active'
-            })
-          } else if (!u.password && existingLocal.password) {
-            // Retain local custom password if API user record lacks password field
-            u.password = existingLocal.password
-          }
-        })
-      }
+      return { status: res.status, ok: res.ok, data }
+    } catch (e) {
+      // Try next endpoint URL
     }
-  } catch (e) {
-    // API offline, use local storage list
   }
-
-  return localUsers
+  return null
 }
 
 async function handleLogin() {
@@ -84,55 +63,64 @@ async function handleLogin() {
   errorMessage.value = ''
 
   try {
-    const registeredUsers = await fetchUsersList()
-    
-    // 1. Match email in User Management
-    const matchedUser = registeredUsers.find(
-      u => u && u.email && u.email.trim().toLowerCase() === inputEmail
-    )
+    // 1. Attempt Server-Side Authentication via Laravel API
+    const response = await postLogin({ email: inputEmail, password: inputPassword })
+
+    if (response) {
+      if (response.ok && response.data.success) {
+        // Successful API Authentication
+        const { token, user } = response.data
+
+        if (authStore.login) {
+          await authStore.login(inputEmail, inputPassword, user)
+        }
+
+        localStorage.setItem('cams_token', token)
+        localStorage.setItem('cams_user', JSON.stringify(user))
+        localStorage.setItem('cams_user_role', user.role || 'Admin')
+        localStorage.setItem('cams_token_time', Date.now().toString())
+
+        router.push('/')
+        return
+      } else {
+        // Handle explicit backend security errors (e.g., 401 Invalid Credentials, 403 Account Inactive)
+        errorMessage.value = response.data.message || 'Invalid email or password.'
+        isLoading.value = false
+        return
+      }
+    }
+
+    // 2. Offline Fallback Mode (Only triggered if Laravel server is entirely unreachable)
+    const localUsers = JSON.parse(localStorage.getItem('cams_users_list') || '[]')
+    const matchedUser = localUsers.find(u => u && u.email && u.email.toLowerCase() === inputEmail)
 
     if (!matchedUser) {
-      errorMessage.value = 'Account not found. Only registered accounts created in User Management can log in.'
+      errorMessage.value = 'Backend server unreachable and account not found locally.'
       isLoading.value = false
       return
     }
 
-    // 2. Check if account status is active
     if ((matchedUser.status || 'Active').toLowerCase() !== 'active') {
-      errorMessage.value = 'Access Revoked: Your account is marked as Inactive in User Management.'
+      errorMessage.value = 'Access Revoked: Your account is marked as Inactive.'
       isLoading.value = false
       return
     }
 
-    // 3. Strict Password Verification (No fallback string!)
-    const storedPassword = matchedUser.password
-
-    if (!storedPassword) {
-      errorMessage.value = 'Account setup incomplete. Please re-create this user in User Management.'
-      isLoading.value = false
-      return
-    }
-
-    if (inputPassword !== storedPassword) {
+    if (matchedUser.password && inputPassword !== matchedUser.password) {
       errorMessage.value = 'Incorrect password. Please verify your credentials.'
       isLoading.value = false
       return
     }
 
-    // 4. Successful Authentication
-    if (authStore.login) {
-      await authStore.login(inputEmail, inputPassword, matchedUser)
-    }
-
+    // Offline login success
     localStorage.setItem('cams_user', JSON.stringify(matchedUser))
     localStorage.setItem('cams_user_role', matchedUser.role || 'Admin')
-    if (!localStorage.getItem('cams_token')) {
-      localStorage.setItem('cams_token', `cams-token-${Date.now()}`)
-    }
-
+    localStorage.setItem('cams_token', `cams-token-${Date.now()}`)
+    localStorage.setItem('cams_token_time', Date.now().toString())
     router.push('/')
+
   } catch (err) {
-    errorMessage.value = 'An error occurred during authentication. Please try again.'
+    errorMessage.value = 'An unexpected error occurred during authentication.'
   } finally {
     isLoading.value = false
   }
@@ -142,6 +130,7 @@ async function handleStudentContinue() {
   isStudentLoading.value = true
   try {
     await authStore.loginAsStudent()
+    localStorage.setItem('cams_token_time', Date.now().toString())
     router.push('/student-exam')
   } catch (err) {
     errorMessage.value = 'Failed to open Student Portal. Please try again.'
@@ -181,7 +170,7 @@ async function handleStudentContinue() {
             <input 
               v-model="email" 
               type="email" 
-              placeholder="e.g. email@bma.edu.ph"
+              placeholder="e.g. it@bma.edu.ph"
               autocomplete="off"
               required
               class="w-full pl-9 pr-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
