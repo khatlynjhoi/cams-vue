@@ -1,6 +1,27 @@
 <template>
-  <div class="p-4 md:p-6 max-w-8xl mx-auto space-y-6 font-sans text-slate-800 antialiased min-h-screen bg-slate-50">
+  <div class="p-4 md:p-6 max-w-8xl mx-auto space-y-6 font-sans text-slate-800 antialiased min-h-screen bg-slate-50 relative">
     
+    <!-- REACTIVE FLOATING TOAST NOTIFICATION -->
+    <Transition name="toast">
+      <div 
+        v-if="toast.show" 
+        class="fixed top-5 right-5 z-50 p-4 rounded-2xl shadow-xl flex items-center gap-3 border text-sm font-bold max-w-md transition-all duration-300"
+        :class="
+          toast.type === 'success' ? 'bg-emerald-900 text-white border-emerald-700' :
+          toast.type === 'error' ? 'bg-rose-900 text-white border-rose-700' :
+          'bg-slate-900 text-white border-slate-700'
+        "
+      >
+        <CheckCircle2 v-if="toast.type === 'success'" class="text-emerald-400 shrink-0" :size="20" />
+        <AlertTriangle v-else-if="toast.type === 'error'" class="text-rose-400 shrink-0" :size="20" />
+        <Info v-else class="text-blue-400 shrink-0" :size="20" />
+        <span class="flex-1">{{ toast.message }}</span>
+        <button @click="toast.show = false" class="text-slate-300 hover:text-white cursor-pointer">
+          <X :size="16" />
+        </button>
+      </div>
+    </Transition>
+
     <!-- BRANDED SKELETON LOADER -->
     <div v-if="isLoading" class="space-y-6 animate-pulse">
       
@@ -264,6 +285,11 @@
                   <span class="text-sm font-bold text-slate-900">
                     {{ c.title }}
                   </span>
+
+                  <!-- TOTAL HOURS BADGE IN CSV PREVIEW -->
+                  <span class="ml-auto px-2.5 py-0.5 bg-emerald-100 text-emerald-800 font-mono text-xs font-bold rounded-lg flex items-center gap-1 border border-emerald-200 shrink-0">
+                    <Clock :size="12" /> {{ calculateTotalHours(c.courseOutcomes) }} hrs
+                  </span>
                 </div>
 
                 <div class="pl-4 space-y-1">
@@ -295,21 +321,32 @@
 
             <button 
               @click="submitBulkCourses" 
-              class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl shadow-xs cursor-pointer"
+              :disabled="isUploadingBulk"
+              class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 transition"
             >
-              Import All {{ bulkPreview.length }} Courses
+              <Loader2 v-if="isUploadingBulk" class="animate-spin" :size="16" />
+              <span>{{ isUploadingBulk ? `Importing ${bulkPreview.length} Course(s)...` : `Import All ${bulkPreview.length} Courses` }}</span>
             </button>
           </div>
         </div>
 
         <div class="flex items-center gap-3 pt-2">
+          <!-- REACTIVE SAVE / UPDATE BUTTON WITH LOADING SPINNER -->
           <button 
             @click="handleSaveCourse" 
-            class="px-6 py-2.5 text-sm font-bold text-white rounded-xl shadow-xs transition-colors cursor-pointer"
+            :disabled="isSaving"
+            class="px-6 py-2.5 text-sm font-bold text-white rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             :class="editingCourseId ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
           >
-            {{ editingCourseId ? 'Update Syllabus & Structure' : 'Save Syllabus & Structure' }}
+            <Loader2 v-if="isSaving" class="animate-spin" :size="16" />
+            <span>
+              {{ isSaving 
+                ? (editingCourseId ? 'Updating Syllabus...' : 'Saving Syllabus...') 
+                : (editingCourseId ? 'Update Syllabus & Structure' : 'Save Syllabus & Structure') 
+              }}
+            </span>
           </button>
+
           <button 
             v-if="editingCourseId" 
             @click="cancelEdit" 
@@ -383,9 +420,15 @@
               </button>
 
               <div class="flex items-center gap-3">
+                <!-- TOTAL HOURS BADGE IN COURSE REGISTRY LIST -->
+                <span class="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono text-xs font-bold rounded-lg flex items-center gap-1 shrink-0">
+                  <Clock :size="13" /> {{ calculateTotalHours(c.courseOutcomes) }} hrs
+                </span>
+
                 <span class="text-[11px] font-semibold text-slate-400">
                   {{ c.courseOutcomes?.length || 0 }} Outcomes
                 </span>
+
                 <button 
                   @click="startEditCourse(c)" 
                   class="text-slate-400 hover:text-amber-600 p-1 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
@@ -393,12 +436,16 @@
                 >
                   <Pencil :size="16" />
                 </button>
+
+                <!-- REACTIVE DELETE BUTTON WITH SPINNER -->
                 <button 
                   @click="deleteCourse(c.id)" 
-                  class="text-slate-400 hover:text-rose-600 p-1 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                  :disabled="deletingCourseId === c.id"
+                  class="text-slate-400 hover:text-rose-600 p-1 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                   title="Delete Course"
                 >
-                  <Trash2 :size="16" />
+                  <Loader2 v-if="deletingCourseId === c.id" class="animate-spin text-rose-600" :size="16" />
+                  <Trash2 v-else :size="16" />
                 </button>
               </div>
             </div>
@@ -451,13 +498,40 @@ import { ref, onMounted, computed } from 'vue'
 import {
   Plus, Trash2, Clock, Download,
   Upload, ChevronDown, ChevronRight, Search, Filter, ArrowUpDown,
-  Pencil, RotateCcw, BookOpen
+  Pencil, RotateCcw, BookOpen, Loader2, CheckCircle2, AlertTriangle, Info, X
 } from 'lucide-vue-next'
 
 const STORAGE_KEY = 'cams_courses_data'
 
 const courses = ref([])
 const isLoading = ref(true)
+const isSaving = ref(false)
+const deletingCourseId = ref(null)
+
+// Toast Alert State
+const toast = ref({
+  show: false,
+  message: '',
+  type: 'success'
+})
+
+function showToast(message, type = 'success', duration = 3500) {
+  toast.value = { show: true, message, type }
+  setTimeout(() => {
+    toast.value.show = false
+  }, duration)
+}
+
+// Total Hours Helper Function
+function calculateTotalHours(outcomes) {
+  if (!Array.isArray(outcomes)) return 0
+  return outcomes.reduce((total, co) => {
+    const los = co.learningOutcomes || co.objectives || co.learning_outcomes || []
+    if (!Array.isArray(los)) return total
+    const coTotal = los.reduce((sum, lo) => sum + (Number(lo.hours) || 0), 0)
+    return total + coTotal
+  }, 0)
+}
 
 // Accordion State
 const expandedCourses = ref(new Set())
@@ -648,15 +722,7 @@ function removeLearningOutcome(coIndex, loIndex) {
 }
 
 const totalCourseHours = computed(() => {
-  let total = 0
-  courseOutcomes.value.forEach(co => {
-    if (Array.isArray(co.learningOutcomes)) {
-      co.learningOutcomes.forEach(lo => {
-        total += Number(lo.hours) || 0
-      })
-    }
-  })
-  return total
+  return calculateTotalHours(courseOutcomes.value)
 })
 
 // Edit Management
@@ -695,7 +761,7 @@ function cancelEdit() {
 // Save Course Data directly to System
 async function handleSaveCourse() {
   if (!courseCode.value.trim() || !courseTitle.value.trim()) {
-    alert('Please enter both Course Code and Course Title.')
+    showToast('Please enter both Course Code and Course Title.', 'error')
     return
   }
 
@@ -706,7 +772,7 @@ async function handleSaveCourse() {
     course_outcomes: JSON.parse(JSON.stringify(courseOutcomes.value))
   }
 
-  isLoading.value = true
+  isSaving.value = true
 
   try {
     const isEdit = !!editingCourseId.value
@@ -719,17 +785,16 @@ async function handleSaveCourse() {
     })
 
     if (res && res.ok) {
-      alert('Course syllabus saved successfully!')
+      showToast(isEdit ? 'Course syllabus updated successfully!' : 'Course syllabus created successfully!', 'success')
       cancelEdit()
       await loadCoursesFromStorage()
     } else {
-      alert(res?.data?.message || 'Failed to save course syllabus. Please try again.')
+      showToast(res?.data?.message || 'Failed to save course syllabus.', 'error')
     }
   } catch (err) {
-    alert('Unable to connect to the server. Could not save course.')
-  } finally {
-    isLoading.value = false
-  }
+    showToast('Unable to connect to the server. Could not save course.', 'error')
+  } font
+    isSaving.value = false
 }
 
 // CSV Handlers
@@ -862,9 +927,11 @@ function handleBulkCSVUpload(event) {
   reader.onload = e => {
     try {
       bulkPreview.value = parseCourseCSVText(e.target.result)
+      showToast(`Parsed ${bulkPreview.value.length} courses from CSV.`, 'info')
     } catch (err) {
       csvParseError.value = err.message
       bulkPreview.value = []
+      showToast(err.message, 'error')
     }
     event.target.value = ''
   }
@@ -874,10 +941,8 @@ function handleBulkCSVUpload(event) {
 
 async function submitBulkCourses() {
   if (bulkPreview.value.length === 0) return
-  if (!confirm(`Are you sure you want to import ${bulkPreview.value.length} course(s) into the system?`)) return
 
   isUploadingBulk.value = true
-  isLoading.value = true
 
   for (const course of bulkPreview.value) {
     const payload = {
@@ -898,30 +963,43 @@ async function submitBulkCourses() {
   }
 
   await loadCoursesFromStorage()
+  showToast(`Successfully imported ${bulkPreview.value.length} course(s).`, 'success')
   bulkPreview.value = []
   csvFileName.value = ''
   isUploadingBulk.value = false
-  isLoading.value = false
 }
 
 // Delete Course from System
 async function deleteCourse(id) {
   if (!confirm('Are you sure you want to delete this course structure?')) return
 
-  isLoading.value = true
+  deletingCourseId.value = id
 
   try {
     const res = await fetchFromEndpoints(`/courses/${id}`, { method: 'DELETE' })
     if (res && res.ok) {
       if (editingCourseId.value === id) cancelEdit()
+      showToast('Course successfully deleted.', 'success')
       await loadCoursesFromStorage()
     } else {
-      alert(res?.data?.message || 'Failed to delete course.')
+      showToast(res?.data?.message || 'Failed to delete course.', 'error')
     }
   } catch (err) {
-    alert('Unable to connect to the server. Could not delete course.')
+    showToast('Unable to connect to the server. Could not delete course.', 'error')
   } finally {
-    isLoading.value = false
+    deletingCourseId.value = null
   }
 }
 </script>
+
+<style scoped>
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.3s ease;
+}
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.95);
+}
+</style>
