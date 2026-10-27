@@ -180,7 +180,8 @@
               <label class="block font-bold text-slate-700 mb-1">Full Name</label>
               <input 
                 v-model="form.name" 
-                placeholder="e.g. Percival Banting" 
+                placeholder="e.g. Juan Dela Cruz" 
+                autocomplete="off"
                 class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold" 
               />
               <p v-if="formErrors.name" class="text-[11px] text-rose-600 mt-1 font-semibold">{{ formErrors.name }}</p>
@@ -191,7 +192,8 @@
               <input 
                 v-model="form.email" 
                 type="email" 
-                placeholder="e.g. p.banting@bma.edu.ph" 
+                placeholder="e.g. j.delacruz@bma.edu.ph" 
+                autocomplete="off"
                 class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold" 
               />
               <p v-if="formErrors.email" class="text-[11px] text-rose-600 mt-1 font-semibold">{{ formErrors.email }}</p>
@@ -203,39 +205,73 @@
                 v-model="form.password" 
                 type="password" 
                 placeholder="••••••••" 
-                class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold" 
+                autocomplete="new-password"
+                @input="validatePasswordInline(false)"
+                class="w-full p-2.5 border rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold transition" 
+                :class="formErrors.password ? 'border-rose-300 bg-rose-50/30' : 'border-slate-200'"
               />
 
-              <div v-if="form.password" class="mt-2 space-y-1">
+              <!-- INSTANT REAL-TIME PASSWORD AUTHENTICATION CHECKLIST -->
+              <div v-if="form.password" class="mt-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
                 <div class="flex justify-between items-center text-xs font-bold">
-                  <span class="text-slate-500">Strength:</span>
-                  <span :class="passwordStrength.color">{{ passwordStrength.label }}</span>
+                  <span class="text-slate-600">Password Requirements:</span>
+                  <span :class="passwordStrength.color" class="font-extrabold">{{ passwordStrength.label }}</span>
                 </div>
-                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                
+                <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                   <div 
                     class="h-full transition-all duration-300" 
                     :class="passwordStrength.barColor" 
                     :style="{ width: `${passwordStrength.score}%` }"
                   ></div>
                 </div>
+
+                <div class="grid grid-cols-2 gap-1.5 text-[11px] font-semibold pt-1">
+                  <div class="flex items-center gap-1.5" :class="passwordRequirements.minLength ? 'text-emerald-700' : 'text-slate-400'">
+                    <CheckCircle2 v-if="passwordRequirements.minLength" :size="12" />
+                    <XCircle v-else :size="12" />
+                    <span>8+ Characters</span>
+                  </div>
+                  <div class="flex items-center gap-1.5" :class="passwordRequirements.hasUpper ? 'text-emerald-700' : 'text-slate-400'">
+                    <CheckCircle2 v-if="passwordRequirements.hasUpper" :size="12" />
+                    <XCircle v-else :size="12" />
+                    <span>Uppercase Letter</span>
+                  </div>
+                  <div class="flex items-center gap-1.5" :class="passwordRequirements.hasNumber ? 'text-emerald-700' : 'text-slate-400'">
+                    <CheckCircle2 v-if="passwordRequirements.hasNumber" :size="12" />
+                    <XCircle v-else :size="12" />
+                    <span>Number (0-9)</span>
+                  </div>
+                  <div class="flex items-center gap-1.5" :class="passwordRequirements.hasSymbol ? 'text-emerald-700' : 'text-slate-400'">
+                    <CheckCircle2 v-if="passwordRequirements.hasSymbol" :size="12" />
+                    <XCircle v-else :size="12" />
+                    <span>Special Symbol (!@#$)</span>
+                  </div>
+                </div>
               </div>
 
-              <p v-if="formErrors.password" class="text-[11px] text-rose-600 mt-1 font-semibold">{{ formErrors.password }}</p>
+              <p v-if="formErrors.password" class="text-[11px] text-rose-600 mt-1 font-semibold flex items-center gap-1">
+                <AlertTriangle :size="12" /> {{ formErrors.password }}
+              </p>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block font-bold text-slate-700 mb-1">System Role</label>
                 <select v-model="form.role" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-slate-50 focus:bg-white font-bold text-slate-800 cursor-pointer">
+                  <option value="" disabled selected>Select Role</option>
                   <option v-for="r in rolesList" :key="r" :value="r">{{ r }}</option>
                 </select>
+                <p v-if="formErrors.role" class="text-[11px] text-rose-600 mt-1 font-semibold">{{ formErrors.role }}</p>
               </div>
 
               <div>
                 <label class="block font-bold text-slate-700 mb-1">Department</label>
                 <select v-model="form.department" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-slate-50 focus:bg-white font-bold text-slate-800 cursor-pointer">
+                  <option value="" disabled selected>Select Department</option>
                   <option v-for="d in departmentList" :key="d" :value="d">{{ d }}</option>
                 </select>
+                <p v-if="formErrors.department" class="text-[11px] text-rose-600 mt-1 font-semibold">{{ formErrors.department }}</p>
               </div>
             </div>
 
@@ -252,7 +288,11 @@
             <button @click="showAddModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl cursor-pointer">
               Cancel
             </button>
-            <button @click="handleCreateUser" :disabled="isSubmitting" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs cursor-pointer disabled:opacity-50">
+            <button 
+              @click="handleCreateUser" 
+              :disabled="isSubmitting || !isPasswordValid" 
+              class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
               {{ isSubmitting ? 'Saving...' : 'Create & Grant Access' }}
             </button>
           </div>
@@ -286,38 +326,77 @@
 
             <div>
               <label class="block font-bold text-slate-700 mb-1">Reset Password (Optional)</label>
-              <input v-model="form.password" type="password" placeholder="Leave blank to keep current password" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold" />
+              <input 
+                v-model="form.password" 
+                type="password" 
+                placeholder="Leave blank to keep current password" 
+                autocomplete="new-password" 
+                @input="validatePasswordInline(true)"
+                class="w-full p-2.5 border rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white text-slate-900 font-semibold transition" 
+                :class="formErrors.password ? 'border-rose-300 bg-rose-50/30' : 'border-slate-200'"
+              />
 
-              <div v-if="form.password" class="mt-2 space-y-1">
+              <!-- INSTANT REAL-TIME PASSWORD AUTHENTICATION CHECKLIST -->
+              <div v-if="form.password" class="mt-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
                 <div class="flex justify-between items-center text-xs font-bold">
-                  <span class="text-slate-500">Strength:</span>
-                  <span :class="passwordStrength.color">{{ passwordStrength.label }}</span>
+                  <span class="text-slate-600">Password Requirements:</span>
+                  <span :class="passwordStrength.color" class="font-extrabold">{{ passwordStrength.label }}</span>
                 </div>
-                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                
+                <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                   <div 
                     class="h-full transition-all duration-300" 
                     :class="passwordStrength.barColor" 
                     :style="{ width: `${passwordStrength.score}%` }"
                   ></div>
                 </div>
+
+                <div class="grid grid-cols-2 gap-1.5 text-[11px] font-semibold pt-1">
+                  <div class="flex items-center gap-1.5" :class="passwordRequirements.minLength ? 'text-emerald-700' : 'text-slate-400'">
+                    <CheckCircle2 v-if="passwordRequirements.minLength" :size="12" />
+                    <XCircle v-else :size="12" />
+                    <span>8+ Characters</span>
+                  </div>
+                  <div class="flex items-center gap-1.5" :class="passwordRequirements.hasUpper ? 'text-emerald-700' : 'text-slate-400'">
+                    <CheckCircle2 v-if="passwordRequirements.hasUpper" :size="12" />
+                    <XCircle v-else :size="12" />
+                    <span>Uppercase Letter</span>
+                  </div>
+                  <div class="flex items-center gap-1.5" :class="passwordRequirements.hasNumber ? 'text-emerald-700' : 'text-slate-400'">
+                    <CheckCircle2 v-if="passwordRequirements.hasNumber" :size="12" />
+                    <XCircle v-else :size="12" />
+                    <span>Number (0-9)</span>
+                  </div>
+                  <div class="flex items-center gap-1.5" :class="passwordRequirements.hasSymbol ? 'text-emerald-700' : 'text-slate-400'">
+                    <CheckCircle2 v-if="passwordRequirements.hasSymbol" :size="12" />
+                    <XCircle v-else :size="12" />
+                    <span>Special Symbol (!@#$)</span>
+                  </div>
+                </div>
               </div>
 
-              <p v-if="formErrors.password" class="text-[11px] text-rose-600 mt-1 font-semibold">{{ formErrors.password }}</p>
+              <p v-if="formErrors.password" class="text-[11px] text-rose-600 mt-1 font-semibold flex items-center gap-1">
+                <AlertTriangle :size="12" /> {{ formErrors.password }}
+              </p>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block font-bold text-slate-700 mb-1">System Role</label>
                 <select v-model="form.role" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-slate-50 focus:bg-white font-bold text-slate-800 cursor-pointer">
+                  <option value="" disabled>Select Role</option>
                   <option v-for="r in rolesList" :key="r" :value="r">{{ r }}</option>
                 </select>
+                <p v-if="formErrors.role" class="text-[11px] text-rose-600 mt-1 font-semibold">{{ formErrors.role }}</p>
               </div>
 
               <div>
                 <label class="block font-bold text-slate-700 mb-1">Department</label>
                 <select v-model="form.department" class="w-full p-2.5 border border-slate-200 rounded-xl outline-none bg-slate-50 focus:bg-white font-bold text-slate-800 cursor-pointer">
+                  <option value="" disabled>Select Department</option>
                   <option v-for="d in departmentList" :key="d" :value="d">{{ d }}</option>
                 </select>
+                <p v-if="formErrors.department" class="text-[11px] text-rose-600 mt-1 font-semibold">{{ formErrors.department }}</p>
               </div>
             </div>
 
@@ -334,7 +413,11 @@
             <button @click="showEditModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl cursor-pointer">
               Cancel
             </button>
-            <button @click="handleUpdateUser" :disabled="isSubmitting" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs cursor-pointer disabled:opacity-50">
+            <button 
+              @click="handleUpdateUser" 
+              :disabled="isSubmitting || (form.password && !isPasswordValid)" 
+              class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
               {{ isSubmitting ? 'Updating...' : 'Save Changes' }}
             </button>
           </div>
@@ -406,8 +489,8 @@ const initialFormState = {
   name: '',
   email: '',
   password: '',
-  role: 'Instructor',
-  department: 'BSMT',
+  role: '',
+  department: '',
   status: 'Active'
 }
 
@@ -417,16 +500,32 @@ const formErrors = ref({})
 const rolesList = ['Admin', 'Assessment Officer', 'Instructor', 'Cadet']
 const departmentList = ['BSMT', 'BSMARE', 'General Education', 'Assessment & Quality', 'ICT']
 
-// Password Strength Evaluator
+// Real-Time Password Policy Evaluator
+const passwordRequirements = computed(() => {
+  const pwd = form.value.password || ''
+  return {
+    minLength: pwd.length >= 8,
+    hasUpper: /[A-Z]/.test(pwd),
+    hasNumber: /[0-9]/.test(pwd),
+    hasSymbol: /[^A-Za-z0-9]/.test(pwd)
+  }
+})
+
+const isPasswordValid = computed(() => {
+  const req = passwordRequirements.value
+  return req.minLength && req.hasUpper && req.hasNumber && req.hasSymbol
+})
+
+// Password Strength Bar Evaluator
 const passwordStrength = computed(() => {
   const pwd = form.value.password || ''
   if (!pwd) return { score: 0, label: '', color: '', barColor: 'bg-slate-200' }
 
   let score = 0
-  if (pwd.length >= 8) score++
-  if (/[A-Z]/.test(pwd)) score++
-  if (/[0-9]/.test(pwd)) score++
-  if (/[^A-Za-z0-9]/.test(pwd)) score++
+  if (passwordRequirements.value.minLength) score++
+  if (passwordRequirements.value.hasUpper) score++
+  if (passwordRequirements.value.hasNumber) score++
+  if (passwordRequirements.value.hasSymbol) score++
 
   switch (score) {
     case 1:
@@ -442,12 +541,32 @@ const passwordStrength = computed(() => {
   }
 })
 
+// Instant Real-Time Inline Password Validation
+function validatePasswordInline(isEdit = false) {
+  const pwd = form.value.password
+  if (!pwd) {
+    formErrors.value.password = isEdit ? '' : 'Initial password is required.'
+    return
+  }
+
+  if (!isPasswordValid.value) {
+    const missing = []
+    if (!passwordRequirements.value.minLength) missing.push('8+ characters')
+    if (!passwordRequirements.value.hasUpper) missing.push('1 uppercase letter')
+    if (!passwordRequirements.value.hasNumber) missing.push('1 number')
+    if (!passwordRequirements.value.hasSymbol) missing.push('1 special symbol')
+
+    formErrors.value.password = `Password needs: ${missing.join(', ')}.`
+  } else {
+    formErrors.value.password = ''
+  }
+}
+
 /**
  * Standard API Fetch helper prioritizing fresh localStorage token and Vue Router navigation
  */
 async function sendApiRequest(path, options = {}) {
   const endpoints = ['/api', 'http://127.0.0.1:8000/api', 'http://localhost:8000/api']
-  // Prioritize fresh cams_token from localStorage over stale Pinia state
   const token = localStorage.getItem('cams_token') || auth.token || localStorage.getItem('token') || ''
 
   const headers = {
@@ -466,7 +585,6 @@ async function sendApiRequest(path, options = {}) {
       if (contentType.includes('application/json')) {
         const data = await res.json()
 
-        // Handle expired Sanctum token using Vue Router to preserve base URL /cams-vue/
         if (res.status === 401) {
           localStorage.removeItem('cams_token')
           localStorage.removeItem('cams_user')
@@ -513,7 +631,6 @@ async function loadUsers() {
     isLoading.value = false
   }
 
-  // Local fallback if backend server is unreachable
   const localSaved = JSON.parse(localStorage.getItem('cams_users_list') || '[]')
   users.value = localSaved.length ? localSaved : [
     { id: 1, name: 'IT Administrator', email: 'it@bma.edu.ph', role: 'Admin', department: 'ICT', status: 'Active' },
@@ -567,10 +684,16 @@ function validateForm(isEdit = false) {
 
   if (!isEdit && !form.value.password) {
     errors.password = 'Initial password is required.'
-  } else if (form.value.password && form.value.password.length < 8) {
-    errors.password = 'Password must be at least 8 characters long.'
-  } else if (form.value.password && passwordStrength.value.score < 50) {
-    errors.password = 'Password is too weak. Combine letters, numbers, and symbols.'
+  } else if (form.value.password && !isPasswordValid.value) {
+    errors.password = 'Password does not meet institutional complexity criteria.'
+  }
+
+  if (!form.value.role) {
+    errors.role = 'System role selection is required.'
+  }
+
+  if (!form.value.department) {
+    errors.department = 'Department selection is required.'
   }
 
   formErrors.value = errors
@@ -623,7 +746,6 @@ async function handleUpdateUser() {
     status: form.value.status
   }
 
-  // Only include password if explicitly modified
   if (form.value.password && form.value.password.trim()) {
     payload.password = form.value.password.trim()
   }
