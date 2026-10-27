@@ -81,7 +81,7 @@
             Course Builder & Syllabus Manager
           </h1>
           <p class="text-sm text-slate-200 font-normal">
-            Define Programs, Course Codes, Titles, Course Outcomes (COs), and Learning Objectives (LOs) mapped directly to MySQL.
+            Define Programs, Course Codes, Titles, Course Outcomes (COs), and Learning Objectives (LOs) with hours allocation.
           </p>
         </div>
       </div>
@@ -356,7 +356,7 @@
         </div>
 
         <div v-if="filteredAndSortedCourses.length === 0" class="p-8 text-center text-slate-500 text-sm">
-          No registered courses found in database. Create a new course above or upload a CSV file.
+          No registered courses found. Create a new course above or upload a CSV file.
         </div>
 
         <div class="divide-y divide-slate-100">
@@ -519,7 +519,7 @@ async function fetchFromEndpoints(path, options = {}) {
   throw new Error('Backend API unreachable')
 }
 
-// Load Courses strictly from MySQL
+// Load Courses strictly from System Service
 async function loadCoursesFromStorage() {
   isLoading.value = true
 
@@ -692,7 +692,7 @@ function cancelEdit() {
   ]
 }
 
-// Save Course Data directly to MySQL
+// Save Course Data directly to System
 async function handleSaveCourse() {
   if (!courseCode.value.trim() || !courseTitle.value.trim()) {
     alert('Please enter both Course Code and Course Title.')
@@ -719,14 +719,14 @@ async function handleSaveCourse() {
     })
 
     if (res && res.ok) {
-      alert('Course syllabus successfully saved to MySQL database!')
+      alert('Course syllabus saved successfully!')
       cancelEdit()
       await loadCoursesFromStorage()
     } else {
-      alert(res?.data?.message || 'Failed to save course in database.')
+      alert(res?.data?.message || 'Failed to save course syllabus. Please try again.')
     }
   } catch (err) {
-    alert('Server unreachable. Could not save course to MySQL.')
+    alert('Unable to connect to the server. Could not save course.')
   } finally {
     isLoading.value = false
   }
@@ -865,8 +865,8 @@ function handleBulkCSVUpload(event) {
     } catch (err) {
       csvParseError.value = err.message
       bulkPreview.value = []
-    } font
-      event.target.value = ''
+    }
+    event.target.value = ''
   }
 
   reader.readAsText(file)
@@ -874,7 +874,7 @@ function handleBulkCSVUpload(event) {
 
 async function submitBulkCourses() {
   if (bulkPreview.value.length === 0) return
-  if (!confirm(`Are you sure you want to import ${bulkPreview.value.length} course(s) into MySQL?`)) return
+  if (!confirm(`Are you sure you want to import ${bulkPreview.value.length} course(s) into the system?`)) return
 
   isUploadingBulk.value = true
   isLoading.value = true
@@ -904,7 +904,7 @@ async function submitBulkCourses() {
   isLoading.value = false
 }
 
-// Delete Course from MySQL
+// Delete Course from System
 async function deleteCourse(id) {
   if (!confirm('Are you sure you want to delete this course structure?')) return
 
@@ -919,7 +919,7 @@ async function deleteCourse(id) {
       alert(res?.data?.message || 'Failed to delete course.')
     }
   } catch (err) {
-    alert('Failed to delete course from MySQL server.')
+    alert('Unable to connect to the server. Could not delete course.')
   } finally {
     isLoading.value = false
   }
