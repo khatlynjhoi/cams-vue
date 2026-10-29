@@ -1,1 +1,0 @@
-import{u as e}from"./index-Bmrn5I6p.js";var t=e(`chevron-down`,[[`path`,{d:`m6 9 6 6 6-6`,key:`qrunsl`}]]),n=(e,t)=>{let n=e.__vccOpts||e;for(let[e,r]of t)n[e]=r;return n};export{t as n,n as t};
