@@ -248,7 +248,7 @@ function normalizeExamItem(q, idx, fallbackCode = '', overrideCorrectAnswer = nu
   const finalCorrectAnswer = overrideCorrectAnswer ?? q.correctAnswer ?? q.correct_answer ?? q.correct_choice ?? q.answer ?? q.correct_option ?? q.correct
 
   return {
-    id: idx + 1, // Unique key for Vue studentAnswers
+    id: idx + 1,
     originalId: q.id,
     code: q.code || `${fallbackCode || 'ITEM'}-Q${idx + 1}`,
     text: q.text || q.question_text || q.question || '',
@@ -266,77 +266,74 @@ function loadActiveScheduleQuestions(passcode) {
   const code = passcode.trim().toUpperCase()
   const bankQuestions = fetchQuestionBankData()
 
-  const storageKeys = ['cams_pilot_sessions', 'cams_pilot_schedules', 'cams_schedules']
-  let pilotSchedules = []
+  let rawQuestions = []
 
-  for (const key of storageKeys) {
+  // 1. Check Saved Test Blueprints FIRST (preserves exact Test Builder sequence)
+  const testKeys = ['cams_saved_tests', 'cams_test_blueprints', 'cams_blueprints']
+  for (const tKey of testKeys) {
     try {
-      const data = localStorage.getItem(key)
-      if (data) {
-        const parsed = JSON.parse(data)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          pilotSchedules = parsed
+      const savedTests = JSON.parse(localStorage.getItem(tKey) || '[]')
+      if (Array.isArray(savedTests) && savedTests.length > 0) {
+        const matchedTest = savedTests.find(t => {
+          const c = String(t.course || t.course_code || t.code || t.title || '').toUpperCase()
+          return c === code || code.includes(c) || c.includes(code)
+        })
+        if (matchedTest && Array.isArray(matchedTest.items) && matchedTest.items.length > 0) {
+          rawQuestions = matchedTest.items
           break
         }
       }
     } catch (_) {}
   }
 
-  let activeSchedule = pilotSchedules.find(s => {
-    const sPass = String(s.access_code || s.passcode || s.code || s.courseCode || s.courseId || '').trim().toUpperCase()
-    const isActive = s.status ? String(s.status).toLowerCase() === 'active' : true
-    return (sPass === code || code.includes(sPass) || sPass.includes(code)) && isActive
-  })
+  // 2. Check Pilot Sessions / Schedules if no direct saved test match
+  if (rawQuestions.length === 0) {
+    const storageKeys = ['cams_pilot_sessions', 'cams_pilot_schedules', 'cams_schedules']
+    let pilotSchedules = []
 
-  if (!activeSchedule) {
-    try {
-      const passcodesMap = JSON.parse(localStorage.getItem('cams_active_passcodes') || '{}')
-      activeSchedule = passcodesMap[code]
-    } catch (_) {}
-  }
-
-  let rawQuestions = []
-
-  if (activeSchedule && Array.isArray(activeSchedule.questions) && activeSchedule.questions.length > 0) {
-    rawQuestions = activeSchedule.questions
-  } else {
-    const targetCourse = String(activeSchedule?.course_code || activeSchedule?.courseCode || activeSchedule?.course || '').toUpperCase()
-
-    const testKeys = ['cams_saved_tests', 'cams_test_blueprints', 'cams_blueprints']
-    for (const tKey of testKeys) {
+    for (const key of storageKeys) {
       try {
-        const savedTests = JSON.parse(localStorage.getItem(tKey) || '[]')
-        if (Array.isArray(savedTests) && savedTests.length > 0) {
-          const matchedTest = savedTests.find(t => {
-            const c = String(t.course || t.course_code || t.code || '').toUpperCase()
-            return targetCourse ? (c === targetCourse) : (code.includes(c) || c.includes(code))
-          })
-          if (matchedTest && Array.isArray(matchedTest.items) && matchedTest.items.length > 0) {
-            rawQuestions = matchedTest.items
+        const data = localStorage.getItem(key)
+        if (data) {
+          const parsed = JSON.parse(data)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            pilotSchedules = parsed
             break
           }
         }
       } catch (_) {}
     }
 
-    if (rawQuestions.length === 0) {
-      rawQuestions = bankQuestions.filter(q => {
-        const courseCode = String(q.courseId || q.course_id || q.courseCode || q.course || q.code || '').toUpperCase()
-        const matchesCourse = targetCourse ? courseCode.includes(targetCourse) : (courseCode.includes(code) || code.includes(courseCode))
-        const isApproved = !q.status || q.status === 'Approved' || q.status === 'Pending'
-        return matchesCourse && isApproved
-      })
+    let activeSchedule = pilotSchedules.find(s => {
+      const sPass = String(s.access_code || s.passcode || s.code || s.courseCode || s.courseId || '').trim().toUpperCase()
+      const isActive = s.status ? String(s.status).toLowerCase() === 'active' : true
+      return (sPass === code || code.includes(sPass) || sPass.includes(code)) && isActive
+    })
+
+    if (!activeSchedule) {
+      try {
+        const passcodesMap = JSON.parse(localStorage.getItem('cams_active_passcodes') || '{}')
+        activeSchedule = passcodesMap[code]
+      } catch (_) {}
+    }
+
+    if (activeSchedule && Array.isArray(activeSchedule.questions) && activeSchedule.questions.length > 0) {
+      rawQuestions = activeSchedule.questions
     }
   }
 
-  const sortedQuestions = [...rawQuestions].sort((a, b) => {
-    const orderA = a.order ?? a.sequence ?? a.item_number ?? Infinity
-    const orderB = b.order ?? b.sequence ?? b.item_number ?? Infinity
-    if (orderA !== Infinity || orderB !== Infinity) return orderA - orderB
-    return 0
-  })
+  // 3. Fallback to Question Bank
+  if (rawQuestions.length === 0) {
+    rawQuestions = bankQuestions.filter(q => {
+      const courseCode = String(q.courseId || q.course_id || q.courseCode || q.course || q.code || '').toUpperCase()
+      const matchesCourse = courseCode.includes(code) || code.includes(courseCode)
+      const isApproved = !q.status || q.status === 'Approved' || q.status === 'Pending'
+      return matchesCourse && isApproved
+    })
+  }
 
-  return sortedQuestions.map((q, idx) => {
+  // Preserve exact array sequence without re-sorting
+  return rawQuestions.map((q, idx) => {
     const cleanQText = String(q.text || q.question_text || q.question || '').trim().toLowerCase()
     const qCode = String(q.code || q.id || '').trim().toUpperCase()
 
@@ -423,25 +420,28 @@ async function startExam() {
     return
   }
 
-  try {
-    const data = await fetchFromEndpoints('/exams/generate', {
-      method: 'POST',
-      body: JSON.stringify({ 
-        courseId: passcode,
-        passcode: passcode,
-        totalItems: totalItemsInput.value,
-        program: selectedProgram.value,
-        classLevel: selectedClassLevel.value
-      })
-    })
+  // Load from blueprint / active schedule first to preserve exact order
+  const localQuestions = loadActiveScheduleQuestions(passcode)
 
-    if (data && data.success && Array.isArray(data.exam) && data.exam.length > 0) {
-      examItems.value = data.exam.map((q, idx) => normalizeExamItem(q, idx, passcode))
-    } else {
-      examItems.value = loadActiveScheduleQuestions(passcode)
-    }
-  } catch (err) {
-    examItems.value = loadActiveScheduleQuestions(passcode)
+  if (localQuestions.length > 0) {
+    examItems.value = localQuestions
+  } else {
+    try {
+      const data = await fetchFromEndpoints('/exams/generate', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          courseId: passcode,
+          passcode: passcode,
+          totalItems: totalItemsInput.value,
+          program: selectedProgram.value,
+          classLevel: selectedClassLevel.value
+        })
+      })
+
+      if (data && data.success && Array.isArray(data.exam) && data.exam.length > 0) {
+        examItems.value = data.exam.map((q, idx) => normalizeExamItem(q, idx, passcode))
+      }
+    } catch (err) {}
   }
 
   if (examItems.value.length > 0) {
@@ -545,9 +545,20 @@ function evaluateQuestionAnswer(item, studentAns) {
     return false
   }
 
-  const rawCorrect = item.correctAnswer ?? item.correct_answer
+  let rawCorrect = item.correctAnswer ?? item.correct_answer
   if (rawCorrect === undefined || rawCorrect === null || String(rawCorrect).trim() === '') {
     return false
+  }
+
+  if (typeof rawCorrect === 'string' && (rawCorrect.trim().startsWith('[') || rawCorrect.trim().startsWith('{'))) {
+    try {
+      rawCorrect = JSON.parse(rawCorrect)
+    } catch (_) {}
+  }
+
+  if (Array.isArray(rawCorrect)) {
+    if (rawCorrect.length === 0) return false
+    rawCorrect = rawCorrect[0]
   }
 
   const normalizeStr = (val) => {
@@ -560,11 +571,12 @@ function evaluateQuestionAnswer(item, studentAns) {
     return str.replace(/^(?:option|choice)?\s*[a-d0-9][\.\)\:\-]\s*/i, '').trim()
   }
 
-  const options = (item.options || []).map(o => normalizeStr(o))
-  const cleanOptions = options.map(o => stripPrefix(o))
+  const rawOptions = item.options || []
+  const optionsNorm = rawOptions.map(o => normalizeStr(o))
+  const cleanOptions = optionsNorm.map(o => stripPrefix(o))
 
   // WRITTEN / SHORT ANSWER
-  if (['short_answer', 'essay', 'open_ended', 'written'].includes(item.type) || options.length === 0) {
+  if (['short_answer', 'essay', 'open_ended', 'written'].includes(item.type) || rawOptions.length === 0) {
     const studentText = stripPrefix(normalizeStr(studentAns))
     const targetText = stripPrefix(normalizeStr(rawCorrect))
 
@@ -583,42 +595,46 @@ function evaluateQuestionAnswer(item, studentAns) {
 
   // MULTIPLE CHOICE / TRUE-FALSE EVALUATION
   const studentIdx = Number(studentAns)
-  if (isNaN(studentIdx) || studentIdx < 0 || studentIdx >= options.length) return false
+  if (isNaN(studentIdx) || studentIdx < 0 || studentIdx >= rawOptions.length) {
+    const studentTextClean = stripPrefix(normalizeStr(studentAns))
+    const targetTextClean = stripPrefix(normalizeStr(rawCorrect))
+    if (studentTextClean && targetTextClean && studentTextClean === targetTextClean) return true
+    return false
+  }
 
-  const studentOptRaw = options[studentIdx] || ''
+  const studentOptRaw = optionsNorm[studentIdx] || ''
   const studentOptClean = cleanOptions[studentIdx] || ''
 
   const rawCorrectStr = typeof rawCorrect === 'object' 
     ? (rawCorrect.text || rawCorrect.choice || rawCorrect.value || rawCorrect.label || '')
     : String(rawCorrect).trim()
 
-  const cleanCorrect = stripPrefix(normalizeStr(rawCorrectStr))
   const normCorrectStr = normalizeStr(rawCorrectStr)
+  const cleanCorrect = stripPrefix(normCorrectStr)
 
-  // 1. Direct text match against option text
-  if (cleanCorrect && studentOptClean && (studentOptClean === cleanCorrect || cleanCorrect.includes(studentOptClean) || studentOptClean.includes(cleanCorrect))) {
+  // 1. Direct 0-indexed integer match (0 = A, 1 = B, 2 = C, 3 = D)
+  if (/^\d+$/.test(rawCorrectStr)) {
+    const targetNum = parseInt(rawCorrectStr, 10)
+    if (studentIdx === targetNum) return true
+  }
+
+  // 2. Letter match (A/a -> 0, B/b -> 1, C/c -> 2, D/d -> 3)
+  const letterMap = { 'a': 0, 'b': 1, 'c': 2, 'd': 3 }
+  if (letterMap[normCorrectStr] !== undefined && studentIdx === letterMap[normCorrectStr]) {
     return true
   }
-  if (normCorrectStr && studentOptRaw && (studentOptRaw === normCorrectStr || normCorrectStr.includes(studentOptRaw) || studentOptRaw.includes(normCorrectStr))) {
-    return true
-  }
-
-  // 2. Letter match (A, B, C, D)
   const letterMatch = rawCorrectStr.match(/^(?:option|choice)?\s*([a-dA-D])(?:\.|\)|\s|$)/i)
   if (letterMatch) {
     const letterIdx = letterMatch[1].toUpperCase().charCodeAt(0) - 65
     if (studentIdx === letterIdx) return true
   }
-  if (/^[a-d]$/i.test(normCorrectStr)) {
-    const letterIdx = normCorrectStr.toUpperCase().charCodeAt(0) - 65
-    if (studentIdx === letterIdx) return true
-  }
 
-  // 3. Numeric Index Match (0-based or 1-based)
-  if (typeof rawCorrect === 'number' || (!isNaN(Number(rawCorrectStr)) && /^\d+$/.test(rawCorrectStr))) {
-    const num = Number(rawCorrectStr)
-    if (studentIdx === num) return true        // 0-indexed
-    if (studentIdx === (num - 1)) return true  // 1-indexed
+  // 3. Option Text match
+  if (cleanCorrect && studentOptClean && (studentOptClean === cleanCorrect || cleanCorrect.includes(studentOptClean) || studentOptClean.includes(cleanCorrect))) {
+    return true
+  }
+  if (normCorrectStr && studentOptRaw && (studentOptRaw === normCorrectStr || normCorrectStr.includes(studentOptRaw) || normCorrectStr.includes(studentOptRaw))) {
+    return true
   }
 
   return false

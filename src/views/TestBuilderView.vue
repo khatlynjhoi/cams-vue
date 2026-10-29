@@ -210,7 +210,7 @@
               <label class="block text-sm font-bold text-slate-700 mb-1">Assessment Term</label>
               <select 
                 v-model="examConfig.term" 
-                @change="updateExamTitle"
+                @change="onTermChange"
                 class="w-full text-sm p-2 border border-slate-200 rounded-xl font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer text-slate-900"
               >
                 <option value="" disabled selected>Select Term</option>
@@ -274,7 +274,23 @@
                 </p>
               </div>
 
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
+                <!-- SORTING DROPDOWN FOR BLUEPRINT ITEMS -->
+                <select 
+                  v-model="blueprintSortBy"
+                  @change="sortBlueprintItems"
+                  :disabled="selectedItems.length === 0"
+                  class="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 outline-none cursor-pointer text-slate-700 disabled:opacity-50"
+                >
+                  <option value="custom">Sort: Manual Order</option>
+                  <option value="code_asc">Sort: Code (A-Z)</option>
+                  <option value="code_desc">Sort: Code (Z-A)</option>
+                  <option value="co">Sort: Course Outcome (CO)</option>
+                  <option value="lo">Sort: Learning Outcome (LO)</option>
+                  <option value="bloom">Sort: Bloom's Taxonomy</option>
+                  <option value="type">Sort: Question Type</option>
+                </select>
+
                 <button 
                   @click="isQuestionModalOpen = true"
                   :disabled="!examConfig.course"
@@ -356,6 +372,26 @@
                 </div>
 
                 <div class="flex items-center gap-3 shrink-0">
+                  <!-- REORDER QUESTION SEQUENCE CONTROLS -->
+                  <div class="flex items-center gap-0.5 bg-slate-100 border border-slate-200 rounded-xl p-0.5">
+                    <button 
+                      @click="moveItemUp(idx)" 
+                      :disabled="idx === 0"
+                      class="p-1 text-slate-500 hover:text-emerald-700 hover:bg-white rounded-lg disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer transition-colors"
+                      title="Move Question Up"
+                    >
+                      <ChevronUp :size="15" />
+                    </button>
+                    <button 
+                      @click="moveItemDown(idx)" 
+                      :disabled="idx === selectedItems.length - 1"
+                      class="p-1 text-slate-500 hover:text-emerald-700 hover:bg-white rounded-lg disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer transition-colors"
+                      title="Move Question Down"
+                    >
+                      <ChevronDown :size="15" />
+                    </button>
+                  </div>
+
                   <div class="text-right">
                     <span class="text-[10px] block text-slate-400 font-bold uppercase">Points</span>
                     <input 
@@ -817,7 +853,6 @@
                   :key="pair.id || pIdx"
                   class="p-2.5 bg-slate-50/80 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-sm"
                 >
-                  <!-- Prompt / Left Item -->
                   <div class="flex items-center gap-2 flex-1 min-w-0">
                     <span class="font-bold text-slate-400 font-mono text-[11px]">#{{ pIdx + 1 }}</span>
                     <img 
@@ -831,7 +866,6 @@
 
                   <ArrowRight :size="14" class="text-emerald-700 shrink-0" />
 
-                  <!-- Correct Match / Right Item -->
                   <div class="flex items-center gap-2 flex-1 justify-end min-w-0">
                     <span class="font-bold text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-300 truncate font-mono text-[11px]">
                       {{ pair.rightText }}
@@ -979,7 +1013,9 @@ import {
   RotateCcw,
   CheckCircle2,
   Image as ImageIcon,
-  ArrowRight
+  ArrowRight,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-vue-next'
 
 // PURGE LEGACY STORAGE KEY TO PREVENT MOCK COURSE DESYNC
@@ -1047,6 +1083,8 @@ const filterLO = ref('')
 const filterType = ref('')
 const sortBy = ref('code_asc')
 const pickerSelectedIds = ref([])
+
+const blueprintSortBy = ref('custom')
 
 const aiBlueprint = ref({
   targetTotalItems: 10,
@@ -1589,6 +1627,45 @@ function importSelectedQuestions() {
 
   pickerSelectedIds.value = []
   isQuestionModalOpen.value = false
+  sortBlueprintItems()
+}
+
+function moveItemUp(index) {
+  if (index <= 0) return
+  const temp = selectedItems.value[index]
+  selectedItems.value[index] = selectedItems.value[index - 1]
+  selectedItems.value[index - 1] = temp
+  blueprintSortBy.value = 'custom'
+}
+
+function moveItemDown(index) {
+  if (index >= selectedItems.value.length - 1) return
+  const temp = selectedItems.value[index]
+  selectedItems.value[index] = selectedItems.value[index + 1]
+  selectedItems.value[index + 1] = temp
+  blueprintSortBy.value = 'custom'
+}
+
+function sortBlueprintItems() {
+  if (blueprintSortBy.value === 'custom' || selectedItems.value.length === 0) return
+
+  const items = [...selectedItems.value]
+
+  if (blueprintSortBy.value === 'code_asc') {
+    items.sort((a, b) => (a.code || '').localeCompare(b.code || '', undefined, { numeric: true }))
+  } else if (blueprintSortBy.value === 'code_desc') {
+    items.sort((a, b) => (b.code || '').localeCompare(a.code || '', undefined, { numeric: true }))
+  } else if (blueprintSortBy.value === 'co') {
+    items.sort((a, b) => (a.co || '').localeCompare(b.co || '', undefined, { numeric: true }))
+  } else if (blueprintSortBy.value === 'lo') {
+    items.sort((a, b) => (a.lo || '').localeCompare(b.lo || '', undefined, { numeric: true }))
+  } else if (blueprintSortBy.value === 'bloom') {
+    items.sort((a, b) => (a.bloomLevel || '').localeCompare(b.bloomLevel || ''))
+  } else if (blueprintSortBy.value === 'type') {
+    items.sort((a, b) => (a.type || '').localeCompare(b.type || ''))
+  }
+
+  selectedItems.value = items
 }
 
 function resetFilters() {
@@ -1620,20 +1697,36 @@ async function loadQuestionsForCourse(courseCode) {
   let rawQuestions = []
 
   try {
-    const programParam = examConfig.value.program ? `&program=${encodeURIComponent(examConfig.value.program)}` : ''
-    const data = await fetchFromEndpoints(`/questions?course=${encodeURIComponent(courseCode)}&status=Approved${programParam}`)
+    const data = await fetchFromEndpoints(`/questions?course=${encodeURIComponent(courseCode)}&status=Approved`)
     rawQuestions = Array.isArray(data) ? data : (data?.data || [])
   } catch (err) {
     const savedBank = safeParseStorage('cams_question_bank_data') || safeParseStorage('cams_questions_data')
     if (savedBank) {
       const parsed = Array.isArray(savedBank) ? savedBank : (savedBank.data || [])
       rawQuestions = parsed.filter(q => {
-        const c = (q.courseCode || q.course || q.course_code || '').toUpperCase()
+        const c = (q.courseCode || q.course || q.course_code || q.course_id || '').toString().toUpperCase()
         return c === courseCode.toUpperCase() || courseCode.toUpperCase().includes(c)
       })
     }
   } finally {
-    const approvedQuestions = rawQuestions.filter(q => isQuestionApproved(q))
+    const targetProg = (examConfig.value.program || '').toUpperCase()
+    const targetTerm = (examConfig.value.term || '').toLowerCase().replace('exam', '').trim()
+
+    const approvedQuestions = rawQuestions.filter(q => {
+      if (!isQuestionApproved(q)) return false
+
+      const qCourse = (q.course?.code || q.courseCode || q.course_code || q.course_id || '').toString().toUpperCase()
+      const matchesCourse = !courseCode || qCourse === courseCode.toUpperCase() || courseCode.toUpperCase().includes(qCourse) || qCourse.includes(courseCode.toUpperCase())
+
+      const qProg = (q.program || '').toUpperCase()
+      const matchesProgram = !targetProg || !qProg || qProg === 'BOTH' || qProg === 'ALL' || qProg.includes(targetProg) || targetProg.includes(qProg)
+
+      const qTerm = (q.term || '').toLowerCase().replace('exam', '').trim()
+      const matchesTerm = !targetTerm || !qTerm || qTerm === targetTerm || qTerm.includes(targetTerm) || targetTerm.includes(qTerm)
+
+      return matchesCourse && matchesProgram && matchesTerm
+    })
+
     availableQuestionBank.value = approvedQuestions.map(q => normalizeQuestion(q))
     isLoadingQuestions.value = false
   }
@@ -1647,6 +1740,13 @@ function onProgramChange() {
 function onCourseChange() {
   updateExamTitle()
   loadQuestionsForCourse(examConfig.value.course)
+}
+
+function onTermChange() {
+  updateExamTitle()
+  if (examConfig.value.course) {
+    loadQuestionsForCourse(examConfig.value.course)
+  }
 }
 
 async function loadCourses() {
@@ -1727,6 +1827,7 @@ function autoAssembleTest() {
     selectedItems.value.push(...selected)
     isAutoBuilding.value = false
     isAiModalOpen.value = false
+    sortBlueprintItems()
   }, 800)
 }
 
